@@ -15,13 +15,13 @@ def ingest_documents(docs_dir: str | Path | None = None) -> tuple[int, int]:
     if docs_dir is None:
         docs_dir = DOCUMENTS_DIR
 
-    txt_files = list(Path(docs_dir).glob("*.txt"))
-    if not txt_files:
-        print(f"在 {docs_dir}/ 下没找到 .txt 文件，跳过")
+    files = list(Path(docs_dir).glob("*.txt")) + list(Path(docs_dir).glob("*.md"))
+    if not files:
+        print(f"在 {docs_dir}/ 下没找到 .txt 或 .md 文件，跳过")
         return 0, 0
 
     all_docs: list[Document] = []
-    for f in txt_files:
+    for f in files:
         loader = TextLoader(str(f), encoding="utf-8")
         all_docs.extend(loader.load())
 
