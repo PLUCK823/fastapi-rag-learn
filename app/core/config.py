@@ -14,8 +14,8 @@ ROOT_DIR = Path(__file__).parent.parent.parent
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 
-# Embedding
-EMBEDDING_MODEL = "text-embedding-3-small"
+# Embedding（本地模型，无需 API key）
+EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
 
 # 向量库
 CHROMA_DIR = ROOT_DIR / "chroma_db"

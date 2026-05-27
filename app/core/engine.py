@@ -2,7 +2,8 @@
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph
 from typing_extensions import TypedDict
 
@@ -34,7 +35,7 @@ def _init() -> None:
     if _initialized:
         return
 
-    _embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    _embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
     _llm = ChatOpenAI(model=LLM_MODEL, temperature=0.3, base_url=OPENAI_BASE_URL)
     _vectorstore = Chroma(
         embedding_function=_embeddings,
