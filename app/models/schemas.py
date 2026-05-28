@@ -24,19 +24,6 @@ class AskResponse(BaseModel):
     sources: list[SourceInfo]
 
 
-# ── Ingest (deprecated, use KB docs instead) ──
-
-class IngestResponse(BaseModel):
-    message: str
-    file_count: int
-    chunk_count: int
-
-
-class IngestTextRequest(BaseModel):
-    content: str
-    filename: str = "untitled.txt"
-
-
 # ── Knowledge Base ──
 
 class KBCreateRequest(BaseModel):

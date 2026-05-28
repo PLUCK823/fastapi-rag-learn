@@ -1,5 +1,7 @@
 """RAG 引擎 — LangGraph 编排检索 + 生成，按知识库隔离向量库"""
 
+from collections.abc import Iterator
+
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -125,3 +127,51 @@ def ask(question: str, kb_id: int) -> tuple[str, list[SourceInfo]]:
     result = graph.invoke({"question": question})  # type: ignore[call-overload]
     sources = extract_sources(result["context"])
     return result["answer"], sources
+
+
+# ── 文档内容 ──
+
+def get_document_content(kb_id: int, document_id: int) -> str:
+    vs = _get_kb_vectorstore(kb_id)
+    raw = vs._collection.get(where={"document_id": document_id})
+    if not raw["documents"]:
+        return ""
+    metadatas: list = raw["metadatas"] or []
+    pairs = sorted(
+        zip(metadatas, raw["documents"]),
+        key=lambda x: int(x[0].get("chunk_index", 0)) if x[0] else 0,
+    )
+    return "\n\n".join(p[1] for p in pairs)
+
+
+# ── 流式问答 ──
+
+def ask_stream(question: str, kb_id: int) -> Iterator[str]:
+    _init_shared()
+    assert _llm is not None
+
+    vectorstore = _get_kb_vectorstore(kb_id)
+    retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
+
+    docs: list[Document] = retriever.invoke(question)
+
+    docs_text_parts: list[str] = []
+    for i, d in enumerate(docs, start=1):
+        name = d.metadata.get("document_name", "unknown")
+        docs_text_parts.append(f"[{i}] ({name})\n{d.page_content}")
+    docs_text = "\n\n".join(docs_text_parts)
+
+    prompt = f"""根据以下参考资料回答问题。如果资料里没有答案，就说不知道。
+
+引用参考资料时在句末标注来源编号，如[1]、[2]。
+
+参考资料:
+{docs_text}
+
+问题: {question}
+
+答案:"""
+    for chunk in _llm.stream(prompt):
+        c = chunk.content
+        if isinstance(c, str):
+            yield c

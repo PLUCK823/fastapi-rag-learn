@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import current_user
 from app.core.database import get_sync_session
+from app.core.engine import get_document_content
 from app.models.schemas import (
     DocCreateRequest,
     DocInfo,
@@ -122,3 +123,14 @@ def delete_document(
 ):
     kb_service.delete_document(session, kb_id, doc_id, user.id)
     return {"message": "文档已删除"}
+
+
+@router.get("/{kb_id}/docs/{doc_id}/content")
+def get_doc_content(
+    kb_id: int,
+    doc_id: int,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    kb_service.get_document(session, kb_id, doc_id, user.id)  # 校验所有权
+    return {"content": get_document_content(kb_id, doc_id)}
