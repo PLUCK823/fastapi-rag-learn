@@ -129,6 +129,15 @@ def add_document(
 ) -> Document:
     _get_kb(session, kb_id, user_id)  # 校验所有权
 
+    existing = session.execute(
+        select(Document).where(
+            Document.kb_id == kb_id,
+            Document.filename == filename,
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="知识库中已存在同名文档")
+
     doc = Document(kb_id=kb_id, filename=filename)
     session.add(doc)
     session.flush()

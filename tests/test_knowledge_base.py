@@ -83,6 +83,21 @@ async def test_add_and_list_docs(client: AsyncClient, auth_headers: dict, kb_id:
 
 
 @pytest.mark.asyncio
+async def test_duplicate_doc_name_fails(client: AsyncClient, auth_headers: dict, kb_id: int):
+    await client.post(
+        f"/kb/{kb_id}/docs",
+        json={"content": "Hello", "filename": "readme.txt"},
+        headers=auth_headers,
+    )
+    resp = await client.post(
+        f"/kb/{kb_id}/docs",
+        json={"content": "World", "filename": "readme.txt"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_update_document(client: AsyncClient, auth_headers: dict, kb_id: int):
     resp = await client.post(
         f"/kb/{kb_id}/docs",
