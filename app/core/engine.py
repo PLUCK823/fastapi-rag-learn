@@ -1,4 +1,4 @@
-"""RAG 引擎 — LangGraph 编排检索 + 生成，按用户隔离向量库"""
+"""RAG 引擎 — LangGraph 编排检索 + 生成，按知识库隔离向量库"""
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -14,6 +14,7 @@ from app.core.config import (
     OPENAI_BASE_URL,
     RETRIEVAL_K,
 )
+from app.models.schemas import SourceInfo
 
 _initialized = False
 _embeddings: HuggingFaceEmbeddings | None = None
@@ -21,7 +22,6 @@ _llm: ChatOpenAI | None = None
 
 
 def _init_shared() -> None:
-    """初始化共享的 embedding 模型和 LLM（只加载一次）"""
     global _initialized, _embeddings, _llm
     if _initialized:
         return
@@ -30,10 +30,10 @@ def _init_shared() -> None:
     _initialized = True
 
 
-def _get_user_vectorstore(user_id: int) -> Chroma:
+def _get_kb_vectorstore(kb_id: int) -> Chroma:
     _init_shared()
     assert _embeddings is not None
-    collection_name = f"user_{user_id}"
+    collection_name = f"kb_{kb_id}"
     return Chroma(
         embedding_function=_embeddings,
         persist_directory=str(CHROMA_DIR),
@@ -41,15 +41,47 @@ def _get_user_vectorstore(user_id: int) -> Chroma:
     )
 
 
-def get_vectorstore(user_id: int) -> Chroma:
-    return _get_user_vectorstore(user_id)
+def get_vectorstore(kb_id: int) -> Chroma:
+    return _get_kb_vectorstore(kb_id)
 
 
-def ask(question: str, user_id: int) -> str:
+def delete_collection(kb_id: int) -> None:
+    vs = _get_kb_vectorstore(kb_id)
+    try:
+        vs.delete_collection()
+    except Exception:
+        pass  # collection may not exist yet
+
+
+def delete_document_chunks(kb_id: int, document_id: int) -> None:
+    vs = _get_kb_vectorstore(kb_id)
+    try:
+        vs.delete(where={"document_id": document_id})
+    except Exception:
+        pass
+
+
+def extract_sources(docs: list[Document]) -> list[SourceInfo]:
+    seen: set[int] = set()
+    sources: list[SourceInfo] = []
+    for idx, d in enumerate(docs, start=1):
+        doc_id = d.metadata.get("document_id")
+        if doc_id and doc_id not in seen:
+            seen.add(doc_id)
+            sources.append(SourceInfo(
+                index=idx,
+                document_id=int(doc_id),
+                document_name=str(d.metadata.get("document_name", "")),
+                snippet=d.page_content[:200],
+            ))
+    return sources
+
+
+def ask(question: str, kb_id: int) -> tuple[str, list[SourceInfo]]:
     _init_shared()
     assert _llm is not None
 
-    vectorstore = _get_user_vectorstore(user_id)
+    vectorstore = _get_kb_vectorstore(kb_id)
     retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
 
     class RAGState(TypedDict):
@@ -62,8 +94,15 @@ def ask(question: str, user_id: int) -> str:
         return {"context": docs}
 
     def generate(state: RAGState) -> dict:
-        docs_text = "\n\n".join(d.page_content for d in state["context"])
+        docs_text_parts: list[str] = []
+        for i, d in enumerate(state["context"], start=1):
+            name = d.metadata.get("document_name", "unknown")
+            docs_text_parts.append(f"[{i}] ({name})\n{d.page_content}")
+        docs_text = "\n\n".join(docs_text_parts)
+
         prompt = f"""根据以下参考资料回答问题。如果资料里没有答案，就说不知道。
+
+引用参考资料时在句末标注来源编号，如[1]、[2]。
 
 参考资料:
 {docs_text}
@@ -84,4 +123,5 @@ def ask(question: str, user_id: int) -> str:
         .compile()
     )
     result = graph.invoke({"question": question})  # type: ignore[call-overload]
-    return result["answer"]
+    sources = extract_sources(result["context"])
+    return result["answer"], sources

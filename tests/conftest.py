@@ -17,12 +17,11 @@ os.environ["SECRET_KEY"] = "test-secret-key-for-jwt-signing-must-be-at-least-32-
 
 @pytest.fixture
 async def client() -> AsyncClient:
-    from app.core.database import Base, engine
+    from app.core.database import Base, sync_engine
     from app.main import app
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+    Base.metadata.drop_all(sync_engine)
+    Base.metadata.create_all(sync_engine)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -32,7 +31,6 @@ async def client() -> AsyncClient:
 
 @pytest.fixture
 async def auth_headers(client: AsyncClient) -> dict:
-    """注册用户并登录，返回带 token 的 headers"""
     email = "test@example.com"
     password = "testpass123"
 
@@ -46,3 +44,11 @@ async def auth_headers(client: AsyncClient) -> dict:
     assert resp.status_code == 200, f"Login failed: {resp.text}"
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def kb_id(client: AsyncClient, auth_headers: dict) -> int:
+    """创建一个测试知识库并返回其 id"""
+    resp = await client.post("/kb", json={"name": "测试知识库"}, headers=auth_headers)
+    assert resp.status_code == 200
+    return resp.json()["id"]
