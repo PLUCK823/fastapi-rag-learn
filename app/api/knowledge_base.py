@@ -11,6 +11,7 @@ from app.models.schemas import (
     DocUpdateRequest,
     KBCreateRequest,
     KBDeleteResponse,
+    KBDetail,
     KBInfo,
     KBRenameRequest,
 )
@@ -37,11 +38,14 @@ def create_kb(
     )
 
 
-@router.get("", response_model=list[KBInfo])
+@router.get("", response_model=list[KBInfo] | list[KBDetail])
 def list_kbs(
+    include_docs: bool = False,
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
+    if include_docs:
+        return kb_service.list_kbs_with_docs(session, user.id)
     return kb_service.list_kbs(session, user.id)
 
 

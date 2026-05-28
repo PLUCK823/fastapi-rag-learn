@@ -80,3 +80,7 @@ class DocInfo(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class KBDetail(KBInfo):
+    documents: list[DocInfo]

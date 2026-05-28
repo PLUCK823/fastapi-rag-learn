@@ -56,6 +56,32 @@ def list_kbs(session: Session, user_id: int) -> list[dict]:
     ]
 
 
+def list_kbs_with_docs(session: Session, user_id: int) -> list[dict]:
+    result = session.execute(
+        select(KnowledgeBase).where(KnowledgeBase.user_id == user_id)
+    )
+    kbs = result.scalars().all()
+    return [
+        {
+            "id": kb.id,
+            "name": kb.name,
+            "document_count": len(kb.documents),
+            "created_at": kb.created_at,
+            "documents": [
+                {
+                    "id": d.id,
+                    "filename": d.filename,
+                    "chunk_count": d.chunk_count,
+                    "created_at": d.created_at,
+                    "updated_at": d.updated_at,
+                }
+                for d in kb.documents
+            ],
+        }
+        for kb in kbs
+    ]
+
+
 def _get_kb(session: Session, kb_id: int, user_id: int) -> KnowledgeBase:
     result = session.execute(
         select(KnowledgeBase).where(KnowledgeBase.id == kb_id)
