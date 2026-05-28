@@ -22,21 +22,28 @@ test("full user flow", async ({ page }) => {
   await page.getByText("E2E 测试库").click();
   await expect(page).toHaveURL(/\/chat\/\d+/);
 
-  // 4. Add document via ByteMD editor
+  // 4. Open "新增" modal
+  await page.getByRole("button", { name: "+ 新增" }).click();
+  await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
+
+  // 5. Fill filename and Markdown content
+  await page.getByPlaceholder("例如: readme.md").fill("hello.md");
+  // Click the ByteMD editor and type
   const editor = page.locator(".bytemd-editor .CodeMirror");
   await editor.click();
-  await page.keyboard.type("Python 是一门编程语言，广泛用于 Web 开发。");
-  await page.getByPlaceholder("文件名").fill("hello.txt");
-  await page.getByRole("button", { name: "新增" }).click();
-  await expect(page.getByText("hello.txt")).toBeVisible({ timeout: 5000 });
+  await page.keyboard.type("# Hello World\n\nPython 是一门编程语言，广泛用于 Web 开发。");
+  await page.getByRole("button", { name: "创建文档" }).click();
 
-  // 5. Chat
+  // Modal should close and doc should appear
+  await expect(page.getByText("hello.md")).toBeVisible({ timeout: 5000 });
+
+  // 6. Chat
   await page.getByPlaceholder("输入问题，按 Enter 发送...").fill("Python 适合做什么？");
   await page.getByRole("button", { name: "发送" }).click();
   await expect(page.getByText("Python 适合做什么？")).toBeVisible({ timeout: 5000 });
   await expect(page.getByText("Python")).toBeVisible({ timeout: 20000 });
 
-  // 6. Verify nickname
+  // 7. Verify nickname
   await expect(page.getByText(EMAIL)).toBeVisible();
 
   console.log("ALL E2E TESTS PASSED");

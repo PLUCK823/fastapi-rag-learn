@@ -25,11 +25,15 @@ export default function ChatPage() {
   const [kb, setKb] = useState<KBDetail | null>(null);
   const [docs, setDocs] = useState<Document[]>([]);
   const [input, setInput] = useState("");
-  const [docContent, setDocContent] = useState("");
-  const [docName, setDocName] = useState("");
-  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   const { messages, isStreaming, send, clear } = useChatWS(kbIdNum);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editDoc, setEditDoc] = useState<Document | null>(null);
+  const [mdContent, setMdContent] = useState("");
+  const [filename, setFilename] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -48,96 +52,83 @@ export default function ChatPage() {
     refreshDocs();
   }, [kbId]);
 
-  const handleView = async (doc: Document) => {
-    setViewingDoc(doc);
-    setDocName(doc.filename);
-    const { content } = await getDocContent(kbIdNum, doc.id);
-    setDocContent(content);
+  const openNew = () => {
+    setEditDoc(null);
+    setMdContent("");
+    setFilename("");
+    setModalOpen(true);
   };
 
-  const resetForm = () => {
-    setViewingDoc(null);
-    setDocName("");
-    setDocContent("");
+  const openEdit = async (doc: Document) => {
+    setEditDoc(doc);
+    setFilename(doc.filename);
+    const { content } = await getDocContent(kbIdNum, doc.id);
+    setMdContent(content);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+  };
+
+  const handleSave = async () => {
+    if (!filename.trim() || !mdContent.trim()) return;
+    setSaving(true);
+    try {
+      if (editDoc) {
+        await updateDocument(kbIdNum, editDoc.id, mdContent);
+      } else {
+        await addDocument(kbIdNum, mdContent, filename.trim());
+      }
+      closeModal();
+      refreshDocs();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="flex gap-6 max-w-6xl mx-auto h-[calc(100vh-120px)]">
       {/* 文档侧栏 */}
-      <div className="w-64 shrink-0 bg-white border rounded-lg p-4 overflow-y-auto">
-        <h2 className="font-bold text-sm mb-3">{kb?.name ?? "..."} · 文档</h2>
-        <div className="mb-2 border rounded overflow-hidden" style={{ height: 160 }}>
-          <Editor value={docContent} plugins={plugins} onChange={(v) => setDocContent(v)} />
+      <div className="w-56 shrink-0 bg-white border rounded-lg p-4 overflow-y-auto">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-sm">{kb?.name ?? "..."}</h2>
+          <button
+            type="button"
+            className="bg-purple-600 text-white rounded px-2 py-0.5 text-xs hover:bg-purple-700"
+            onClick={openNew}
+          >
+            + 新增
+          </button>
         </div>
-        <div className="flex gap-1 mb-2">
-          <input
-            value={docName}
-            onChange={(e) => setDocName(e.target.value)}
-            placeholder="文件名"
-            className="border rounded px-2 py-1 text-xs flex-1"
-          />
-          {viewingDoc ? (
-            <>
+        {docs.length === 0 ? (
+          <p className="text-gray-300 text-xs">暂无文档</p>
+        ) : (
+          docs.map((d) => (
+            <div
+              key={d.id}
+              className="flex items-center justify-between py-1.5 text-xs border-b border-gray-50 last:border-0"
+            >
               <button
                 type="button"
-                className="bg-green-600 text-white rounded px-2 py-1 text-xs"
+                className="text-purple-700 hover:underline text-left truncate flex-1 mr-2"
+                onClick={() => openEdit(d)}
+              >
+                {d.filename}
+              </button>
+              <button
+                type="button"
+                className="text-red-400 hover:text-red-600 shrink-0"
                 onClick={async () => {
-                  await updateDocument(kbIdNum, viewingDoc.id, docContent);
-                  resetForm();
+                  await deleteDocument(kbIdNum, d.id);
                   refreshDocs();
                 }}
               >
-                保存
+                删
               </button>
-              <button
-                type="button"
-                className="text-xs text-gray-400 hover:text-gray-600 px-1"
-                onClick={resetForm}
-              >
-                取消
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="bg-purple-600 text-white rounded px-2 py-1 text-xs"
-              onClick={async () => {
-                if (!docName.trim() || !docContent.trim()) return;
-                try {
-                  await addDocument(kbIdNum, docContent, docName.trim());
-                  resetForm();
-                  refreshDocs();
-                } catch (e) {
-                  console.error("addDocument failed:", e);
-                }
-              }}
-            >
-              新增
-            </button>
-          )}
-        </div>
-        {docs.map((d) => (
-          <div key={d.id} className="flex items-center justify-between py-1 text-xs">
-            <button
-              type="button"
-              className="text-purple-700 hover:underline text-left truncate max-w-[140px]"
-              onClick={() => handleView(d)}
-            >
-              {d.filename}
-            </button>
-            <button
-              type="button"
-              className="text-red-400 hover:text-red-600"
-              onClick={async () => {
-                await deleteDocument(kbIdNum, d.id);
-                if (viewingDoc?.id === d.id) resetForm();
-                refreshDocs();
-              }}
-            >
-              删
-            </button>
-          </div>
-        ))}
+            </div>
+          ))
+        )}
       </div>
 
       {/* 聊天区 */}
@@ -190,6 +181,61 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+
+      {/* Markdown 编辑弹窗 */}
+      {modalOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-8"
+          onClick={closeModal}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h3 className="font-bold text-lg">
+                {editDoc ? `编辑: ${editDoc.filename}` : "新建文档"}
+              </h3>
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                onClick={closeModal}
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 py-3 border-b bg-gray-50">
+              <label className="text-xs text-gray-500 mr-2">文件名</label>
+              <input
+                value={filename}
+                onChange={(e) => setFilename(e.target.value)}
+                placeholder="例如: readme.md"
+                className="border rounded px-3 py-1.5 text-sm w-80"
+              />
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <Editor value={mdContent} plugins={plugins} onChange={(v) => setMdContent(v)} />
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border rounded"
+                onClick={closeModal}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="px-6 py-2 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                disabled={!filename.trim() || !mdContent.trim() || saving}
+                onClick={handleSave}
+              >
+                {saving ? "保存中..." : editDoc ? "保存修改" : "创建文档"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
