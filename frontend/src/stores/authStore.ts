@@ -1,5 +1,29 @@
 import { create } from "zustand";
 
+const storage = {
+  get: (k: string): string | null => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set: (k: string, v: string) => {
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      /* noop */
+    }
+  },
+  remove: (k: string) => {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      /* noop */
+    }
+  },
+};
+
 interface AuthState {
   token: string | null;
   setToken: (t: string) => void;
@@ -8,13 +32,13 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  token: localStorage.getItem("token"),
+  token: storage.get("token"),
   setToken: (t) => {
-    localStorage.setItem("token", t);
+    storage.set("token", t);
     set({ token: t });
   },
   logout: () => {
-    localStorage.removeItem("token");
+    storage.remove("token");
     set({ token: null });
   },
   isAuthenticated: () => !!get().token,

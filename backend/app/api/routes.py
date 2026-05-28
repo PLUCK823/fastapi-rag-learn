@@ -25,7 +25,7 @@ def ask_endpoint(req: AskRequest, user: User = Depends(current_user)):
 async def ws_ask(websocket: WebSocket, kb_id: int, token: str = Query(...)):
     await websocket.accept()
     try:
-        jwt_decode(token, SECRET_KEY, algorithms=["HS256"])
+        jwt_decode(token, SECRET_KEY, algorithms=["HS256"], audience="fastapi-users:auth")
     except PyJWTError:
         await websocket.send_text(json.dumps({"error": "invalid token"}))
         await websocket.close()
