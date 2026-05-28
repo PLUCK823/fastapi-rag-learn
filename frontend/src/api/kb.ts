@@ -1,0 +1,43 @@
+import type { KBDetail, KnowledgeBase } from "../types";
+import api from "./client";
+
+export async function listKBs(includeDocs = false) {
+  const res = await api.get<KnowledgeBase[] | KBDetail[]>("/kb", {
+    params: { include_docs: includeDocs },
+  });
+  return res.data;
+}
+
+export async function createKB(name: string) {
+  const res = await api.post<KnowledgeBase>("/kb", { name });
+  return res.data;
+}
+
+export async function renameKB(id: number, name: string) {
+  const res = await api.put<KnowledgeBase>(`/kb/${id}`, { name });
+  return res.data;
+}
+
+export async function deleteKB(id: number) {
+  const res = await api.delete(`/kb/${id}`);
+  return res.data;
+}
+
+export async function addDocument(kbId: number, content: string, filename: string) {
+  const res = await api.post(`/kb/${kbId}/docs`, { content, filename });
+  return res.data;
+}
+
+export async function updateDocument(kbId: number, docId: number, content: string) {
+  const res = await api.put(`/kb/${kbId}/docs/${docId}`, { content });
+  return res.data;
+}
+
+export async function deleteDocument(kbId: number, docId: number) {
+  return api.delete(`/kb/${kbId}/docs/${docId}`);
+}
+
+export async function getDocContent(kbId: number, docId: number) {
+  const res = await api.get<{ content: string }>(`/kb/${kbId}/docs/${docId}/content`);
+  return res.data;
+}
