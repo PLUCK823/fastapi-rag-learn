@@ -19,3 +19,4 @@ chroma_db/
 .DS_Store
 test.db
 app.db
+test_gr.db
