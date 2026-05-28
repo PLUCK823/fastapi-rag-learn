@@ -28,7 +28,12 @@ def _init_shared() -> None:
     if _initialized:
         return
     _embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-    _llm = ChatOpenAI(model=LLM_MODEL, temperature=0.3, base_url=OPENAI_BASE_URL)
+    _llm = ChatOpenAI(
+        model=LLM_MODEL,
+        temperature=0.7,
+        base_url=OPENAI_BASE_URL,
+        frequency_penalty=0.5,
+    )
     _initialized = True
 
 
