@@ -1,4 +1,4 @@
-import type { KBDetail, KnowledgeBase } from "../types";
+import type { KBDetail, KnowledgeBase, Message } from "../types";
 import api from "./client";
 
 export async function listKBs(includeDocs = false) {
@@ -40,4 +40,13 @@ export async function deleteDocument(kbId: number, docId: number) {
 export async function getDocContent(kbId: number, docId: number) {
   const res = await api.get<{ content: string }>(`/kb/${kbId}/docs/${docId}/content`);
   return res.data;
+}
+
+export async function listMessages(kbId: number) {
+  const res = await api.get<Message[]>(`/kb/${kbId}/messages`);
+  return res.data;
+}
+
+export async function clearMessages(kbId: number) {
+  return api.delete(`/kb/${kbId}/messages`);
 }

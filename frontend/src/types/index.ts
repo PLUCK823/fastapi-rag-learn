@@ -26,11 +26,6 @@ export interface SourceInfo {
   snippet: string;
 }
 
-export interface AskRequest {
-  kb_id: number;
-  text: string;
-}
-
 export interface AskResponse {
   question: string;
   answer: string;
@@ -39,4 +34,19 @@ export interface AskResponse {
 
 export interface KBDetail extends KnowledgeBase {
   documents: Document[];
+}
+
+export interface Message {
+  id: number | string;
+  role: "user" | "assistant";
+  content: string;
+  sources?: SourceInfo[];
+  created_at?: string;
+  isStreaming?: boolean;
+}
+
+export interface Profile {
+  id: number;
+  email: string;
+  nickname: string | null;
 }

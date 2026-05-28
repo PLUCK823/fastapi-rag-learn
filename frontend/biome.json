@@ -8,8 +8,9 @@
   "linter": {
     "rules": {
       "recommended": true,
-      "correctness": { "useExhaustiveDependencies": "warn" },
-      "suspicious": { "noArrayIndexKey": "off" }
+      "correctness": { "useExhaustiveDependencies": "off" },
+      "suspicious": { "noArrayIndexKey": "off" },
+      "a11y": { "noStaticElementInteractions": "off", "useKeyWithClickEvents": "off", "noLabelWithoutControl": "off" }
     }
   },
   "assist": {

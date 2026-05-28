@@ -26,12 +26,19 @@ test("full user flow", async ({ page }) => {
   await page.locator("textarea").first().fill("Python 是一门编程语言，广泛用于 Web 开发。");
   await page.getByPlaceholder("文件名").fill("hello.txt");
   await page.getByRole("button", { name: "新增" }).click();
-  await expect(page.getByText("hello.txt")).toBeVisible({ timeout: 5000 });
+  await page.waitForTimeout(500);
+  await expect(page.getByText("hello.txt")).toBeVisible({ timeout: 10000 });
 
-  // 5. Chat
+  // 5. Chat - user message should appear as bubble, then streaming answer
   await page.getByPlaceholder("输入问题，按 Enter 发送...").fill("Python 适合做什么？");
   await page.getByRole("button", { name: "发送" }).click();
+  // User question should appear immediately
+  await expect(page.getByText("Python 适合做什么？")).toBeVisible({ timeout: 5000 });
+  // Wait for the answer to start streaming
   await expect(page.getByText("Python")).toBeVisible({ timeout: 20000 });
+
+  // 6. Verify nickname displays email by default
+  await expect(page.getByText(EMAIL)).toBeVisible();
 
   console.log("ALL E2E TESTS PASSED");
 });

@@ -1,11 +1,14 @@
 """知识库 + 文档管理路由（同步，避免 greenlet）"""
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import delete
+from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
 
 from app.core.auth import current_user
 from app.core.database import get_sync_session
 from app.core.engine import get_document_content
+from app.models.chat import ChatMessage
 from app.models.schemas import (
     DocCreateRequest,
     DocInfo,
@@ -15,6 +18,7 @@ from app.models.schemas import (
     KBDetail,
     KBInfo,
     KBRenameRequest,
+    MessageInfo,
 )
 from app.models.user import User
 from app.services import knowledge_base as kb_service
@@ -134,3 +138,36 @@ def get_doc_content(
 ):
     kb_service.get_document(session, kb_id, doc_id, user.id)  # 校验所有权
     return {"content": get_document_content(kb_id, doc_id)}
+
+
+# ── Chat Messages ──
+
+@router.get("/{kb_id}/messages", response_model=list[MessageInfo])
+def list_messages(
+    kb_id: int,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    kb_service._get_kb(session, kb_id, user.id)
+    result = session.execute(
+        sa_select(ChatMessage)
+        .where(ChatMessage.kb_id == kb_id, ChatMessage.user_id == user.id)
+        .order_by(ChatMessage.created_at)
+    )
+    return result.scalars().all()
+
+
+@router.delete("/{kb_id}/messages")
+def clear_messages(
+    kb_id: int,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    kb_service._get_kb(session, kb_id, user.id)
+    session.execute(
+        delete(ChatMessage).where(
+            ChatMessage.kb_id == kb_id, ChatMessage.user_id == user.id
+        )
+    )
+    session.commit()
+    return {"message": "聊天记录已清空"}

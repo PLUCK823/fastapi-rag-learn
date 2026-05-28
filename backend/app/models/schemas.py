@@ -71,3 +71,33 @@ class DocInfo(BaseModel):
 
 class KBDetail(KBInfo):
     documents: list[DocInfo]
+
+
+# ── Chat ──
+
+class MessageInfo(BaseModel):
+    id: int
+    role: str
+    content: str
+    sources: list[SourceInfo] | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Profile ──
+
+class ProfileResponse(BaseModel):
+    id: int
+    email: str
+    nickname: str | None = None
+
+
+class NicknameRequest(BaseModel):
+    nickname: str
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str
+

@@ -1,6 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { addDocument, deleteDocument, getDocContent, listKBs, updateDocument } from "../api/kb";
+import {
+  addDocument,
+  clearMessages,
+  deleteDocument,
+  getDocContent,
+  listKBs,
+  updateDocument,
+} from "../api/kb";
+import ChatMessage from "../components/chat/ChatMessage";
 import { useChatWS } from "../hooks/useChat";
 import type { Document, KBDetail } from "../types";
 
@@ -13,7 +21,12 @@ export default function ChatPage() {
   const [docContent, setDocContent] = useState("");
   const [docName, setDocName] = useState("");
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
-  const { streamingText, isStreaming, send, setStreamingText } = useChatWS(kbIdNum);
+  const { messages, isStreaming, send, clear } = useChatWS(kbIdNum);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const refreshDocs = async () => {
     const kbs = (await listKBs(true)) as KBDetail[];
@@ -46,8 +59,6 @@ export default function ChatPage() {
       {/* 文档侧栏 */}
       <div className="w-64 shrink-0 bg-white border rounded-lg p-4 overflow-y-auto">
         <h2 className="font-bold text-sm mb-3">{kb?.name ?? "..."} · 文档</h2>
-
-        {/* 文档内容输入区 */}
         <textarea
           value={docContent}
           onChange={(e) => setDocContent(e.target.value)}
@@ -97,8 +108,6 @@ export default function ChatPage() {
             </button>
           )}
         </div>
-
-        {/* 文档列表 */}
         {docs.map((d) => (
           <div key={d.id} className="flex items-center justify-between py-1 text-xs">
             <button
@@ -125,8 +134,26 @@ export default function ChatPage() {
 
       {/* 聊天区 */}
       <div className="flex-1 flex flex-col bg-white border rounded-lg p-4">
-        <div className="flex-1 overflow-y-auto mb-4 whitespace-pre-wrap text-sm text-gray-700">
-          {streamingText || <span className="text-gray-300">输入问题开始对话</span>}
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-sm">对话</h2>
+          <button
+            type="button"
+            className="text-xs text-gray-400 hover:text-red-500"
+            onClick={async () => {
+              await clearMessages(kbIdNum);
+              clear();
+            }}
+          >
+            清空聊天
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto mb-4">
+          {messages.length === 0 ? (
+            <p className="text-gray-300 text-sm text-center mt-20">输入问题开始对话</p>
+          ) : (
+            messages.map((m) => <ChatMessage key={m.id} msg={m} />)
+          )}
+          <div ref={bottomRef} />
         </div>
         <div className="flex gap-2">
           <input
@@ -134,7 +161,6 @@ export default function ChatPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !isStreaming && input.trim()) {
-                setStreamingText("");
                 send(input.trim());
                 setInput("");
               }
@@ -148,7 +174,6 @@ export default function ChatPage() {
             className="bg-purple-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50"
             disabled={isStreaming || !input.trim()}
             onClick={() => {
-              setStreamingText("");
               send(input.trim());
               setInput("");
             }}
