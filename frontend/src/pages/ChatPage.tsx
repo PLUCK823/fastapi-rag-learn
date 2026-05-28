@@ -99,9 +99,13 @@ export default function ChatPage() {
               className="bg-purple-600 text-white rounded px-2 py-1 text-xs"
               onClick={async () => {
                 if (!docName.trim() || !docContent.trim()) return;
-                await addDocument(kbIdNum, docContent, docName.trim());
-                resetForm();
-                refreshDocs();
+                try {
+                  await addDocument(kbIdNum, docContent, docName.trim());
+                  resetForm();
+                  refreshDocs();
+                } catch (e) {
+                  console.error("addDocument failed:", e);
+                }
               }}
             >
               新增
