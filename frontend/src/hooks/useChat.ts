@@ -39,44 +39,39 @@ export function useChatWS(kbId: number) {
         try {
           const data = JSON.parse(e.data);
           if (data.error) {
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              if (last?.role === "assistant") {
-                last.content += `[错误: ${data.error}]`;
-                last.isStreaming = false;
-              }
-              return [...prev];
-            });
+            setMessages((prev) =>
+              prev.map((m, i) =>
+                i === prev.length - 1 && m.role === "assistant"
+                  ? { ...m, content: `${m.content}[错误: ${data.error}]`, isStreaming: false }
+                  : m,
+              ),
+            );
             setIsStreaming(false);
           }
         } catch {
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last?.role === "assistant") {
-              last.content += e.data;
-            }
-            return [...prev];
-          });
+          setMessages((prev) =>
+            prev.map((m, i) =>
+              i === prev.length - 1 && m.role === "assistant"
+                ? { ...m, content: m.content + e.data }
+                : m,
+            ),
+          );
         }
       };
       ws.onclose = () => {
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last?.role === "assistant") last.isStreaming = false;
-          return [...prev];
-        });
+        setMessages((prev) =>
+          prev.map((m, i) =>
+            i === prev.length - 1 && m.role === "assistant" ? { ...m, isStreaming: false } : m,
+          ),
+        );
         setIsStreaming(false);
       };
-      ws.onerror = () => {
-        setIsStreaming(false);
-      };
+      ws.onerror = () => setIsStreaming(false);
     },
     [kbId],
   );
 
-  const clear = useCallback(() => {
-    setMessages([]);
-  }, []);
+  const clear = useCallback(() => setMessages([]), []);
 
   return { messages, isStreaming, send, clear, setMessages };
 }
