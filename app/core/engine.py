@@ -1,4 +1,4 @@
-"""RAG 引擎 — LangGraph 编排检索 + 生成"""
+"""RAG 引擎 — LangGraph 编排检索 + 生成，按用户隔离向量库"""
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -15,42 +15,50 @@ from app.core.config import (
     RETRIEVAL_K,
 )
 
-# 懒加载：只在真正调用时才初始化
 _initialized = False
-_embeddings = None
-_llm = None
-_vectorstore = None
-_retriever = None
-_rag_app = None
+_embeddings: HuggingFaceEmbeddings | None = None
+_llm: ChatOpenAI | None = None
 
 
-def get_vectorstore() -> Chroma:
-    """获取向量库实例（供 ingest 用）"""
-    _init()
-    return _vectorstore
-
-
-def _init() -> None:
-    global _initialized, _embeddings, _llm, _vectorstore, _retriever, _rag_app
+def _init_shared() -> None:
+    """初始化共享的 embedding 模型和 LLM（只加载一次）"""
+    global _initialized, _embeddings, _llm
     if _initialized:
         return
-
     _embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
     _llm = ChatOpenAI(model=LLM_MODEL, temperature=0.3, base_url=OPENAI_BASE_URL)
-    _vectorstore = Chroma(
+    _initialized = True
+
+
+def _get_user_vectorstore(user_id: int) -> Chroma:
+    _init_shared()
+    assert _embeddings is not None
+    collection_name = f"user_{user_id}"
+    return Chroma(
         embedding_function=_embeddings,
         persist_directory=str(CHROMA_DIR),
+        collection_name=collection_name,
     )
-    _retriever = _vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
 
-    # 组装 LangGraph
+
+def get_vectorstore(user_id: int) -> Chroma:
+    return _get_user_vectorstore(user_id)
+
+
+def ask(question: str, user_id: int) -> str:
+    _init_shared()
+    assert _llm is not None
+
+    vectorstore = _get_user_vectorstore(user_id)
+    retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
+
     class RAGState(TypedDict):
         question: str
         context: list[Document]
         answer: str
 
     def retrieve(state: RAGState) -> dict:
-        docs = _retriever.invoke(state["question"])
+        docs: list[Document] = retriever.invoke(state["question"])
         return {"context": docs}
 
     def generate(state: RAGState) -> dict:
@@ -66,17 +74,14 @@ def _init() -> None:
         response = _llm.invoke(prompt)
         return {"answer": response.content}
 
-    g = StateGraph(RAGState)
-    g.add_node("retrieve", retrieve)
-    g.add_node("generate", generate)
-    g.set_entry_point("retrieve")
-    g.add_edge("retrieve", "generate")
-    g.set_finish_point("generate")
-    _rag_app = g.compile()
-    _initialized = True
-
-
-def ask(question: str) -> str:
-    _init()
-    result = _rag_app.invoke({"question": question})
+    graph = (
+        StateGraph(RAGState)
+        .add_node("retrieve", retrieve)
+        .add_node("generate", generate)
+        .add_edge("retrieve", "generate")
+        .set_entry_point("retrieve")
+        .set_finish_point("generate")
+        .compile()
+    )
+    result = graph.invoke({"question": question})  # type: ignore[call-overload]
     return result["answer"]

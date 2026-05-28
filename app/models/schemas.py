@@ -16,3 +16,8 @@ class IngestResponse(BaseModel):
     message: str
     file_count: int
     chunk_count: int
+
+
+class IngestTextRequest(BaseModel):
+    content: str
+    filename: str = "untitled.txt"
