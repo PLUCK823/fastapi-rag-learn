@@ -74,8 +74,9 @@ export default function ChatPage() {
   const handleSave = async () => {
     if (!filename.trim() || !mdContent.trim()) return;
     const name = filename.trim();
-    const hasExt = name.lastIndexOf(".") > 0;
-    const finalName = hasExt ? name : `${name}.md`;
+    const dot = name.lastIndexOf(".");
+    const base = dot > 0 ? name.slice(0, dot) : name;
+    const finalName = `${base}.md`;
     setSaving(true);
     try {
       if (editDoc) {
