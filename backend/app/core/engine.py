@@ -99,13 +99,12 @@ def ask(question: str, kb_id: int) -> tuple[str, list[SourceInfo]]:
         docs_text_parts: list[str] = []
         for i, d in enumerate(state["context"], start=1):
             name = d.metadata.get("document_name", "unknown")
-            docs_text_parts.append(f"--- 参考{i}: {name} ---\n{d.page_content}")
-        docs_text = "\n\n".join(docs_text_parts)
+            docs_text_parts.append(f"来源{i}({name}): {d.page_content}")
+        docs_text = "\n".join(docs_text_parts)
 
-        prompt = f"""根据以下参考资料回答问题。如果资料里没有答案，就说不知道。
+        prompt = f"""根据以下资料回答问题。如果资料里没有答案，就说不知道。
 
-
-参考资料:
+资料:
 {docs_text}
 
 问题: {state["question"]}
@@ -157,13 +156,12 @@ def ask_stream(question: str, kb_id: int) -> Iterator[str]:
     docs_text_parts: list[str] = []
     for i, d in enumerate(docs, start=1):
         name = d.metadata.get("document_name", "unknown")
-        docs_text_parts.append(f"[{i}] ({name})\n{d.page_content}")
-    docs_text = "\n\n".join(docs_text_parts)
+        docs_text_parts.append(f"来源{i}({name}): {d.page_content}")
+    docs_text = "\n".join(docs_text_parts)
 
-    prompt = f"""根据以下参考资料回答问题。如果资料里没有答案，就说不知道。
+    prompt = f"""根据以下资料回答问题。如果资料里没有答案，就说不知道。
 
-
-参考资料:
+资料:
 {docs_text}
 
 问题: {question}
