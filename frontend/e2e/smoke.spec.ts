@@ -22,22 +22,21 @@ test("full user flow", async ({ page }) => {
   await page.getByText("E2E 测试库").click();
   await expect(page).toHaveURL(/\/chat\/\d+/);
 
-  // 4. Add document
-  await page.locator("textarea").first().fill("Python 是一门编程语言，广泛用于 Web 开发。");
+  // 4. Add document via ByteMD editor
+  const editor = page.locator(".bytemd-editor .CodeMirror");
+  await editor.click();
+  await page.keyboard.type("Python 是一门编程语言，广泛用于 Web 开发。");
   await page.getByPlaceholder("文件名").fill("hello.txt");
   await page.getByRole("button", { name: "新增" }).click();
-  await page.waitForTimeout(500);
-  await expect(page.getByText("hello.txt")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("hello.txt")).toBeVisible({ timeout: 5000 });
 
-  // 5. Chat - user message should appear as bubble, then streaming answer
+  // 5. Chat
   await page.getByPlaceholder("输入问题，按 Enter 发送...").fill("Python 适合做什么？");
   await page.getByRole("button", { name: "发送" }).click();
-  // User question should appear immediately
   await expect(page.getByText("Python 适合做什么？")).toBeVisible({ timeout: 5000 });
-  // Wait for the answer to start streaming
   await expect(page.getByText("Python")).toBeVisible({ timeout: 20000 });
 
-  // 6. Verify nickname displays email by default
+  // 6. Verify nickname
   await expect(page.getByText(EMAIL)).toBeVisible();
 
   console.log("ALL E2E TESTS PASSED");

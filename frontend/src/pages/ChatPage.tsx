@@ -1,5 +1,10 @@
+import gfm from "@bytemd/plugin-gfm";
+import highlight from "@bytemd/plugin-highlight";
+import { Editor } from "@bytemd/react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import "bytemd/dist/index.css";
+import "highlight.js/styles/github.css";
 import {
   addDocument,
   clearMessages,
@@ -11,6 +16,8 @@ import {
 import ChatMessage from "../components/chat/ChatMessage";
 import { useChatWS } from "../hooks/useChat";
 import type { Document, KBDetail } from "../types";
+
+const plugins = [gfm(), highlight()];
 
 export default function ChatPage() {
   const { kbId } = useParams<{ kbId: string }>();
@@ -59,12 +66,9 @@ export default function ChatPage() {
       {/* 文档侧栏 */}
       <div className="w-64 shrink-0 bg-white border rounded-lg p-4 overflow-y-auto">
         <h2 className="font-bold text-sm mb-3">{kb?.name ?? "..."} · 文档</h2>
-        <textarea
-          value={docContent}
-          onChange={(e) => setDocContent(e.target.value)}
-          placeholder="文档内容..."
-          className="w-full border rounded p-2 text-xs h-24 resize-none mb-2"
-        />
+        <div className="mb-2 border rounded overflow-hidden" style={{ height: 160 }}>
+          <Editor value={docContent} plugins={plugins} onChange={(v) => setDocContent(v)} />
+        </div>
         <div className="flex gap-1 mb-2">
           <input
             value={docName}
