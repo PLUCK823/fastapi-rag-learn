@@ -33,6 +33,7 @@ def _init_shared() -> None:
         temperature=0.7,
         base_url=OPENAI_BASE_URL,
         frequency_penalty=0.5,
+        streaming=True,
     )
     _initialized = True
 
