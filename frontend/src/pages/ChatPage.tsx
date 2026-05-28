@@ -73,12 +73,13 @@ export default function ChatPage() {
 
   const handleSave = async () => {
     if (!filename.trim() || !mdContent.trim()) return;
+    const finalName = filename.trim().endsWith(".md") ? filename.trim() : `${filename.trim()}.md`;
     setSaving(true);
     try {
       if (editDoc) {
         await updateDocument(kbIdNum, editDoc.id, mdContent);
       } else {
-        await addDocument(kbIdNum, mdContent, filename.trim());
+        await addDocument(kbIdNum, mdContent, finalName);
       }
       closeModal();
       refreshDocs();
@@ -209,7 +210,7 @@ export default function ChatPage() {
               <input
                 value={filename}
                 onChange={(e) => setFilename(e.target.value)}
-                placeholder="例如: readme.md"
+                placeholder="例如: readme（默认 .md）"
                 className="border rounded px-3 py-1.5 text-sm w-80"
               />
             </div>

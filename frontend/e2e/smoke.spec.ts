@@ -27,7 +27,7 @@ test("full user flow", async ({ page }) => {
   await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
 
   // 5. Fill filename and Markdown content
-  await page.getByPlaceholder("例如: readme.md").fill("hello.md");
+  await page.getByPlaceholder("例如: readme（默认 .md）").fill("hello");
   // Click the ByteMD editor and type
   const editor = page.locator(".bytemd-editor .CodeMirror");
   await editor.click();
@@ -35,7 +35,7 @@ test("full user flow", async ({ page }) => {
   await page.getByRole("button", { name: "创建文档" }).click();
 
   // Modal should close and doc should appear
-  await expect(page.getByText("hello.md")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("button", { name: "hello.md" })).toBeVisible({ timeout: 5000 });
 
   // 6. Chat
   await page.getByPlaceholder("输入问题，按 Enter 发送...").fill("Python 适合做什么？");
