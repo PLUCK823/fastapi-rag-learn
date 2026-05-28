@@ -99,12 +99,11 @@ def ask(question: str, kb_id: int) -> tuple[str, list[SourceInfo]]:
         docs_text_parts: list[str] = []
         for i, d in enumerate(state["context"], start=1):
             name = d.metadata.get("document_name", "unknown")
-            docs_text_parts.append(f"[{i}] ({name})\n{d.page_content}")
+            docs_text_parts.append(f"--- 参考{i}: {name} ---\n{d.page_content}")
         docs_text = "\n\n".join(docs_text_parts)
 
         prompt = f"""根据以下参考资料回答问题。如果资料里没有答案，就说不知道。
 
-引用参考资料时在句末标注来源编号，如[1]、[2]。
 
 参考资料:
 {docs_text}
@@ -163,7 +162,6 @@ def ask_stream(question: str, kb_id: int) -> Iterator[str]:
 
     prompt = f"""根据以下参考资料回答问题。如果资料里没有答案，就说不知道。
 
-引用参考资料时在句末标注来源编号，如[1]、[2]。
 
 参考资料:
 {docs_text}
