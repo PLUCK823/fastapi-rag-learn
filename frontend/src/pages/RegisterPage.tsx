@@ -124,7 +124,7 @@ export default function RegisterPage() {
                 color: "var(--color-cream)",
               }}
             >
-              {loading ? "注册中..." : "注册"}
+              {loading ? "注册中..." : "注册并登录"}
             </button>
           </form>
 

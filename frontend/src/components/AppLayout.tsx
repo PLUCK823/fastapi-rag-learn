@@ -19,10 +19,12 @@ function SettingsModal({
   initialNickname,
   email,
   onClose,
+  onNicknameChanged,
 }: {
   initialNickname: string;
   email: string;
   onClose: () => void;
+  onNicknameChanged: (nickname: string) => void;
 }) {
   const [newNick, setNewNick] = useState(initialNickname);
   const [oldPw, setOldPw] = useState("");
@@ -37,8 +39,9 @@ function SettingsModal({
 
   const handleNickname = useCallback(async () => {
     await updateNickname(newNick);
+    onNicknameChanged(newNick);
     showMsg("昵称已更新");
-  }, [newNick]);
+  }, [newNick, onNicknameChanged]);
 
   const handlePassword = useCallback(async () => {
     if (!oldPw.trim() || !newPw.trim()) {
@@ -293,6 +296,7 @@ export default function AppLayout() {
           initialNickname={nickname}
           email={email}
           onClose={() => setShowSettings(false)}
+          onNicknameChanged={setNickname}
         />
       )}
     </div>

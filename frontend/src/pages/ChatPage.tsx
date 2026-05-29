@@ -70,6 +70,7 @@ export default function ChatPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editDoc, setEditDoc] = useState<Document | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   // Auto-scroll
   useEffect(() => {
@@ -120,10 +121,15 @@ export default function ChatPage() {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      await uploadFile(kbIdNum, file);
-      refreshDocs();
-      // Reset so same file can be re-uploaded
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploading(true);
+      try {
+        await uploadFile(kbIdNum, file);
+        refreshDocs();
+      } finally {
+        setUploading(false);
+        // Reset so same file can be re-uploaded
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
     },
     [kbIdNum, refreshDocs],
   );
@@ -160,15 +166,16 @@ export default function ChatPage() {
           </button>
           <button
             type="button"
-            className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
+            className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors disabled:opacity-50"
             style={{
               backgroundColor: "var(--surface-bg)",
               color: "var(--text-secondary)",
               border: "var(--border-medium)",
             }}
+            disabled={uploading}
             onClick={() => fileInputRef.current?.click()}
           >
-            上传
+            {uploading ? "上传中..." : "上传"}
           </button>
           <input
             ref={fileInputRef}

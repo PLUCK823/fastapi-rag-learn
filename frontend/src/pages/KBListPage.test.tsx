@@ -8,9 +8,7 @@ import KBListPage from "./KBListPage";
 
 const server = setupServer(
   http.get("/kb", () =>
-    HttpResponse.json([
-      { id: 1, name: "我的知识库", document_count: 3, created_at: "2025-01-01" },
-    ]),
+    HttpResponse.json([{ id: 1, name: "我的知识库", document_count: 3, created_at: "2025-01-01" }]),
   ),
   http.post("/kb", async ({ request }) => {
     const body = (await request.json()) as { name: string };

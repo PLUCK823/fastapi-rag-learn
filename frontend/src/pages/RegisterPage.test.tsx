@@ -31,7 +31,7 @@ describe("RegisterPage", () => {
     );
     expect(screen.getByPlaceholderText("name@example.com")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("至少 6 个字符")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "注册" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "注册并登录" })).toBeInTheDocument();
   });
 
   it("shows link to login", () => {
@@ -51,7 +51,7 @@ describe("RegisterPage", () => {
     );
     await userEvent.type(screen.getByPlaceholderText("name@example.com"), "new@test.com");
     await userEvent.type(screen.getByPlaceholderText("至少 6 个字符"), "pass123456");
-    await userEvent.click(screen.getByRole("button", { name: "注册" }));
+    await userEvent.click(screen.getByRole("button", { name: "注册并登录" }));
     expect(localStorage.getItem("token")).toBe("fake-token");
   });
 });
