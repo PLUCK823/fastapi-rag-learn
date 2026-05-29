@@ -60,4 +60,58 @@ describe("ChatMessage", () => {
     expect(screen.getByText(/readme\.md/)).toBeInTheDocument();
     expect(screen.getByText(/notes\.txt/)).toBeInTheDocument();
   });
+
+  it("renders markdown code blocks in assistant message", () => {
+    const msg: Message = {
+      id: "5",
+      role: "assistant",
+      content: "```python\nprint('hello')\n```",
+    };
+    render(<ChatMessage msg={msg} />);
+    expect(screen.getByText(/print\('hello'\)/)).toBeInTheDocument();
+  });
+
+  it("renders inline code in assistant message", () => {
+    const msg: Message = {
+      id: "6",
+      role: "assistant",
+      content: "使用 `pip install` 安装",
+    };
+    render(<ChatMessage msg={msg} />);
+    expect(screen.getByText("pip install")).toBeInTheDocument();
+  });
+
+  it("renders markdown lists in assistant message", () => {
+    const msg: Message = {
+      id: "7",
+      role: "assistant",
+      content: "- 项目一\n- 项目二\n",
+    };
+    render(<ChatMessage msg={msg} />);
+    expect(screen.getByText("项目一")).toBeInTheDocument();
+    expect(screen.getByText("项目二")).toBeInTheDocument();
+  });
+
+  it("renders markdown links in assistant message", () => {
+    const msg: Message = {
+      id: "8",
+      role: "assistant",
+      content: "查看 [文档](https://example.com) 了解更多",
+    };
+    render(<ChatMessage msg={msg} />);
+    const link = screen.getByRole("link", { name: "文档" });
+    expect(link).toHaveAttribute("href", "https://example.com");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("renders user message as plain text (no markdown)", () => {
+    const msg: Message = {
+      id: "9",
+      role: "user",
+      content: "```python\nprint('hello')\n```",
+    };
+    render(<ChatMessage msg={msg} />);
+    // User message should show the raw text including backticks
+    expect(screen.getByText(/```python/)).toBeInTheDocument();
+  });
 });

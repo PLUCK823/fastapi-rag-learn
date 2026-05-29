@@ -215,7 +215,7 @@ export default function ChatPage() {
   }, [input, isStreaming, send, refreshSessions]);
 
   const displayName = activeSessionId
-    ? sessions.find((s) => s.session_id === activeSessionId)?.first_question ?? "对话"
+    ? (sessions.find((s) => s.session_id === activeSessionId)?.first_question ?? "对话")
     : "对话";
 
   return (
@@ -263,10 +263,7 @@ export default function ChatPage() {
         </div>
 
         {/* Sessions section */}
-        <div
-          className="pb-2 mb-2"
-          style={{ borderBottom: "var(--border-light)" }}
-        >
+        <div className="pb-2 mb-2" style={{ borderBottom: "var(--border-light)" }}>
           <div className="flex items-center justify-between mb-1">
             <span
               className="text-[10px] font-medium uppercase tracking-wider"
