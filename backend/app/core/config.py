@@ -33,3 +33,13 @@ CHUNK_OVERLAP = 50
 
 # 检索
 RETRIEVAL_K = 3
+
+# CORS 配置（生产部署需要）
+# 允许的来源，多个用逗号分隔，例如: "http://localhost:5173,https://example.com"
+CORS_ALLOW_ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173").split(",")
+CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
+CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "*").split(",")
+
+# Rate Limiting（防止 API 过度调用）
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))  # 每分钟最大请求数
+RATE_LIMIT_PERIOD = int(os.getenv("RATE_LIMIT_PERIOD", "60"))  # 秒

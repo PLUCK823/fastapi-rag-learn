@@ -3,7 +3,7 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from jwt import PyJWTError
 from jwt import decode as jwt_decode
 from sqlalchemy.orm import Session
@@ -46,7 +46,26 @@ def ask_endpoint(
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
-    answer, sources = ask(req.text, req.kb_id)
+    try:
+        answer, sources = ask(req.text, req.kb_id)
+    except Exception as e:
+        # Handle LLM/embedding failures gracefully
+        error_msg = str(e)
+        if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="LLM 服务暂时不可用，请稍后再试"
+            )
+        if "api" in error_msg.lower() or "key" in error_msg.lower():
+            raise HTTPException(
+                status_code=500,
+                detail="LLM 服务配置错误，请联系管理员"
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"生成回答时发生错误: {error_msg}"
+        )
+
     _save_message(session, req.kb_id, user.id, "user", req.text, None)
     _save_message(session, req.kb_id, user.id, "assistant", answer, sources)
     return AskResponse(question=req.text, answer=answer, sources=sources)
@@ -117,6 +136,13 @@ async def ws_ask(
                 _save_message(session, kb_id, user_id, "user", data, None, sid)
                 _save_message(session, kb_id, user_id, "assistant", full_answer, sources, sid)
     except Exception as e:
-        await websocket.send_text(json.dumps({"error": str(e)}))
+        error_msg = str(e)
+        # Provide user-friendly error messages
+        if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+            await websocket.send_text(json.dumps({"error": "LLM 服务暂时不可用，请稍后再试"}))
+        elif "api" in error_msg.lower() or "key" in error_msg.lower():
+            await websocket.send_text(json.dumps({"error": "LLM 服务配置错误，请联系管理员"}))
+        else:
+            await websocket.send_text(json.dumps({"error": f"生成回答时发生错误: {error_msg}"}))
     finally:
         await websocket.close()
