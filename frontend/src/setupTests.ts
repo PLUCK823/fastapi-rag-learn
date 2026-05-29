@@ -17,3 +17,6 @@ globalThis.localStorage = {
   },
   key: (i: number) => Object.keys(store)[i] ?? null,
 } as Storage;
+
+// Mock scrollIntoView for jsdom
+Element.prototype.scrollIntoView = () => {};

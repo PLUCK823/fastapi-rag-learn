@@ -7,6 +7,7 @@ import {
   getDocContent,
   listKBs,
   listSessions,
+  renameDocument,
   uploadFile,
 } from "../api/kb";
 import ChatMessage from "../components/chat/ChatMessage";
@@ -94,6 +95,18 @@ export default function ChatPage() {
   const [uploading, setUploading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
   const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
+
+  // Document rename state
+  const [editingDocId, setEditingDocId] = useState<number | null>(null);
+  const [editingDocName, setEditingDocName] = useState("");
+  const docEditInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus edit input when editing starts
+  useEffect(() => {
+    if (editingDocId && docEditInputRef.current) {
+      docEditInputRef.current.focus();
+    }
+  }, [editingDocId]);
 
   // Auto-scroll
   useEffect(() => {
@@ -188,6 +201,20 @@ export default function ChatPage() {
     setConfirmDelete(null);
     refreshDocs();
   }, [kbIdNum, confirmDelete, refreshDocs]);
+
+  const handleEditDocName = useCallback((doc: Document) => {
+    setEditingDocId(doc.id);
+    setEditingDocName(doc.filename);
+  }, []);
+
+  const executeRenameDoc = useCallback(async () => {
+    const name = editingDocName.trim();
+    if (!editingDocId || !name) return;
+    await renameDocument(kbIdNum, editingDocId, name);
+    setEditingDocId(null);
+    setEditingDocName("");
+    refreshDocs();
+  }, [kbIdNum, editingDocId, editingDocName, refreshDocs]);
 
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -342,22 +369,67 @@ export default function ChatPage() {
                 className="flex items-center justify-between py-2 text-xs group"
                 style={{ borderBottom: "var(--border-light)" }}
               >
-                <button
-                  type="button"
-                  className="text-left truncate flex-1 mr-2 py-0.5 transition-colors"
-                  style={{ color: "var(--text-secondary)" }}
-                  onClick={() => openEdit(d)}
-                >
-                  {d.filename}
-                </button>
-                <button
-                  type="button"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-xs"
-                  style={{ color: "var(--text-muted)" }}
-                  onClick={() => handleDeleteDoc(d)}
-                >
-                  删
-                </button>
+                {editingDocId === d.id ? (
+                  <input
+                    ref={docEditInputRef}
+                    value={editingDocName}
+                    onChange={(e) => setEditingDocName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") executeRenameDoc();
+                      if (e.key === "Escape") {
+                        setEditingDocId(null);
+                        setEditingDocName("");
+                      }
+                    }}
+                    onBlur={() => {
+                      if (editingDocName.trim() && editingDocName.trim() !== d.filename) {
+                        executeRenameDoc();
+                      } else {
+                        setEditingDocId(null);
+                        setEditingDocName("");
+                      }
+                    }}
+                    className="flex-1 px-2 py-1 rounded text-xs outline-none mr-2"
+                    style={{
+                      backgroundColor: "var(--surface-bg)",
+                      border: "1px solid var(--color-copper)",
+                      color: "var(--text-primary)",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="text-left truncate flex-1 mr-2 py-0.5 transition-colors"
+                    style={{ color: "var(--text-secondary)" }}
+                    onClick={() => openEdit(d)}
+                  >
+                    {d.filename}
+                  </button>
+                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {editingDocId !== d.id && (
+                    <button
+                      type="button"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity px-1 py-0.5 rounded text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditDocName(d);
+                      }}
+                    >
+                      改
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                    onClick={() => handleDeleteDoc(d)}
+                  >
+                    删
+                  </button>
+                </div>
               </div>
             ))
           )}

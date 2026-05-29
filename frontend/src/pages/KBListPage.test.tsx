@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import KBListPage from "./KBListPage";
 
 // Track KB state for dynamic responses
@@ -28,9 +28,7 @@ const server = setupServer(
   }),
   http.put("/kb/:id", async ({ request, params }) => {
     const body = (await request.json()) as { name: string };
-    kbState = kbState.map((kb) =>
-      kb.id === Number(params.id) ? { ...kb, name: body.name } : kb
-    );
+    kbState = kbState.map((kb) => (kb.id === Number(params.id) ? { ...kb, name: body.name } : kb));
     return HttpResponse.json({
       id: Number(params.id),
       name: body.name,
