@@ -85,7 +85,7 @@ export default function ChatPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const { messages, isStreaming, send, clear, prepareSend } = useChatWS(kbIdNum, activeSessionId);
+  const { messages, isStreaming, send, clear, prepareSend, resetLoadFlag } = useChatWS(kbIdNum, activeSessionId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -135,11 +135,13 @@ export default function ChatPage() {
     refreshSessions().then((list) => {
       // Only select existing session, don't create empty one
       if (list.length > 0) {
+        // Reset flag before setting session so messages will be loaded
+        resetLoadFlag();
         setActiveSessionId(list[0].session_id);
       }
       // If no sessions, activeSessionId stays null (no empty session created)
     });
-  }, [refreshDocs, refreshSessions]);
+  }, [refreshDocs, refreshSessions, resetLoadFlag]);
 
   /* ── Session actions ── */
 
@@ -151,9 +153,11 @@ export default function ChatPage() {
     }
 
     // Clear active session - will create new one when user sends message
+    // Reset the flag so that when we set activeSessionId to null, it clears messages
+    resetLoadFlag();
     setActiveSessionId(null);
     clear();
-  }, [messages.length, clear]);
+  }, [messages.length, clear, resetLoadFlag]);
 
   const handleDeleteSession = useCallback((s: Session) => {
     setConfirmDeleteSession(s);
@@ -167,9 +171,15 @@ export default function ChatPage() {
     const list = await refreshSessions();
     // If deleted current session, switch to latest
     if (activeSessionId === sid) {
-      setActiveSessionId(list.length > 0 ? list[0].session_id : null);
+      if (list.length > 0) {
+        resetLoadFlag();
+        setActiveSessionId(list[0].session_id);
+      } else {
+        setActiveSessionId(null);
+        clear();
+      }
     }
-  }, [kbIdNum, confirmDeleteSession, activeSessionId, refreshSessions]);
+  }, [kbIdNum, confirmDeleteSession, activeSessionId, refreshSessions, resetLoadFlag, clear]);
 
   /* ── Document actions ── */
 
@@ -342,7 +352,10 @@ export default function ChatPage() {
                         color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
                         backgroundColor: isActive ? "var(--surface-bg)" : "transparent",
                       }}
-                      onClick={() => setActiveSessionId(s.session_id)}
+                      onClick={() => {
+                        resetLoadFlag();
+                        setActiveSessionId(s.session_id);
+                      }}
                     >
                       <span className="block truncate text-[11px]">
                         {s.first_question || "新的对话"}

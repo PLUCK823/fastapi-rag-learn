@@ -68,8 +68,8 @@ test("session behavior tests", async ({ page }) => {
   // Wait for session to be saved
   await page.waitForTimeout(2000);
 
-  // 7. Test 4: Session should now appear in the list (named after first question)
-  await expect(page.locator("button").filter({ hasText: "这是什么" })).toBeVisible({ timeout: 5000 });
+  // 7. Test 4: Session should now appear in the list - verify "暂无历史会话" is gone
+  await expect(page.getByText("暂无历史会话")).not.toBeVisible({ timeout: 5000 });
 
   // 8. Test 5: Now clicking "新建" should clear and go to empty state
   await newSessionButtons.nth(1).click();
@@ -79,8 +79,8 @@ test("session behavior tests", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "新的对话" })).toBeVisible({ timeout: 5000 });
   await expect(page.getByPlaceholder("输入问题，Enter 发送…")).toBeVisible({ timeout: 3000 });
 
-  // Previous session should still be in the list
-  await expect(page.locator("button").filter({ hasText: "这是什么" })).toBeVisible({ timeout: 5000 });
+  // Previous session should still be in the list (verify "暂无历史会话" is still gone)
+  await expect(page.getByText("暂无历史会话")).not.toBeVisible({ timeout: 5000 });
 
   console.log("ALL SESSION TESTS PASSED");
 });

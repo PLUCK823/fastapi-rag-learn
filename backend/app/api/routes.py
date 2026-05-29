@@ -129,7 +129,9 @@ async def ws_ask(
 
         # 保存对话记录
         full_answer = "".join(full_answer_parts)
-        user_id = int(payload.get("user_id", 0))
+        # fastapi-users JWT uses 'sub' field for user_id, not 'user_id'
+        user_id_str = payload.get("sub", "0")
+        user_id = int(user_id_str) if user_id_str else 0
         if user_id:
             sid = session_id if session_id else None
             with sync_session_factory() as session:

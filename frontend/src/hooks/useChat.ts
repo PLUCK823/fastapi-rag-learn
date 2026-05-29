@@ -19,8 +19,8 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   // Keep ref in sync with prop
   useEffect(() => {
     sessionIdRef.current = sessionId;
-    // Reset the flag when sessionId changes so we can load messages for the new session
-    shouldLoadMessages.current = true;
+    // DO NOT reset the flag here - it should only be reset when user explicitly selects a session
+    // The flag is managed by prepareSend() and the session selection handler
   }, [sessionId]);
 
   // Load session messages when sessionId changes
@@ -48,6 +48,11 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   // Prepare for send - prevent useEffect from loading messages
   const prepareSend = useCallback(() => {
     shouldLoadMessages.current = false;
+  }, []);
+
+  // Reset flag to allow loading messages (used when user selects a session)
+  const resetLoadFlag = useCallback(() => {
+    shouldLoadMessages.current = true;
   }, []);
 
   const send = useCallback(
@@ -137,5 +142,5 @@ export function useChatWS(kbId: number, sessionId: string | null) {
 
   const clear = useCallback(() => setMessages([]), []);
 
-  return { messages, isStreaming, send, clear, setMessages, prepareSend };
+  return { messages, isStreaming, send, clear, setMessages, prepareSend, resetLoadFlag };
 }
