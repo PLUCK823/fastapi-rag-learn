@@ -57,8 +57,22 @@ npm run dev                                      # dev server (port 5173)
 2. **实现功能** — 编写/修改代码
 3. **校验（后端）** — `cd backend && uv run ruff check --fix . && uv run mypy app/`
 4. **校验（前端）** — `cd frontend && npx biome check --fix src/ && npx tsc --noEmit`
-5. **写测试** — 后端 `uv run pytest tests/ -v`，前端 `npx vitest run`，全部通过。不允许假测试（如 `assert True`）
-6. **改后提交** — `git add -A && git commit -m "..."` 保存本次改动
+5. **单元测试** — 后端 `uv run pytest tests/ -v`，前端 `npx vitest run`，全部通过。不允许假测试（如 `assert True`）
+6. **E2E UI测试** — 启动服务后运行 `npx playwright test`，验证完整用户流程
+7. **改后提交** — `git add -A && git commit -m "..."` 保存本次改动
+
+### E2E 测试启动命令
+
+```bash
+# 启动后端（在 backend 目录）
+uv run uvicorn app.main:app --port 8000 --host 127.0.0.1
+
+# 启动前端（在 frontend 目录）
+npm run dev
+
+# 运行 E2E 测试（在 frontend 目录）
+npx playwright test --reporter=list
+```
 
 ## Architecture
 
