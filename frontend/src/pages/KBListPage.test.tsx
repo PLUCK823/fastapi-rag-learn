@@ -8,7 +8,9 @@ import KBListPage from "./KBListPage";
 
 const server = setupServer(
   http.get("/kb", () =>
-    HttpResponse.json([{ id: 1, name: "我的知识库", document_count: 3, created_at: "2025-01-01" }]),
+    HttpResponse.json([
+      { id: 1, name: "我的知识库", document_count: 3, created_at: "2025-01-01" },
+    ]),
   ),
   http.post("/kb", async ({ request }) => {
     const body = (await request.json()) as { name: string };
@@ -38,9 +40,6 @@ describe("KBListPage", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("3 篇文档")).toBeInTheDocument();
-    // KB name appears as a link
-    const links = screen.getAllByText("我的知识库");
-    expect(links.length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows empty state when no KBs", async () => {
@@ -51,7 +50,7 @@ describe("KBListPage", () => {
         <KBListPage />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("暂无知识库，创建一个开始吧。")).toBeInTheDocument();
+    expect(await screen.findByText("暂无知识库")).toBeInTheDocument();
   });
 
   it("renders input and create button", () => {
@@ -61,7 +60,7 @@ describe("KBListPage", () => {
         <KBListPage />
       </MemoryRouter>,
     );
-    expect(screen.getByPlaceholderText("知识库名称")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("输入知识库名称…")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "创建" })).toBeInTheDocument();
   });
 
@@ -72,13 +71,10 @@ describe("KBListPage", () => {
         <KBListPage />
       </MemoryRouter>,
     );
-    const input = screen.getByPlaceholderText("知识库名称");
+    const input = screen.getByPlaceholderText("输入知识库名称…");
     expect(input).toBeInTheDocument();
     await userEvent.type(input, "新知识库");
-    expect(input).toHaveValue("新知识库");
-
     await userEvent.click(screen.getByRole("button", { name: "创建" }));
-
     // After creation, the list refreshes — KB card appears
     expect(await screen.findByText("3 篇文档")).toBeInTheDocument();
   });

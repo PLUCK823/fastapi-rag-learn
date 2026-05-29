@@ -13,7 +13,10 @@ const server = setupServer(
 );
 
 beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  localStorage.clear();
+});
 afterAll(() => server.close());
 
 describe("LoginPage", () => {
@@ -23,8 +26,8 @@ describe("LoginPage", () => {
         <LoginPage />
       </MemoryRouter>,
     );
-    expect(screen.getByPlaceholderText("邮箱")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("密码")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("name@example.com")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("••••••••")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
   });
 
@@ -35,9 +38,18 @@ describe("LoginPage", () => {
         <LoginPage />
       </MemoryRouter>,
     );
-    await userEvent.type(screen.getByPlaceholderText("邮箱"), "a@b.com");
-    await userEvent.type(screen.getByPlaceholderText("密码"), "wrong");
+    await userEvent.type(screen.getByPlaceholderText("name@example.com"), "a@b.com");
+    await userEvent.type(screen.getByPlaceholderText("••••••••"), "wrong");
     await userEvent.click(screen.getByRole("button", { name: "登录" }));
-    expect(await screen.findByText("登录失败，请检查邮箱和密码")).toBeInTheDocument();
+    expect(await screen.findByText("邮箱或密码不正确")).toBeInTheDocument();
+  });
+
+  it("has registration link", () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("注册")).toBeInTheDocument();
   });
 });

@@ -1,63 +1,180 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { createKB, deleteKB, listKBs } from "../api/kb";
 import type { KBDetail, KnowledgeBase } from "../types";
+
+/* ── Hoisted static empty state ── */
+const EMPTY_STATE = (
+  <div className="text-center py-20 animate-fade-in-up">
+    <div
+      className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5"
+      style={{ backgroundColor: "var(--surface-bg)" }}
+    >
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity="0.3"
+        role="img"
+        aria-label="空知识库"
+      >
+        <title>空知识库</title>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="12" y1="18" x2="12" y2="12" />
+        <line x1="9" y1="15" x2="15" y2="15" />
+      </svg>
+    </div>
+    <p className="display-text text-base mb-2" style={{ color: "var(--text-secondary)" }}>
+      暂无知识库
+    </p>
+    <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+      创建一个开始吧
+    </p>
+  </div>
+);
 
 export default function KBListPage() {
   const [kbs, setKBs] = useState<(KnowledgeBase | KBDetail)[]>([]);
   const [newName, setNewName] = useState("");
 
-  const refresh = () => listKBs(true).then(setKBs);
+  const refresh = useCallback(() => {
+    listKBs(true).then(setKBs);
+  }, []);
+
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
+
+  const handleCreate = useCallback(async () => {
+    const name = newName.trim();
+    if (!name) return;
+    await createKB(name);
+    setNewName("");
+    refresh();
+  }, [newName, refresh]);
+
+  const handleDelete = useCallback(
+    async (kb: KnowledgeBase | KBDetail) => {
+      if (!confirm(`确定删除「${kb.name}」及其所有文档？此操作不可撤销。`)) return;
+      await deleteKB(kb.id);
+      refresh();
+    },
+    [refresh],
+  );
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">我的知识库</h1>
-      <div className="flex gap-2 mb-6">
+      {/* Header */}
+      <div className="flex items-baseline justify-between mb-8 animate-fade-in-up">
+        <div>
+          <h1 className="display-text text-2xl mb-1" style={{ color: "var(--text-primary)" }}>
+            我的知识库
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {kbs.length === 0 ? "创建知识库，导入文档开始 RAG 问答" : `${kbs.length} 个知识库`}
+          </p>
+        </div>
+      </div>
+
+      {/* Create bar */}
+      <div className="flex gap-3 mb-8 animate-fade-in-up" style={{ animationDelay: "50ms" }}>
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="知识库名称"
-          className="border rounded px-3 py-2 text-sm flex-1"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleCreate();
+          }}
+          placeholder="输入知识库名称…"
+          className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none transition-colors"
+          style={{
+            backgroundColor: "var(--surface-card)",
+            border: "var(--border-medium)",
+            color: "var(--text-primary)",
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = "var(--color-copper)";
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = "rgba(28,28,46,0.1)";
+          }}
         />
         <button
           type="button"
-          className="bg-purple-600 text-white rounded px-4 py-2 text-sm hover:bg-purple-700"
-          onClick={async () => {
-            if (!newName.trim()) return;
-            await createKB(newName.trim());
-            setNewName("");
-            refresh();
+          className="px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200"
+          style={{
+            backgroundColor: "var(--color-ink)",
+            color: "var(--color-cream)",
           }}
+          onClick={handleCreate}
         >
           创建
         </button>
       </div>
+
+      {/* KB List */}
       {kbs.length === 0 ? (
-        <p className="text-gray-400 text-sm">暂无知识库，创建一个开始吧。</p>
+        EMPTY_STATE
       ) : (
         <div className="space-y-3">
-          {kbs.map((kb) => (
+          {kbs.map((kb, i) => (
             <div
               key={kb.id}
-              className="bg-white border rounded-lg p-4 flex items-center justify-between"
+              className="card card-hover px-5 py-4 flex items-center justify-between animate-fade-in-up"
+              style={{ animationDelay: `${100 + i * 60}ms` }}
             >
-              <div>
-                <Link to={`/chat/${kb.id}`} className="font-medium text-purple-700 hover:underline">
-                  {kb.name}
-                </Link>
-                <span className="text-xs text-gray-400 ml-3">{kb.document_count} 篇文档</span>
+              <div className="flex items-center gap-4 min-w-0">
+                {/* Icon */}
+                <div
+                  className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
+                  style={{ backgroundColor: "var(--surface-bg)" }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--color-copper)"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    role="img"
+                    aria-label="知识库"
+                  >
+                    <title>知识库</title>
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <Link
+                    to={`/chat/${kb.id}`}
+                    className="font-medium text-sm no-underline transition-colors block truncate"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {kb.name}
+                  </Link>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {kb.document_count} 篇文档
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
-                className="text-xs text-red-500 hover:text-red-700"
-                onClick={async () => {
-                  if (!confirm(`确定删除「${kb.name}」及其所有文档？`)) return;
-                  await deleteKB(kb.id);
-                  refresh();
+                className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors shrink-0 ml-4"
+                style={{ color: "var(--text-muted)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(181, 91, 91, 0.08)";
+                  e.currentTarget.style.color = "var(--danger)";
                 }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "var(--text-muted)";
+                }}
+                onClick={() => handleDelete(kb)}
               >
                 删除
               </button>

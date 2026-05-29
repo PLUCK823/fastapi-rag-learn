@@ -4,7 +4,7 @@ import type { Message } from "../../types";
 import ChatMessage from "./ChatMessage";
 
 describe("ChatMessage", () => {
-  it("renders user message with purple background", () => {
+  it("renders user message", () => {
     const msg: Message = {
       id: "1",
       role: "user",
@@ -12,9 +12,11 @@ describe("ChatMessage", () => {
     };
     render(<ChatMessage msg={msg} />);
     expect(screen.getByText("什么是 RAG？")).toBeInTheDocument();
-    // User message is right-aligned
-    const container = screen.getByText("什么是 RAG？").closest("div");
-    expect(container?.className).toContain("bg-purple");
+    // User message is right-aligned: text → div.content → div.bubble → div.flex(justify-end)
+    const textEl = screen.getByText("什么是 RAG？");
+    const bubble = textEl.parentElement;
+    const flexContainer = bubble?.parentElement;
+    expect(flexContainer?.className).toContain("justify-end");
   });
 
   it("renders assistant message", () => {
@@ -25,6 +27,11 @@ describe("ChatMessage", () => {
     };
     render(<ChatMessage msg={msg} />);
     expect(screen.getByText("RAG 是检索增强生成。")).toBeInTheDocument();
+    // Assistant message is left-aligned
+    const textEl = screen.getByText("RAG 是检索增强生成。");
+    const bubble = textEl.parentElement;
+    const flexContainer = bubble?.parentElement;
+    expect(flexContainer?.className).toContain("justify-start");
   });
 
   it("shows blinking cursor when streaming and empty", () => {
@@ -35,9 +42,8 @@ describe("ChatMessage", () => {
       isStreaming: true,
     };
     render(<ChatMessage msg={msg} />);
-    // Should show a pulsing block
     const el = screen.getByText("▊");
-    expect(el.className).toContain("animate-pulse");
+    expect(el.className).toContain("animate-pulse-soft");
   });
 
   it("renders sources when present", () => {
@@ -51,7 +57,7 @@ describe("ChatMessage", () => {
       ],
     };
     render(<ChatMessage msg={msg} />);
-    expect(screen.getByText("[1] readme.md")).toBeInTheDocument();
-    expect(screen.getByText("[2] notes.txt")).toBeInTheDocument();
+    expect(screen.getByText(/readme\.md/)).toBeInTheDocument();
+    expect(screen.getByText(/notes\.txt/)).toBeInTheDocument();
   });
 });

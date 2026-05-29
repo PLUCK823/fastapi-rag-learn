@@ -29,8 +29,8 @@ describe("RegisterPage", () => {
         <RegisterPage />
       </MemoryRouter>,
     );
-    expect(screen.getByPlaceholderText("邮箱")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("密码")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("name@example.com")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("至少 6 个字符")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "注册" })).toBeInTheDocument();
   });
 
@@ -49,10 +49,9 @@ describe("RegisterPage", () => {
         <RegisterPage />
       </MemoryRouter>,
     );
-    await userEvent.type(screen.getByPlaceholderText("邮箱"), "new@test.com");
-    await userEvent.type(screen.getByPlaceholderText("密码"), "pass123456");
+    await userEvent.type(screen.getByPlaceholderText("name@example.com"), "new@test.com");
+    await userEvent.type(screen.getByPlaceholderText("至少 6 个字符"), "pass123456");
     await userEvent.click(screen.getByRole("button", { name: "注册" }));
-    // Token should be saved
     expect(localStorage.getItem("token")).toBe("fake-token");
   });
 });
