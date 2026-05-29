@@ -13,6 +13,12 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   const [isStreaming, setIsStreaming] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const doneRef = useRef(false);
+  const sessionIdRef = useRef(sessionId);
+
+  // Keep ref in sync with prop
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // Load session messages when sessionId changes
   useEffect(() => {
@@ -24,9 +30,11 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   }, [kbId, sessionId]);
 
   const send = useCallback(
-    (question: string) => {
+    (question: string, overrideSessionId?: string) => {
       const token = localStorage.getItem("token");
-      if (!token || !sessionId) return;
+      // Use override if provided, otherwise use current ref value
+      const sid = overrideSessionId ?? sessionIdRef.current;
+      if (!token || !sid) return;
 
       const aiId = nextId();
       const userMsg: Message = { id: nextId(), role: "user", content: question };
@@ -37,7 +45,7 @@ export function useChatWS(kbId: number, sessionId: string | null) {
 
       const proto = window.location.protocol === "https:" ? "wss" : "ws";
       const host = window.location.host;
-      const url = `${proto}://${host}/ws/${kbId}?token=${token}&session_id=${sessionId}`;
+      const url = `${proto}://${host}/ws/${kbId}?token=${token}&session_id=${sid}`;
 
       const ws = new WebSocket(url);
       wsRef.current = ws;

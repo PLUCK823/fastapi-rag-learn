@@ -235,11 +235,30 @@ export default function ChatPage() {
   const handleSend = useCallback(() => {
     const text = input.trim();
     if (isStreaming || !text) return;
-    send(text);
+
+    // Auto-create session if none exists
+    let sid = activeSessionId;
+    if (!sid) {
+      sid = `sess_${Date.now()}`;
+      setActiveSessionId(sid);
+      setSessions((prev) => [
+        {
+          session_id: sid,
+          first_question: "新的对话",
+          message_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    }
+
+    // Use the sid (either existing or newly created)
+    send(text, sid);
     setInput("");
     // Refresh sessions after send (to update the list when backend saves)
     setTimeout(() => refreshSessions(), 500);
-  }, [input, isStreaming, send, refreshSessions]);
+  }, [input, isStreaming, send, refreshSessions, activeSessionId]);
 
   const displayName = activeSessionId
     ? (sessions.find((s) => s.session_id === activeSessionId)?.first_question ?? "对话")
