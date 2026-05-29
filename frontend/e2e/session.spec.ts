@@ -22,32 +22,25 @@ test("session behavior tests", async ({ page }) => {
   await page.getByText("Session 测试库").click();
   await expect(page).toHaveURL(/\/chat\/\d+/);
 
-  // 4. Test 1: New KB should have an empty session created automatically
-  // Wait for page to load
+  // 4. Test 1: New KB should NOT have any session created automatically
   await page.waitForTimeout(1000);
 
-  // Should see "新的对话" in the header (auto-created empty session)
+  // Should see "新的对话" in the header (empty state, no session)
   const headerTitle = page.getByRole("heading", { name: "新的对话" });
   await expect(headerTitle).toBeVisible({ timeout: 5000 });
 
-  // Should see the empty session in the session list
-  const sessionButton = page.getByRole("button", { name: /新的对话.*0 条/ });
-  await expect(sessionButton).toBeVisible({ timeout: 5000 });
+  // Should see "暂无历史会话" (no sessions exist)
+  await expect(page.getByText("暂无历史会话")).toBeVisible({ timeout: 5000 });
 
-  // 5. Test 2: Clicking "新建" on empty session should NOT create a new one
-  // Find the session "新建" button (second one, in the "会话" section)
+  // 5. Test 2: Clicking "新建" when no session exists should stay on empty state
   const newSessionButtons = page.getByRole("button", { name: "+ 新建" });
   await newSessionButtons.nth(1).click();
   await page.waitForTimeout(500);
 
-  // Should still have only ONE session (the empty one)
-  // Check by counting session buttons with "0 条" (empty sessions)
-  const emptySessions = page.locator("button").filter({ hasText: "0 条" });
-  const count = await emptySessions.count();
-  expect(count).toBe(1); // Only one empty session, not two
+  // Should still show "暂无历史会话" (no sessions created)
+  await expect(page.getByText("暂无历史会话")).toBeVisible({ timeout: 5000 });
 
-  // 6. Test 3: Send a message to create content
-  // First create a document
+  // 6. Test 3: Create document and send message to create session
   await page.getByRole("button", { name: "+ 新建" }).first().click();
   await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
   await page.getByPlaceholder("例如: readme（默认 .md）").fill("test");
@@ -60,23 +53,34 @@ test("session behavior tests", async ({ page }) => {
   await page.waitForTimeout(2000);
   await expect(page.locator("text=test.md")).toBeVisible({ timeout: 10000 });
 
-  // Now send a chat message
+  // Send a chat message - this will create the session
   const chatInput = page.getByPlaceholder("输入问题，Enter 发送…");
   await chatInput.waitFor({ state: "visible", timeout: 3000 });
   await chatInput.click();
   await page.keyboard.type("这是什么？", { delay: 50 });
   await page.keyboard.press("Enter");
   await page.waitForTimeout(1000);
-  await expect(page.locator("text=这是什么")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator(".chat-message").filter({ hasText: "这是什么" })).toBeVisible({ timeout: 10000 });
 
-  // 7. Test 4: Now clicking "新建" SHOULD create a new session
+  // Wait for AI response
+  await expect(page.locator("text=回答中")).not.toBeVisible({ timeout: 30000 });
+
+  // Wait for session to be saved
+  await page.waitForTimeout(2000);
+
+  // 7. Test 4: Session should now appear in the list (named after first question)
+  await expect(page.locator("button").filter({ hasText: "这是什么" })).toBeVisible({ timeout: 5000 });
+
+  // 8. Test 5: Now clicking "新建" should clear and go to empty state
   await newSessionButtons.nth(1).click();
   await page.waitForTimeout(500);
 
-  // Should now have at least one empty session (the new one)
-  const emptySessionsAfter = page.locator("button").filter({ hasText: "0 条" });
-  const countAfter = await emptySessionsAfter.count();
-  expect(countAfter).toBeGreaterThanOrEqual(1); // At least one empty session now
+  // Should see empty state again
+  await expect(page.getByRole("heading", { name: "新的对话" })).toBeVisible({ timeout: 5000 });
+  await expect(page.getByPlaceholder("输入问题，Enter 发送…")).toBeVisible({ timeout: 3000 });
+
+  // Previous session should still be in the list
+  await expect(page.locator("button").filter({ hasText: "这是什么" })).toBeVisible({ timeout: 5000 });
 
   console.log("ALL SESSION TESTS PASSED");
 });

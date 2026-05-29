@@ -166,8 +166,9 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByText("聊天测试库").click();
     await expect(page).toHaveURL(/\/chat\/\d+/);
 
-    // Should have auto-created empty session
+    // Should NOT have any session yet
     await page.waitForTimeout(1000);
+    await expect(page.getByText("暂无历史会话")).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole("heading", { name: "新的对话" })).toBeVisible({ timeout: 5000 });
 
     // Create document
@@ -181,7 +182,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByRole("button", { name: "创建文档" }).click();
     await page.waitForTimeout(2000);
 
-    // Send message
+    // Send message - session will be created automatically
     const chatInput = page.getByPlaceholder("输入问题，Enter 发送…");
     await chatInput.waitFor({ state: "visible", timeout: 3000 });
     await chatInput.click();
@@ -198,10 +199,28 @@ test.describe("Full E2E Test Suite", () => {
     // Verify AI response contains expected content
     await expect(page.locator(".chat-message").filter({ hasText: "Web" })).toBeVisible({ timeout: 5000 });
 
-    // Verify messages are still visible (the main bug fix)
-    // Messages should NOT disappear after being sent
-    const pythonMessages = await page.locator(".chat-message").filter({ hasText: "Python" }).count();
-    expect(pythonMessages).toBeGreaterThan(0);
+    // Wait for session to be saved to backend
+    await page.waitForTimeout(3000);
+
+    // Session should now appear in the list (named after first question)
+    await expect(page.locator("button").filter({ hasText: "Python 适合做什么" })).toBeVisible({ timeout: 5000 });
+
+    // Create new session - click "新建" button
+    const newSessionButtons = page.getByRole("button", { name: "+ 新建" });
+    await newSessionButtons.nth(1).click();
+    await page.waitForTimeout(500);
+
+    // Should see empty state again (no session selected)
+    await expect(page.getByRole("heading", { name: "新的对话" })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByPlaceholder("输入问题，Enter 发送…")).toBeVisible({ timeout: 3000 });
+
+    // Switch back to first session - click on the session in the list
+    const firstSession = page.locator("button").filter({ hasText: "Python 适合做什么" });
+    await firstSession.click();
+    await page.waitForTimeout(500);
+
+    // Should see previous messages (not lost)
+    await expect(page.locator(".chat-message").filter({ hasText: "Python" })).toBeVisible({ timeout: 5000 });
 
     console.log("✅ Chat flow test passed");
   });
@@ -225,19 +244,19 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByText("空会话测试").click();
     await expect(page).toHaveURL(/\/chat\/\d+/);
 
-    // Should have auto-created empty session
+    // Should NOT have any session yet
     await page.waitForTimeout(1000);
+    await expect(page.getByText("暂无历史会话")).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole("heading", { name: "新的对话" })).toBeVisible({ timeout: 5000 });
 
-    // Click "新建会话" on empty session - should NOT create new session
+    // Click "新建会话" when no session exists - should stay on empty state
     const newSessionButtons = page.getByRole("button", { name: "+ 新建" });
     await newSessionButtons.nth(1).click();
     await page.waitForTimeout(500);
 
-    // Should still have only one empty session (0 messages)
-    const emptySessions = page.locator("button").filter({ hasText: "0 条" });
-    const count = await emptySessions.count();
-    expect(count).toBe(1);
+    // Should still show empty state (no sessions created)
+    await expect(page.getByText("暂无历史会话")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("heading", { name: "新的对话" })).toBeVisible({ timeout: 5000 });
 
     console.log("✅ Empty session behavior test passed");
   });

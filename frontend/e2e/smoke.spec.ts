@@ -47,9 +47,12 @@ test("full user flow", async ({ page }) => {
   await expect(page.locator("text=hello.md")).toBeVisible({ timeout: 10000 });
 
   // 6. Chat - fill input and send
-  // Note: Empty session is auto-created, no need to click "新建会话"
+  // Note: No session exists yet, will be created when message is sent
   const chatInput = page.getByPlaceholder("输入问题，Enter 发送…");
   await chatInput.waitFor({ state: "visible", timeout: 3000 });
+
+  // Verify no sessions exist yet
+  await expect(page.getByText("暂无历史会话")).toBeVisible({ timeout: 3000 });
 
   // Type the question
   await chatInput.click();
@@ -71,6 +74,12 @@ test("full user flow", async ({ page }) => {
   // Verify AI response contains expected content
   const aiMessage = page.locator(".chat-message").filter({ hasText: "Web" });
   await expect(aiMessage).toBeVisible({ timeout: 5000 });
+
+  // Wait for session to be saved
+  await page.waitForTimeout(2000);
+
+  // Now session should appear in the list (named after the first question)
+  await expect(page.locator("button").filter({ hasText: "Python 适合做什么" })).toBeVisible({ timeout: 5000 });
 
   // 7. Verify user email in header
   await expect(page.getByText(EMAIL)).toBeVisible();

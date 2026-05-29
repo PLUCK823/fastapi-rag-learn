@@ -129,27 +129,15 @@ export default function ChatPage() {
     return list;
   }, [kbIdNum]);
 
-  // Init: load docs + sessions, auto-select or create session
+  // Init: load docs + sessions, select latest session if exists
   useEffect(() => {
     refreshDocs();
     refreshSessions().then((list) => {
-      // Auto-select the latest session, or create empty session if no sessions
+      // Only select existing session, don't create empty one
       if (list.length > 0) {
         setActiveSessionId(list[0].session_id);
-      } else {
-        // No sessions exist, create an empty one for immediate use
-        const sid = `sess_${Date.now()}`;
-        setActiveSessionId(sid);
-        setSessions([
-          {
-            session_id: sid,
-            first_question: "新的对话",
-            message_count: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
       }
+      // If no sessions, activeSessionId stays null (no empty session created)
     });
   }, [refreshDocs, refreshSessions]);
 
@@ -158,24 +146,14 @@ export default function ChatPage() {
   const handleNewSession = useCallback(() => {
     // If current session has no messages, don't create a new one
     // Just stay on the current empty session
-    if (messages.length === 0 && activeSessionId) {
+    if (messages.length === 0) {
       return;
     }
 
-    // Generate a timestamp-based session ID
-    const sid = `sess_${Date.now()}`;
-    setActiveSessionId(sid);
-    setSessions((prev) => [
-      {
-        session_id: sid,
-        first_question: "新的对话",
-        message_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-  }, [messages.length, activeSessionId]);
+    // Clear active session - will create new one when user sends message
+    setActiveSessionId(null);
+    clear();
+  }, [messages.length, clear]);
 
   const handleDeleteSession = useCallback((s: Session) => {
     setConfirmDeleteSession(s);
@@ -259,25 +237,13 @@ export default function ChatPage() {
     // Prepare send FIRST - prevent message reload when session changes
     prepareSend();
 
-    // Auto-create session if none exists
+    // Create session if none exists
     let sid = activeSessionId;
     if (!sid) {
-      const newSid = `sess_${Date.now()}`;
-      sid = newSid;
+      sid = `sess_${Date.now()}`;
       // Use flushSync to ensure state updates synchronously
-      // This guarantees that prepareSend() flag is set BEFORE the useEffect runs
       flushSync(() => {
-        setActiveSessionId(newSid);
-        setSessions((prev) => [
-          {
-            session_id: newSid,
-            first_question: "新的对话",
-            message_count: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          ...prev,
-        ]);
+        setActiveSessionId(sid);
       });
     }
 
@@ -289,8 +255,8 @@ export default function ChatPage() {
   }, [input, isStreaming, send, refreshSessions, activeSessionId, prepareSend]);
 
   const displayName = activeSessionId
-    ? (sessions.find((s) => s.session_id === activeSessionId)?.first_question ?? "对话")
-    : "对话";
+    ? (sessions.find((s) => s.session_id === activeSessionId)?.first_question ?? "新的对话")
+    : "新的对话";
 
   return (
     <div className="flex gap-6 max-w-6xl mx-auto" style={{ height: "calc(100vh - 120px)" }}>
