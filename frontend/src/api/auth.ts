@@ -31,3 +31,8 @@ export async function changePassword(oldPassword: string, newPassword: string) {
   });
   return res.data;
 }
+
+export async function refreshToken() {
+  const res = await api.post("/auth/refresh");
+  return res.data as { access_token: string; token_type: string; expires_in: number };
+}

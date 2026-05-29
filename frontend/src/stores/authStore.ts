@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import { refreshToken } from "../api/auth";
+
 const storage = {
   get: (k: string): string | null => {
     try {
@@ -29,6 +31,7 @@ interface AuthState {
   setToken: (t: string) => void;
   logout: () => void;
   isAuthenticated: () => boolean;
+  refresh: () => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -42,4 +45,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ token: null });
   },
   isAuthenticated: () => !!get().token,
+  refresh: async () => {
+    const currentToken = get().token;
+    if (!currentToken) return false;
+
+    try {
+      const data = await refreshToken();
+      storage.set("token", data.access_token);
+      set({ token: data.access_token });
+      return true;
+    } catch {
+      // Refresh failed, logout
+      get().logout();
+      return false;
+    }
+  },
 }));
