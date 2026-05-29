@@ -6,7 +6,10 @@ export default function ChatMessage({ msg }: { msg: Message }) {
   const isUser = msg.role === "user";
 
   return (
-    <div className={`flex mb-4 ${isUser ? "justify-end" : "justify-start"} animate-fade-in-up`}>
+    <div
+      className={`chat-message flex mb-4 ${isUser ? "justify-end" : "justify-start"} animate-fade-in-up`}
+      data-role={msg.role}
+    >
       <div
         className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
           isUser ? "rounded-br-md" : "rounded-bl-md"

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useParams } from "react-router-dom";
 import {
   clearMessages,
@@ -84,7 +85,7 @@ export default function ChatPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const { messages, isStreaming, send, clear } = useChatWS(kbIdNum, activeSessionId);
+  const { messages, isStreaming, send, clear, prepareSend } = useChatWS(kbIdNum, activeSessionId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -124,16 +125,9 @@ export default function ChatPage() {
 
   const refreshSessions = useCallback(async () => {
     const list = await listSessions(kbIdNum);
-    // Preserve current active session if it's not in the backend list
-    // (happens when session is newly created and messages are still being saved)
-    const currentSession = sessions.find((s) => s.session_id === activeSessionId);
-    if (currentSession && !list.some((s) => s.session_id === activeSessionId)) {
-      setSessions([currentSession, ...list]);
-    } else {
-      setSessions(list);
-    }
+    setSessions(list);
     return list;
-  }, [kbIdNum, sessions, activeSessionId]);
+  }, [kbIdNum]);
 
   // Init: load docs + sessions, auto-select or create session
   useEffect(() => {
@@ -262,21 +256,29 @@ export default function ChatPage() {
     const text = input.trim();
     if (isStreaming || !text) return;
 
+    // Prepare send FIRST - prevent message reload when session changes
+    prepareSend();
+
     // Auto-create session if none exists
     let sid = activeSessionId;
     if (!sid) {
-      sid = `sess_${Date.now()}`;
-      setActiveSessionId(sid);
-      setSessions((prev) => [
-        {
-          session_id: sid,
-          first_question: "新的对话",
-          message_count: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
+      const newSid = `sess_${Date.now()}`;
+      sid = newSid;
+      // Use flushSync to ensure state updates synchronously
+      // This guarantees that prepareSend() flag is set BEFORE the useEffect runs
+      flushSync(() => {
+        setActiveSessionId(newSid);
+        setSessions((prev) => [
+          {
+            session_id: newSid,
+            first_question: "新的对话",
+            message_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          ...prev,
+        ]);
+      });
     }
 
     // Use the sid (either existing or newly created)
@@ -284,7 +286,7 @@ export default function ChatPage() {
     setInput("");
     // Refresh sessions after send (to update the list when backend saves)
     setTimeout(() => refreshSessions(), 500);
-  }, [input, isStreaming, send, refreshSessions, activeSessionId]);
+  }, [input, isStreaming, send, refreshSessions, activeSessionId, prepareSend]);
 
   const displayName = activeSessionId
     ? (sessions.find((s) => s.session_id === activeSessionId)?.first_question ?? "对话")

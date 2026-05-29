@@ -46,17 +46,12 @@ test("full user flow", async ({ page }) => {
   // Modal should close and doc should appear - check by text content
   await expect(page.locator("text=hello.md")).toBeVisible({ timeout: 10000 });
 
-  // 6. Create a new session before chatting (required for WebSocket)
-  // The second "+ 新建" button is for sessions (in the "会话" section)
-  const newSessionButtons = page.getByRole("button", { name: "+ 新建" });
-  await newSessionButtons.nth(1).click();
-  await page.waitForTimeout(500);
-
-  // 7. Chat - fill input and send
+  // 6. Chat - fill input and send
+  // Note: Empty session is auto-created, no need to click "新建会话"
   const chatInput = page.getByPlaceholder("输入问题，Enter 发送…");
   await chatInput.waitFor({ state: "visible", timeout: 3000 });
 
-  // Type the question (more reliable than fill for React inputs)
+  // Type the question
   await chatInput.click();
   await page.keyboard.type("Python 适合做什么？", { delay: 50 });
 
@@ -66,10 +61,16 @@ test("full user flow", async ({ page }) => {
   // Press Enter to send
   await page.keyboard.press("Enter");
 
-  // Wait for user message to appear in chat
-  await page.waitForTimeout(1000);
-  await expect(page.locator("text=Python 适合做什么")).toBeVisible({ timeout: 10000 });
-  await expect(page.getByText("Python")).toBeVisible({ timeout: 20000 });
+  // Wait for user message to appear
+  const userMessage = page.locator(".chat-message").filter({ hasText: "Python" });
+  await expect(userMessage).toBeVisible({ timeout: 15000 });
+
+  // Wait for AI response to complete (streaming indicator should disappear)
+  await expect(page.locator("text=回答中")).not.toBeVisible({ timeout: 30000 });
+
+  // Verify AI response contains expected content
+  const aiMessage = page.locator(".chat-message").filter({ hasText: "Web" });
+  await expect(aiMessage).toBeVisible({ timeout: 5000 });
 
   // 7. Verify user email in header
   await expect(page.getByText(EMAIL)).toBeVisible();
