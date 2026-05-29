@@ -12,20 +12,11 @@ export function useChatWS(kbId: number) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const streamBuf = useRef("");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const doneRef = useRef(false);
 
   useEffect(() => {
     listMessages(kbId).then((msgs) => setMessages(msgs));
   }, [kbId]);
-
-  const flushStream = useCallback((aiId: string) => {
-    const text = streamBuf.current;
-    streamBuf.current = "";
-    setMessages((prev) =>
-      prev.map((m) => (m.id === aiId ? { ...m, content: m.content + text } : m)),
-    );
-  }, []);
 
   const send = useCallback(
     (question: string) => {
@@ -37,7 +28,7 @@ export function useChatWS(kbId: number) {
       const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true };
       setMessages((prev) => [...prev, userMsg, aiMsg]);
       setIsStreaming(true);
-      streamBuf.current = "";
+      doneRef.current = false;
 
       const proto = window.location.protocol === "https:" ? "wss" : "ws";
       const host = window.location.host;
@@ -46,37 +37,38 @@ export function useChatWS(kbId: number) {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
-      // Flush buffer every 30ms for smooth typewriter effect
-      timerRef.current = setInterval(() => {
-        if (streamBuf.current) flushStream(aiId);
-      }, 30);
-
       ws.onopen = () => ws.send(question);
       ws.onmessage = (e) => {
+        if (doneRef.current) return;
         try {
           const data = JSON.parse(e.data);
           if (data.error) {
-            streamBuf.current += `[错误: ${data.error}]`;
-            flushStream(aiId);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiId ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false } : m,
+              ),
+            );
             setIsStreaming(false);
+            doneRef.current = true;
           }
         } catch {
-          streamBuf.current += e.data;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
+          );
         }
       };
       ws.onclose = () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        flushStream(aiId);
         setMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, isStreaming: false } : m)));
         setIsStreaming(false);
+        doneRef.current = true;
       };
       ws.onerror = () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        flushStream(aiId);
+        setMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, isStreaming: false } : m)));
         setIsStreaming(false);
+        doneRef.current = true;
       };
     },
-    [kbId, flushStream],
+    [kbId],
   );
 
   const clear = useCallback(() => setMessages([]), []);

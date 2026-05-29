@@ -1,5 +1,6 @@
 """RAG 引擎 — LangGraph 编排检索 + 生成，按知识库隔离向量库"""
 
+import time
 from collections.abc import Iterator
 
 from langchain_chroma import Chroma
@@ -150,22 +151,18 @@ def get_document_content(kb_id: int, document_id: int) -> str:
 
 # ── 流式问答 ──
 
-def ask_stream(question: str, kb_id: int) -> Iterator[str]:
-    _init_shared()
-    assert _llm is not None
-
+def _build_prompt(question: str, kb_id: int) -> str:
     vectorstore = _get_kb_vectorstore(kb_id)
     retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
-
     docs: list[Document] = retriever.invoke(question)
 
-    docs_text_parts: list[str] = []
+    parts: list[str] = []
     for i, d in enumerate(docs, start=1):
         name = d.metadata.get("document_name", "unknown")
-        docs_text_parts.append(f"来源{i}({name}): {d.page_content}")
-    docs_text = "\n".join(docs_text_parts)
+        parts.append(f"来源{i}({name}): {d.page_content}")
+    docs_text = "\n".join(parts)
 
-    prompt = f"""根据以下资料回答问题。如果资料里没有答案，就说不知道。
+    return f"""根据以下资料回答问题。如果资料里没有答案，就说不知道。
 
 资料:
 {docs_text}
@@ -173,7 +170,15 @@ def ask_stream(question: str, kb_id: int) -> Iterator[str]:
 问题: {question}
 
 答案:"""
-    for chunk in _llm.stream(prompt):
-        c = chunk.content
-        if isinstance(c, str):
-            yield c
+
+
+def ask_stream(question: str, kb_id: int) -> Iterator[str]:
+    _init_shared()
+    assert _llm is not None
+
+    prompt = _build_prompt(question, kb_id)
+    answer = str(_llm.invoke(prompt).content)
+
+    for ch in answer:
+        yield ch
+        time.sleep(0.02)
