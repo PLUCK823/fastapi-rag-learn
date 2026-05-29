@@ -40,9 +40,18 @@ export interface Message {
   id: number | string;
   role: "user" | "assistant";
   content: string;
+  session_id?: string | null;
   sources?: SourceInfo[];
   created_at?: string;
   isStreaming?: boolean;
+}
+
+export interface Session {
+  session_id: string;
+  first_question: string;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Profile {

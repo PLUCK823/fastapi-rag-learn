@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { createKB, deleteKB, listKBs } from "../api/kb";
+import ConfirmDialog from "../components/shared/ConfirmDialog";
 import type { KBDetail, KnowledgeBase } from "../types";
 
 /* ── Hoisted static empty state ── */
@@ -41,6 +42,7 @@ const EMPTY_STATE = (
 export default function KBListPage() {
   const [kbs, setKBs] = useState<(KnowledgeBase | KBDetail)[]>([]);
   const [newName, setNewName] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<(KnowledgeBase | KBDetail) | null>(null);
 
   const refresh = useCallback(() => {
     listKBs(true).then(setKBs);
@@ -58,14 +60,16 @@ export default function KBListPage() {
     refresh();
   }, [newName, refresh]);
 
-  const handleDelete = useCallback(
-    async (kb: KnowledgeBase | KBDetail) => {
-      if (!confirm(`确定删除「${kb.name}」及其所有文档？此操作不可撤销。`)) return;
-      await deleteKB(kb.id);
-      refresh();
-    },
-    [refresh],
-  );
+  const handleDelete = useCallback((kb: KnowledgeBase | KBDetail) => {
+    setConfirmDelete(kb);
+  }, []);
+
+  const executeDelete = useCallback(async () => {
+    if (!confirmDelete) return;
+    await deleteKB(confirmDelete.id);
+    setConfirmDelete(null);
+    refresh();
+  }, [confirmDelete, refresh]);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -181,6 +185,18 @@ export default function KBListPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Confirm Delete Dialog */}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="确认删除"
+          message={`确定删除「${confirmDelete.name}」及其所有文档？此操作不可撤销。`}
+          confirmLabel="确认删除"
+          danger
+          onConfirm={executeDelete}
+          onCancel={() => setConfirmDelete(null)}
+        />
       )}
     </div>
   );

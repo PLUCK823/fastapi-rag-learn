@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listMessages } from "../api/kb";
+import { listSessionMessages } from "../api/kb";
 import type { Message } from "../types";
 
 let _msgId = 0;
@@ -8,20 +8,25 @@ function nextId(): string {
   return `msg_${_msgId}_${Date.now()}`;
 }
 
-export function useChatWS(kbId: number) {
+export function useChatWS(kbId: number, sessionId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const doneRef = useRef(false);
 
+  // Load session messages when sessionId changes
   useEffect(() => {
-    listMessages(kbId).then((msgs) => setMessages(msgs));
-  }, [kbId]);
+    if (sessionId) {
+      listSessionMessages(kbId, sessionId).then(setMessages);
+    } else {
+      setMessages([]);
+    }
+  }, [kbId, sessionId]);
 
   const send = useCallback(
     (question: string) => {
       const token = localStorage.getItem("token");
-      if (!token) return;
+      if (!token || !sessionId) return;
 
       const aiId = nextId();
       const userMsg: Message = { id: nextId(), role: "user", content: question };
@@ -32,7 +37,7 @@ export function useChatWS(kbId: number) {
 
       const proto = window.location.protocol === "https:" ? "wss" : "ws";
       const host = window.location.host;
-      const url = `${proto}://${host}/ws/${kbId}?token=${token}`;
+      const url = `${proto}://${host}/ws/${kbId}?token=${token}&session_id=${sessionId}`;
 
       const ws = new WebSocket(url);
       wsRef.current = ws;
@@ -51,7 +56,6 @@ export function useChatWS(kbId: number) {
             setIsStreaming(false);
             doneRef.current = true;
           } else if (data.done) {
-            // 流式结束，附加 sources
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === aiId ? { ...m, isStreaming: false, sources: data.sources } : m,
@@ -60,9 +64,7 @@ export function useChatWS(kbId: number) {
             setIsStreaming(false);
             doneRef.current = true;
           }
-          // 如果是其他 JSON（比如未来扩展），忽略
         } catch {
-          // 普通文本 token，追加到内容
           setMessages((prev) =>
             prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
           );
@@ -79,7 +81,7 @@ export function useChatWS(kbId: number) {
         doneRef.current = true;
       };
     },
-    [kbId],
+    [kbId, sessionId],
   );
 
   const clear = useCallback(() => setMessages([]), []);

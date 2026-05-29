@@ -21,6 +21,7 @@ class ChatMessage(Base):
     )
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), default=datetime.now(UTC)

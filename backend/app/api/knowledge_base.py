@@ -1,7 +1,7 @@
 """知识库 + 文档管理路由（同步，避免 greenlet）"""
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import delete
+from sqlalchemy import delete, desc, func
 from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from app.models.schemas import (
     KBInfo,
     KBRenameRequest,
     MessageInfo,
+    SessionInfo,
 )
 from app.models.user import User
 from app.services import knowledge_base as kb_service
@@ -250,3 +251,99 @@ def clear_messages(
     )
     session.commit()
     return {"message": "聊天记录已清空"}
+
+
+# ── Chat Sessions ──
+
+
+@router.get("/{kb_id}/sessions", response_model=list[SessionInfo])
+def list_sessions(
+    kb_id: int,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    """列出该知识库下所有会话（按最后活跃时间倒序）"""
+    kb_service._get_kb(session, kb_id, user.id)
+
+    rows = session.execute(
+        sa_select(
+            ChatMessage.session_id,
+            func.count(ChatMessage.id).label("message_count"),
+            func.min(ChatMessage.created_at).label("created_at"),
+            func.max(ChatMessage.created_at).label("updated_at"),
+        )
+        .where(
+            ChatMessage.kb_id == kb_id,
+            ChatMessage.user_id == user.id,
+            ChatMessage.session_id.isnot(None),
+        )
+        .group_by(ChatMessage.session_id)
+        .order_by(desc(func.max(ChatMessage.created_at)))
+    ).all()
+
+    result: list[SessionInfo] = []
+    for row in rows:
+        # 取该 session 的第一条 user 消息作为预览
+        first_msg = session.execute(
+            sa_select(ChatMessage)
+            .where(
+                ChatMessage.kb_id == kb_id,
+                ChatMessage.user_id == user.id,
+                ChatMessage.session_id == row.session_id,
+                ChatMessage.role == "user",
+            )
+            .order_by(ChatMessage.created_at)
+            .limit(1)
+        ).scalar()
+
+        result.append(
+            SessionInfo(
+                session_id=row.session_id,
+                first_question=first_msg.content if first_msg else "",
+                message_count=row.message_count,
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+        )
+    return result
+
+
+@router.get("/{kb_id}/sessions/{session_id}/messages", response_model=list[MessageInfo])
+def list_session_messages(
+    kb_id: int,
+    session_id: str,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    """获取指定会话的所有消息"""
+    kb_service._get_kb(session, kb_id, user.id)
+    result = session.execute(
+        sa_select(ChatMessage)
+        .where(
+            ChatMessage.kb_id == kb_id,
+            ChatMessage.user_id == user.id,
+            ChatMessage.session_id == session_id,
+        )
+        .order_by(ChatMessage.created_at)
+    )
+    return result.scalars().all()
+
+
+@router.delete("/{kb_id}/sessions/{session_id}")
+def delete_session(
+    kb_id: int,
+    session_id: str,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    """删除指定会话及其所有消息"""
+    kb_service._get_kb(session, kb_id, user.id)
+    session.execute(
+        delete(ChatMessage).where(
+            ChatMessage.kb_id == kb_id,
+            ChatMessage.user_id == user.id,
+            ChatMessage.session_id == session_id,
+        )
+    )
+    session.commit()
+    return {"message": "会话已删除"}

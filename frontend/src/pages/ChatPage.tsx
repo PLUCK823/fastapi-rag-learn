@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { clearMessages, deleteDocument, getDocContent, listKBs, uploadFile } from "../api/kb";
+import {
+  clearMessages,
+  deleteDocument,
+  deleteSession,
+  getDocContent,
+  listKBs,
+  listSessions,
+  uploadFile,
+} from "../api/kb";
 import ChatMessage from "../components/chat/ChatMessage";
 import DocEditorModal from "../components/chat/DocEditorModal";
+import ConfirmDialog from "../components/shared/ConfirmDialog";
 import { useChatWS } from "../hooks/useChat";
-import type { Document, KBDetail } from "../types";
+import type { Document, KBDetail, Session } from "../types";
 
 const SEND_ICON = (
   <svg
@@ -56,13 +65,25 @@ const EMPTY_CHAT = (
   </div>
 );
 
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${m}/${day}`;
+}
+
 export default function ChatPage() {
   const { kbId } = useParams<{ kbId: string }>();
   const kbIdNum = Number(kbId);
   const [kb, setKb] = useState<KBDetail | null>(null);
   const [docs, setDocs] = useState<Document[]>([]);
   const [input, setInput] = useState("");
-  const { messages, isStreaming, send, clear } = useChatWS(kbIdNum);
+
+  // Session state
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  const { messages, isStreaming, send, clear } = useChatWS(kbIdNum, activeSessionId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +92,8 @@ export default function ChatPage() {
   const [editDoc, setEditDoc] = useState<Document | null>(null);
   const [editContent, setEditContent] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
 
   // Auto-scroll
   useEffect(() => {
@@ -86,9 +109,56 @@ export default function ChatPage() {
     }
   }, [kbIdNum]);
 
+  const refreshSessions = useCallback(async () => {
+    const list = await listSessions(kbIdNum);
+    setSessions(list);
+    return list;
+  }, [kbIdNum]);
+
+  // Init: load docs + sessions, auto-select or create session
   useEffect(() => {
     refreshDocs();
-  }, [refreshDocs]);
+    refreshSessions().then((list) => {
+      // Auto-select the latest session, or none if no sessions
+      if (list.length > 0) {
+        setActiveSessionId(list[0].session_id);
+      }
+    });
+  }, [refreshDocs, refreshSessions]);
+
+  /* ── Session actions ── */
+
+  const handleNewSession = useCallback(() => {
+    // Generate a timestamp-based session ID
+    const sid = `sess_${Date.now()}`;
+    setActiveSessionId(sid);
+    setSessions((prev) => [
+      {
+        session_id: sid,
+        first_question: "新的对话",
+        message_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  }, []);
+
+  const handleDeleteSession = useCallback((s: Session) => {
+    setConfirmDeleteSession(s);
+  }, []);
+
+  const executeDeleteSession = useCallback(async () => {
+    if (!confirmDeleteSession) return;
+    const sid = confirmDeleteSession.session_id;
+    await deleteSession(kbIdNum, sid);
+    setConfirmDeleteSession(null);
+    const list = await refreshSessions();
+    // If deleted current session, switch to latest
+    if (activeSessionId === sid) {
+      setActiveSessionId(list.length > 0 ? list[0].session_id : null);
+    }
+  }, [kbIdNum, confirmDeleteSession, activeSessionId, refreshSessions]);
 
   /* ── Document actions ── */
 
@@ -108,14 +178,16 @@ export default function ChatPage() {
     [kbIdNum],
   );
 
-  const handleDeleteDoc = useCallback(
-    async (doc: Document) => {
-      if (!confirm(`确定删除「${doc.filename}」？`)) return;
-      await deleteDocument(kbIdNum, doc.id);
-      refreshDocs();
-    },
-    [kbIdNum, refreshDocs],
-  );
+  const handleDeleteDoc = useCallback((doc: Document) => {
+    setConfirmDelete(doc);
+  }, []);
+
+  const executeDeleteDoc = useCallback(async () => {
+    if (!confirmDelete) return;
+    await deleteDocument(kbIdNum, confirmDelete.id);
+    setConfirmDelete(null);
+    refreshDocs();
+  }, [kbIdNum, confirmDelete, refreshDocs]);
 
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +199,6 @@ export default function ChatPage() {
         refreshDocs();
       } finally {
         setUploading(false);
-        // Reset so same file can be re-uploaded
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
@@ -139,20 +210,25 @@ export default function ChatPage() {
     if (isStreaming || !text) return;
     send(text);
     setInput("");
-  }, [input, isStreaming, send]);
+    // Refresh sessions after send (to update the list when backend saves)
+    setTimeout(() => refreshSessions(), 500);
+  }, [input, isStreaming, send, refreshSessions]);
+
+  const displayName = activeSessionId
+    ? sessions.find((s) => s.session_id === activeSessionId)?.first_question ?? "对话"
+    : "对话";
 
   return (
     <div className="flex gap-6 max-w-6xl mx-auto" style={{ height: "calc(100vh - 120px)" }}>
-      {/* Document sidebar */}
+      {/* Left sidebar: documents + sessions */}
       <aside className="w-56 shrink-0 card p-4 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between mb-3">
-          <h2
-            className="display-text text-sm font-semibold truncate"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {kb?.name ?? "..."}
-          </h2>
-        </div>
+        {/* KB name */}
+        <h2
+          className="display-text text-sm font-semibold truncate mb-3"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {kb?.name ?? "..."}
+        </h2>
 
         {/* Upload & New buttons */}
         <div className="flex gap-1.5 mb-3">
@@ -184,6 +260,76 @@ export default function ChatPage() {
             className="hidden"
             onChange={handleFileUpload}
           />
+        </div>
+
+        {/* Sessions section */}
+        <div
+          className="pb-2 mb-2"
+          style={{ borderBottom: "var(--border-light)" }}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span
+              className="text-[10px] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-muted)" }}
+            >
+              会话
+            </span>
+            <button
+              type="button"
+              className="text-xs font-medium px-1.5 py-0.5 rounded transition-colors"
+              style={{ color: "var(--accent)" }}
+              onClick={handleNewSession}
+            >
+              + 新建
+            </button>
+          </div>
+          <div className="-mx-4 px-4 max-h-28 overflow-y-auto">
+            {sessions.length === 0 ? (
+              <p className="text-[10px] py-1" style={{ color: "var(--text-muted)" }}>
+                暂无历史会话
+              </p>
+            ) : (
+              sessions.map((s) => {
+                const isActive = s.session_id === activeSessionId;
+                return (
+                  <div
+                    key={s.session_id}
+                    className="flex items-center justify-between py-1 text-xs group"
+                  >
+                    <button
+                      type="button"
+                      className={`text-left truncate flex-1 mr-1 py-0.5 rounded px-1 transition-colors ${
+                        isActive ? "font-medium" : ""
+                      }`}
+                      style={{
+                        color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                        backgroundColor: isActive ? "var(--surface-bg)" : "transparent",
+                      }}
+                      onClick={() => setActiveSessionId(s.session_id)}
+                    >
+                      <span className="block truncate text-[11px]">
+                        {s.first_question || "新的对话"}
+                      </span>
+                      <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>
+                        {fmtDate(s.updated_at)} · {s.message_count} 条
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-[10px]"
+                      style={{ color: "var(--text-muted)" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSession(s);
+                      }}
+                    >
+                      删
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
 
         {/* Doc list */}
@@ -230,10 +376,10 @@ export default function ChatPage() {
         >
           <div className="flex items-center gap-2">
             <h2
-              className="display-text text-sm font-semibold"
+              className="display-text text-sm font-semibold truncate max-w-[300px]"
               style={{ color: "var(--text-primary)" }}
             >
-              对话
+              {displayName}
             </h2>
             {isStreaming && (
               <span className="text-xs animate-pulse-soft" style={{ color: "var(--accent)" }}>
@@ -320,6 +466,30 @@ export default function ChatPage() {
           initialContent={editContent}
           onClose={() => setModalOpen(false)}
           onSaved={refreshDocs}
+        />
+      )}
+
+      {/* Confirm Delete Doc Dialog */}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="确认删除"
+          message={`确定删除「${confirmDelete.filename}」？此操作不可撤销。`}
+          confirmLabel="确认删除"
+          danger
+          onConfirm={executeDeleteDoc}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      {/* Confirm Delete Session Dialog */}
+      {confirmDeleteSession && (
+        <ConfirmDialog
+          title="确认删除"
+          message={`确定删除会话「${confirmDeleteSession.first_question || "新的对话"}」？会话中的所有消息将被清除。`}
+          confirmLabel="确认删除"
+          danger
+          onConfirm={executeDeleteSession}
+          onCancel={() => setConfirmDeleteSession(null)}
         />
       )}
     </div>

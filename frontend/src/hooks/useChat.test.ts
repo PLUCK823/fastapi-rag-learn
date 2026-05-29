@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { useChatWS } from "./useChat";
 
 const server = setupServer(
-  http.get("/kb/:kbId/messages", () =>
+  http.get("/kb/:kbId/sessions/:sessionId/messages", () =>
     HttpResponse.json([{ id: 1, role: "user", content: "hello", created_at: "2025-01-01" }]),
   ),
 );
@@ -20,7 +20,7 @@ afterAll(() => server.close());
 describe("useChatWS", () => {
   it("loads message history on mount", async () => {
     localStorage.setItem("token", "fake");
-    const { result } = renderHook(() => useChatWS(1));
+    const { result } = renderHook(() => useChatWS(1, "sess_test"));
 
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(1);
@@ -32,7 +32,7 @@ describe("useChatWS", () => {
 
   it("clear resets messages", async () => {
     localStorage.setItem("token", "fake");
-    const { result } = renderHook(() => useChatWS(1));
+    const { result } = renderHook(() => useChatWS(1, "sess_test"));
 
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(1);
@@ -47,15 +47,22 @@ describe("useChatWS", () => {
 
   it("send requires token", async () => {
     localStorage.removeItem("token");
-    const { result } = renderHook(() => useChatWS(1));
+    const { result } = renderHook(() => useChatWS(1, "sess_test"));
 
     act(() => {
       result.current.send("test question");
     });
 
-    // No messages should be added without a token
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(0);
     });
+  });
+
+  it("returns empty messages when sessionId is null", async () => {
+    localStorage.setItem("token", "fake");
+    const { result } = renderHook(() => useChatWS(1, null));
+
+    // Should not load messages without a session
+    expect(result.current.messages).toHaveLength(0);
   });
 });

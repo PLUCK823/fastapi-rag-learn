@@ -1,4 +1,4 @@
-import type { KBDetail, KnowledgeBase, Message } from "../types";
+import type { KBDetail, KnowledgeBase, Message, Session } from "../types";
 import api from "./client";
 
 export async function listKBs(includeDocs = false) {
@@ -72,4 +72,18 @@ export async function refreshToken() {
     "/auth/refresh",
   );
   return res.data;
+}
+
+export async function listSessions(kbId: number) {
+  const res = await api.get<Session[]>(`/kb/${kbId}/sessions`);
+  return res.data;
+}
+
+export async function listSessionMessages(kbId: number, sessionId: string) {
+  const res = await api.get<Message[]>(`/kb/${kbId}/sessions/${sessionId}/messages`);
+  return res.data;
+}
+
+export async function deleteSession(kbId: number, sessionId: string) {
+  return api.delete(`/kb/${kbId}/sessions/${sessionId}`);
 }

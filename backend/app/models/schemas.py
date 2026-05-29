@@ -136,10 +136,19 @@ class MessageInfo(BaseModel):
     id: int
     role: str
     content: str
+    session_id: str | None = None
     sources: list[SourceInfo] | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class SessionInfo(BaseModel):
+    session_id: str
+    first_question: str
+    message_count: int
+    created_at: datetime
+    updated_at: datetime
 
 
 # ── Pagination ──

@@ -26,12 +26,14 @@ def _save_message(
     role: str,
     content: str,
     sources: list[SourceInfo] | None,
+    session_id: str | None = None,
 ) -> None:
     msg = ChatMessage(
         kb_id=kb_id,
         user_id=user_id,
         role=role,
         content=content,
+        session_id=session_id,
         sources=[s.model_dump() for s in sources] if sources else None,
     )
     session.add(msg)
@@ -62,7 +64,12 @@ async def _get_token_user(token: str) -> dict[str, Any] | None:
 
 
 @router.websocket("/ws/{kb_id}")
-async def ws_ask(websocket: WebSocket, kb_id: int, token: str = Query(...)):
+async def ws_ask(
+    websocket: WebSocket,
+    kb_id: int,
+    token: str = Query(...),
+    session_id: str = Query(default=""),
+):
     await websocket.accept()
 
     payload = await _get_token_user(token)
@@ -105,9 +112,10 @@ async def ws_ask(websocket: WebSocket, kb_id: int, token: str = Query(...)):
         full_answer = "".join(full_answer_parts)
         user_id = int(payload.get("user_id", 0))
         if user_id:
+            sid = session_id if session_id else None
             with sync_session_factory() as session:
-                _save_message(session, kb_id, user_id, "user", data, None)
-                _save_message(session, kb_id, user_id, "assistant", full_answer, sources)
+                _save_message(session, kb_id, user_id, "user", data, None, sid)
+                _save_message(session, kb_id, user_id, "assistant", full_answer, sources, sid)
     except Exception as e:
         await websocket.send_text(json.dumps({"error": str(e)}))
     finally:
