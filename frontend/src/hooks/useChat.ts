@@ -14,6 +14,7 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const doneRef = useRef(false);
   const sessionIdRef = useRef(sessionId);
+  const shouldLoadMessages = useRef(true); // Prevent reload during send
 
   // Keep ref in sync with prop
   useEffect(() => {
@@ -22,11 +23,13 @@ export function useChatWS(kbId: number, sessionId: string | null) {
 
   // Load session messages when sessionId changes
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId && shouldLoadMessages.current) {
       listSessionMessages(kbId, sessionId).then(setMessages);
-    } else {
+    } else if (!sessionId) {
       setMessages([]);
     }
+    // Reset flag after effect runs
+    shouldLoadMessages.current = true;
   }, [kbId, sessionId]);
 
   const send = useCallback(
@@ -35,6 +38,9 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       // Use override if provided, otherwise use current ref value
       const sid = overrideSessionId ?? sessionIdRef.current;
       if (!token || !sid) return;
+
+      // Prevent useEffect from reloading messages when sessionId changes
+      shouldLoadMessages.current = false;
 
       const aiId = nextId();
       const userMsg: Message = { id: nextId(), role: "user", content: question };

@@ -124,9 +124,16 @@ export default function ChatPage() {
 
   const refreshSessions = useCallback(async () => {
     const list = await listSessions(kbIdNum);
-    setSessions(list);
+    // Preserve current active session if it's not in the backend list
+    // (happens when session is newly created and messages are still being saved)
+    const currentSession = sessions.find((s) => s.session_id === activeSessionId);
+    if (currentSession && !list.some((s) => s.session_id === activeSessionId)) {
+      setSessions([currentSession, ...list]);
+    } else {
+      setSessions(list);
+    }
     return list;
-  }, [kbIdNum]);
+  }, [kbIdNum, sessions, activeSessionId]);
 
   // Init: load docs + sessions, auto-select or create session
   useEffect(() => {
