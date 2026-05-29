@@ -132,9 +132,22 @@ export default function ChatPage() {
   useEffect(() => {
     refreshDocs();
     refreshSessions().then((list) => {
-      // Auto-select the latest session, or none if no sessions
+      // Auto-select the latest session, or create empty session if no sessions
       if (list.length > 0) {
         setActiveSessionId(list[0].session_id);
+      } else {
+        // No sessions exist, create an empty one for immediate use
+        const sid = `sess_${Date.now()}`;
+        setActiveSessionId(sid);
+        setSessions([
+          {
+            session_id: sid,
+            first_question: "新的对话",
+            message_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]);
       }
     });
   }, [refreshDocs, refreshSessions]);
@@ -142,6 +155,12 @@ export default function ChatPage() {
   /* ── Session actions ── */
 
   const handleNewSession = useCallback(() => {
+    // If current session has no messages, don't create a new one
+    // Just stay on the current empty session
+    if (messages.length === 0 && activeSessionId) {
+      return;
+    }
+
     // Generate a timestamp-based session ID
     const sid = `sess_${Date.now()}`;
     setActiveSessionId(sid);
@@ -155,7 +174,7 @@ export default function ChatPage() {
       },
       ...prev,
     ]);
-  }, []);
+  }, [messages.length, activeSessionId]);
 
   const handleDeleteSession = useCallback((s: Session) => {
     setConfirmDeleteSession(s);
