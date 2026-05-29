@@ -50,8 +50,19 @@ export function useChatWS(kbId: number) {
             );
             setIsStreaming(false);
             doneRef.current = true;
+          } else if (data.done) {
+            // 流式结束，附加 sources
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiId ? { ...m, isStreaming: false, sources: data.sources } : m,
+              ),
+            );
+            setIsStreaming(false);
+            doneRef.current = true;
           }
+          // 如果是其他 JSON（比如未来扩展），忽略
         } catch {
+          // 普通文本 token，追加到内容
           setMessages((prev) =>
             prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
           );

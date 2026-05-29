@@ -40,9 +40,16 @@ def create_kb(session: Session, user_id: int, name: str) -> KnowledgeBase:
     return kb
 
 
-def list_kbs(session: Session, user_id: int) -> list[dict]:
+def list_kbs(
+    session: Session, user_id: int, page: int = 1, page_size: int = 20
+) -> list[dict]:
+    offset = (page - 1) * page_size
     result = session.execute(
-        select(KnowledgeBase).where(KnowledgeBase.user_id == user_id)
+        select(KnowledgeBase)
+        .where(KnowledgeBase.user_id == user_id)
+        .order_by(KnowledgeBase.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
     )
     kbs = result.scalars().all()
     return [
@@ -56,9 +63,16 @@ def list_kbs(session: Session, user_id: int) -> list[dict]:
     ]
 
 
-def list_kbs_with_docs(session: Session, user_id: int) -> list[dict]:
+def list_kbs_with_docs(
+    session: Session, user_id: int, page: int = 1, page_size: int = 20
+) -> list[dict]:
+    offset = (page - 1) * page_size
     result = session.execute(
-        select(KnowledgeBase).where(KnowledgeBase.user_id == user_id)
+        select(KnowledgeBase)
+        .where(KnowledgeBase.user_id == user_id)
+        .order_by(KnowledgeBase.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
     )
     kbs = result.scalars().all()
     return [
@@ -149,10 +163,17 @@ def add_document(
     return doc
 
 
-def list_documents(session: Session, kb_id: int, user_id: int) -> list[Document]:
+def list_documents(
+    session: Session, kb_id: int, user_id: int, page: int = 1, page_size: int = 50
+) -> list[Document]:
     _get_kb(session, kb_id, user_id)
+    offset = (page - 1) * page_size
     result = session.execute(
-        select(Document).where(Document.kb_id == kb_id).order_by(Document.created_at)
+        select(Document)
+        .where(Document.kb_id == kb_id)
+        .order_by(Document.created_at)
+        .offset(offset)
+        .limit(page_size)
     )
     return list(result.scalars().all())
 
@@ -176,6 +197,29 @@ def update_document(
     delete_document_chunks(kb_id, doc_id)
     chunk_count = _ingest_to_kb(content, doc.filename, kb_id, doc_id)
     doc.chunk_count = chunk_count
+    doc.updated_at = datetime.now(UTC)
+    session.commit()
+    session.refresh(doc)
+    return doc
+
+
+def rename_document(
+    session: Session, kb_id: int, doc_id: int, user_id: int, filename: str
+) -> Document:
+    doc = get_document(session, kb_id, doc_id, user_id)
+
+    # 检查同名冲突
+    existing = session.execute(
+        select(Document).where(
+            Document.kb_id == kb_id,
+            Document.filename == filename,
+            Document.id != doc_id,
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="知识库中已存在同名文档")
+
+    doc.filename = filename
     doc.updated_at = datetime.now(UTC)
     session.commit()
     session.refresh(doc)

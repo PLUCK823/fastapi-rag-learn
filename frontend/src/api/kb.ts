@@ -37,16 +37,39 @@ export async function deleteDocument(kbId: number, docId: number) {
   return api.delete(`/kb/${kbId}/docs/${docId}`);
 }
 
+export async function renameDocument(kbId: number, docId: number, filename: string) {
+  const res = await api.put(`/kb/${kbId}/docs/${docId}/rename`, { filename });
+  return res.data;
+}
+
 export async function getDocContent(kbId: number, docId: number) {
   const res = await api.get<{ content: string }>(`/kb/${kbId}/docs/${docId}/content`);
   return res.data;
 }
 
-export async function listMessages(kbId: number) {
-  const res = await api.get<Message[]>(`/kb/${kbId}/messages`);
+export async function uploadFile(kbId: number, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await api.post(`/kb/${kbId}/upload`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+}
+
+export async function listMessages(kbId: number, page = 1, pageSize = 50) {
+  const res = await api.get<Message[]>(`/kb/${kbId}/messages`, {
+    params: { page, page_size: pageSize },
+  });
   return res.data;
 }
 
 export async function clearMessages(kbId: number) {
   return api.delete(`/kb/${kbId}/messages`);
+}
+
+export async function refreshToken() {
+  const res = await api.post<{ access_token: string; token_type: string; expires_in: number }>(
+    "/auth/refresh",
+  );
+  return res.data;
 }

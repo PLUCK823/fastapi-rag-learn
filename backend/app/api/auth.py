@@ -1,10 +1,15 @@
-"""认证路由：注册 / 登录 / 个人中心"""
+"""认证路由：注册 / 登录 / 个人中心 / 刷新令牌"""
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi_users.password import PasswordHelper
 from sqlalchemy.orm import Session
 
-from app.core.auth import auth_backend, fastapi_users
+from app.core.auth import (
+    ACCESS_TOKEN_LIFETIME,
+    auth_backend,
+    fastapi_users,
+    get_jwt_strategy,
+)
 from app.core.database import get_sync_session
 from app.models.schemas import NicknameRequest, PasswordChangeRequest, ProfileResponse
 from app.models.user import User, UserCreate, UserRead
@@ -50,3 +55,15 @@ def change_password(
     user.hashed_password = ph.hash(req.new_password)
     session.commit()
     return {"message": "密码已修改"}
+
+
+@router.post("/refresh")
+async def refresh_token(user: User = Depends(current_user)):
+    """用当前 token 换取新 token（只要还没过期就可以刷新）"""
+    strategy = get_jwt_strategy()
+    new_token = await strategy.write_token(user)
+    return {
+        "access_token": new_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_LIFETIME,
+    }

@@ -1,14 +1,11 @@
-"""RAG 引擎 — LangGraph 编排检索 + 生成，按知识库隔离向量库"""
+"""RAG 引擎 — 检索 + LLM 生成，按知识库隔离向量库"""
 
-import time
 from collections.abc import Iterator
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI
-from langgraph.graph import StateGraph
-from typing_extensions import TypedDict
 
 from app.core.config import (
     CHROMA_DIR,
@@ -86,52 +83,40 @@ def extract_sources(docs: list[Document]) -> list[SourceInfo]:
     return sources
 
 
-def ask(question: str, kb_id: int) -> tuple[str, list[SourceInfo]]:
-    _init_shared()
-    assert _llm is not None
-
+def _retrieve_context(
+    question: str, kb_id: int
+) -> tuple[str, list[Document]]:
+    """检索并构建 prompt，同时返回检索到的文档用于来源追溯"""
     vectorstore = _get_kb_vectorstore(kb_id)
     retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
+    docs: list[Document] = retriever.invoke(question)
 
-    class RAGState(TypedDict):
-        question: str
-        context: list[Document]
-        answer: str
+    parts: list[str] = []
+    for i, d in enumerate(docs, start=1):
+        name = d.metadata.get("document_name", "unknown")
+        parts.append(f"来源{i}({name}): {d.page_content}")
+    docs_text = "\n".join(parts)
 
-    def retrieve(state: RAGState) -> dict:
-        docs: list[Document] = retriever.invoke(state["question"])
-        return {"context": docs}
-
-    def generate(state: RAGState) -> dict:
-        docs_text_parts: list[str] = []
-        for i, d in enumerate(state["context"], start=1):
-            name = d.metadata.get("document_name", "unknown")
-            docs_text_parts.append(f"来源{i}({name}): {d.page_content}")
-        docs_text = "\n".join(docs_text_parts)
-
-        prompt = f"""根据以下资料回答问题。如果资料里没有答案，就说不知道。
+    prompt = f"""根据以下资料回答问题。如果资料里没有答案，就说不知道。
 
 资料:
 {docs_text}
 
-问题: {state["question"]}
+问题: {question}
 
 答案:"""
-        response = _llm.invoke(prompt)
-        return {"answer": response.content}
+    return prompt, docs
 
-    graph = (
-        StateGraph(RAGState)
-        .add_node("retrieve", retrieve)
-        .add_node("generate", generate)
-        .add_edge("retrieve", "generate")
-        .set_entry_point("retrieve")
-        .set_finish_point("generate")
-        .compile()
-    )
-    result = graph.invoke({"question": question})  # type: ignore[call-overload]
-    sources = extract_sources(result["context"])
-    return result["answer"], sources
+
+def ask(question: str, kb_id: int) -> tuple[str, list[SourceInfo]]:
+    """非流式 RAG 问答"""
+    _init_shared()
+    assert _llm is not None
+
+    prompt, docs = _retrieve_context(question, kb_id)
+    response = _llm.invoke(prompt)
+    sources = extract_sources(docs)
+    return str(response.content), sources
 
 
 # ── 文档内容 ──
@@ -151,34 +136,32 @@ def get_document_content(kb_id: int, document_id: int) -> str:
 
 # ── 流式问答 ──
 
-def _build_prompt(question: str, kb_id: int) -> str:
-    vectorstore = _get_kb_vectorstore(kb_id)
-    retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
-    docs: list[Document] = retriever.invoke(question)
-
-    parts: list[str] = []
-    for i, d in enumerate(docs, start=1):
-        name = d.metadata.get("document_name", "unknown")
-        parts.append(f"来源{i}({name}): {d.page_content}")
-    docs_text = "\n".join(parts)
-
-    return f"""根据以下资料回答问题。如果资料里没有答案，就说不知道。
-
-资料:
-{docs_text}
-
-问题: {question}
-
-答案:"""
-
-
 def ask_stream(question: str, kb_id: int) -> Iterator[str]:
+    """真正的 LLM token 级流式输出，每个 chunk 是一个 token"""
     _init_shared()
     assert _llm is not None
 
-    prompt = _build_prompt(question, kb_id)
-    answer = str(_llm.invoke(prompt).content)
+    prompt, _docs = _retrieve_context(question, kb_id)
+    for chunk in _llm.stream(prompt):
+        c = chunk.content
+        if isinstance(c, str) and c:
+            yield c
 
-    for ch in answer:
-        yield ch
-        time.sleep(0.02)
+
+def ask_stream_with_sources(
+    question: str, kb_id: int
+) -> tuple[Iterator[str], list[SourceInfo]]:
+    """流式输出 + 来源信息，一次检索供两用"""
+    _init_shared()
+    assert _llm is not None
+
+    prompt, docs = _retrieve_context(question, kb_id)
+    sources = extract_sources(docs)
+
+    def _stream() -> Iterator[str]:
+        for chunk in _llm.stream(prompt):
+            c = chunk.content
+            if isinstance(c, str) and c:
+                yield c
+
+    return _stream(), sources

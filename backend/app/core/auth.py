@@ -14,6 +14,9 @@ from app.models.user import User
 
 UserDB = SQLAlchemyUserDatabase[User, int]
 
+ACCESS_TOKEN_LIFETIME = 3600  # 1 小时
+REFRESH_TOKEN_LIFETIME = 604800  # 7 天
+
 
 async def get_user_db(
     session: AsyncSession = Depends(get_async_session),
@@ -33,7 +36,11 @@ bearer_transport = BearerTransport(tokenUrl="auth/login")
 
 
 def get_jwt_strategy() -> JWTStrategy:
-    return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=3600)
+    return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=ACCESS_TOKEN_LIFETIME)
+
+
+def get_refresh_jwt_strategy() -> JWTStrategy:
+    return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=REFRESH_TOKEN_LIFETIME)
 
 
 auth_backend = AuthenticationBackend(
