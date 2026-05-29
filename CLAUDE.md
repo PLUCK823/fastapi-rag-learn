@@ -91,3 +91,12 @@ npm run dev                                      # dev server (port 5173)
 - MSW (Mock Service Worker) for API mocking at network level
 - Test user behavior (clicks, typing), not implementation details
 - `@testing-library/jest-dom` for DOM assertions
+
+## Skills (全局)
+
+编写或重构前端代码时，**必须**遵循以下两个全局 Skill：
+
+- **`vercel-react-best-practices`** — Vercel 官方 React 性能优化（70 条规则，8 大类别：消除瀑布流、Bundle 优化、服务端性能、重渲染优化、渲染性能、JS 性能等）
+- **`frontend-design`** — Anthropic 官方 UI 设计规范，禁止通用 AI 审美（Inter/Roboto 字体、紫色渐变白底等），要求独特的字体、色彩、空间构图
+
+每次写前端代码前，先参考 vercel-react-best-practices 检查性能模式，再参考 frontend-design 确定视觉方向。
