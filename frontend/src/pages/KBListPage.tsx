@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { createKB, deleteKB, listKBs } from "../api/kb";
+import { createKB, deleteKB, listKBs, renameKB } from "../api/kb";
 import ConfirmDialog from "../components/shared/ConfirmDialog";
 import type { KBDetail, KnowledgeBase } from "../types";
 
@@ -43,6 +43,16 @@ export default function KBListPage() {
   const [kbs, setKBs] = useState<(KnowledgeBase | KBDetail)[]>([]);
   const [newName, setNewName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<(KnowledgeBase | KBDetail) | null>(null);
+  const [editingKb, setEditingKb] = useState<(KnowledgeBase | KBDetail) | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus edit input when editing starts
+  useEffect(() => {
+    if (editingKb && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingKb]);
 
   const refresh = useCallback(() => {
     listKBs(true).then(setKBs);
@@ -63,6 +73,20 @@ export default function KBListPage() {
   const handleDelete = useCallback((kb: KnowledgeBase | KBDetail) => {
     setConfirmDelete(kb);
   }, []);
+
+  const handleEdit = useCallback((kb: KnowledgeBase | KBDetail) => {
+    setEditingKb(kb);
+    setEditingName(kb.name);
+  }, []);
+
+  const executeRename = useCallback(async () => {
+    const name = editingName.trim();
+    if (!editingKb || !name) return;
+    await renameKB(editingKb.id, name);
+    setEditingKb(null);
+    setEditingName("");
+    refresh();
+  }, [editingKb, editingName, refresh]);
 
   const executeDelete = useCallback(async () => {
     if (!confirmDelete) return;
@@ -131,7 +155,7 @@ export default function KBListPage() {
               className="card card-hover px-5 py-4 flex items-center justify-between animate-fade-in-up"
               style={{ animationDelay: `${100 + i * 60}ms` }}
             >
-              <div className="flex items-center gap-4 min-w-0">
+              <div className="flex items-center gap-4 min-w-0 flex-1">
                 {/* Icon */}
                 <div
                   className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
@@ -153,35 +177,83 @@ export default function KBListPage() {
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                   </svg>
                 </div>
-                <div className="min-w-0">
-                  <Link
-                    to={`/chat/${kb.id}`}
-                    className="font-medium text-sm no-underline transition-colors block truncate"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {kb.name}
-                  </Link>
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    {kb.document_count} 篇文档
-                  </span>
-                </div>
+                {editingKb?.id === kb.id ? (
+                  <input
+                    ref={editInputRef}
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") executeRename();
+                      if (e.key === "Escape") {
+                        setEditingKb(null);
+                        setEditingName("");
+                      }
+                    }}
+                    onBlur={() => {
+                      if (editingName.trim() && editingName.trim() !== editingKb?.name) {
+                        executeRename();
+                      } else {
+                        setEditingKb(null);
+                        setEditingName("");
+                      }
+                    }}
+                    className="flex-1 px-3 py-1.5 rounded-lg text-sm outline-none"
+                    style={{
+                      backgroundColor: "var(--surface-bg)",
+                      border: "1px solid var(--color-copper)",
+                      color: "var(--text-primary)",
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      to={`/chat/${kb.id}`}
+                      className="font-medium text-sm no-underline transition-colors block truncate"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {kb.name}
+                    </Link>
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {kb.document_count} 篇文档
+                    </span>
+                  </div>
+                )}
               </div>
-              <button
-                type="button"
-                className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors shrink-0 ml-4"
-                style={{ color: "var(--text-muted)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(181, 91, 91, 0.08)";
-                  e.currentTarget.style.color = "var(--danger)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                }}
-                onClick={() => handleDelete(kb)}
-              >
-                删除
-              </button>
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <button
+                  type="button"
+                  className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+                  style={{ color: "var(--text-muted)" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--surface-bg)";
+                    e.currentTarget.style.color = "var(--text-primary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.color = "var(--text-muted)";
+                  }}
+                  onClick={() => handleEdit(kb)}
+                >
+                  编辑
+                </button>
+                <button
+                  type="button"
+                  className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+                  style={{ color: "var(--text-muted)" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(181, 91, 91, 0.08)";
+                    e.currentTarget.style.color = "var(--danger)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.color = "var(--text-muted)";
+                  }}
+                  onClick={() => handleDelete(kb)}
+                >
+                  删除
+                </button>
+              </div>
             </div>
           ))}
         </div>
