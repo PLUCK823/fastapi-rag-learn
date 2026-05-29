@@ -20,6 +20,7 @@ from app.models.schemas import (
     KBInfo,
     KBRenameRequest,
     MessageInfo,
+    PaginatedResponse,
     SessionInfo,
 )
 from app.models.user import User
@@ -88,7 +89,7 @@ def create_kb(
     )
 
 
-@router.get("", response_model=list[KBInfo] | list[KBDetail])
+@router.get("", response_model=PaginatedResponse[KBInfo] | PaginatedResponse[KBDetail])
 def list_kbs(
     include_docs: bool = False,
     page: int = Query(1, ge=1),
@@ -97,8 +98,19 @@ def list_kbs(
     session: Session = Depends(get_sync_session),
 ):
     if include_docs:
-        return kb_service.list_kbs_with_docs(session, user.id, page=page, page_size=page_size)
-    return kb_service.list_kbs(session, user.id, page=page, page_size=page_size)
+        items = kb_service.list_kbs_with_docs(session, user.id, page=page, page_size=page_size)
+        total = kb_service.count_kbs(session, user.id)
+    else:
+        items = kb_service.list_kbs(session, user.id, page=page, page_size=page_size)
+        total = kb_service.count_kbs(session, user.id)
+    total_pages = (total + page_size - 1) // page_size
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.put("/{kb_id}", response_model=KBInfo)

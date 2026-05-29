@@ -59,3 +59,11 @@ export interface Profile {
   email: string;
   nickname: string | null;
 }
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}

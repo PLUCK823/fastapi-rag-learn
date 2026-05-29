@@ -8,24 +8,42 @@ import ChatPage from "./ChatPage";
 
 // Track document state for dynamic responses
 let docState = [
-  { id: 1, filename: "readme.md", chunk_count: 5, created_at: "2025-01-01", updated_at: "2025-01-01" },
+  {
+    id: 1,
+    filename: "readme.md",
+    chunk_count: 5,
+    created_at: "2025-01-01",
+    updated_at: "2025-01-01",
+  },
 ];
 let sessionState = [
-  { session_id: "sess_1", first_question: "测试问题", message_count: 2, created_at: "2025-01-01", updated_at: "2025-01-01" },
+  {
+    session_id: "sess_1",
+    first_question: "测试问题",
+    message_count: 2,
+    created_at: "2025-01-01",
+    updated_at: "2025-01-01",
+  },
 ];
 
 const server = setupServer(
-  // Get KB with documents
+  // Get KB with documents (paginated response)
   http.get("/kb", () =>
-    HttpResponse.json([
-      {
-        id: 1,
-        name: "测试知识库",
-        document_count: docState.length,
-        created_at: "2025-01-01",
-        documents: docState,
-      },
-    ])
+    HttpResponse.json({
+      items: [
+        {
+          id: 1,
+          name: "测试知识库",
+          document_count: docState.length,
+          created_at: "2025-01-01",
+          documents: docState,
+        },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+    }),
   ),
   // Get sessions
   http.get("/kb/1/sessions", () => HttpResponse.json(sessionState)),
@@ -34,7 +52,7 @@ const server = setupServer(
     HttpResponse.json([
       { id: "1", role: "user", content: "测试问题", created_at: "2025-01-01" },
       { id: "2", role: "assistant", content: "测试回答", created_at: "2025-01-01" },
-    ])
+    ]),
   ),
   // Get document content
   http.get("/kb/1/docs/1/content", () => HttpResponse.json({ content: "文档内容" })),
@@ -42,7 +60,7 @@ const server = setupServer(
   http.put("/kb/1/docs/:docId/rename", async ({ request, params }) => {
     const body = (await request.json()) as { filename: string };
     docState = docState.map((d) =>
-      d.id === Number(params.docId) ? { ...d, filename: body.filename } : d
+      d.id === Number(params.docId) ? { ...d, filename: body.filename } : d,
     );
     return HttpResponse.json({
       id: Number(params.docId),
@@ -65,10 +83,22 @@ afterEach(() => {
   localStorage.clear();
   // Reset state
   docState = [
-    { id: 1, filename: "readme.md", chunk_count: 5, created_at: "2025-01-01", updated_at: "2025-01-01" },
+    {
+      id: 1,
+      filename: "readme.md",
+      chunk_count: 5,
+      created_at: "2025-01-01",
+      updated_at: "2025-01-01",
+    },
   ];
   sessionState = [
-    { session_id: "sess_1", first_question: "测试问题", message_count: 2, created_at: "2025-01-01", updated_at: "2025-01-01" },
+    {
+      session_id: "sess_1",
+      first_question: "测试问题",
+      message_count: 2,
+      created_at: "2025-01-01",
+      updated_at: "2025-01-01",
+    },
   ];
 });
 afterAll(() => server.close());
@@ -84,7 +114,7 @@ describe("ChatPage", () => {
         <Routes>
           <Route path="/chat/:kbId" element={<ChatPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(await screen.findByText("测试知识库")).toBeInTheDocument();
     expect(await screen.findByText("readme.md")).toBeInTheDocument();
@@ -96,7 +126,7 @@ describe("ChatPage", () => {
         <Routes>
           <Route path="/chat/:kbId" element={<ChatPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await screen.findByText("readme.md");
     // The rename button is hidden by default, appears on hover
@@ -112,7 +142,7 @@ describe("ChatPage", () => {
         <Routes>
           <Route path="/chat/:kbId" element={<ChatPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await screen.findByText("readme.md");
 
@@ -143,7 +173,7 @@ describe("ChatPage", () => {
         <Routes>
           <Route path="/chat/:kbId" element={<ChatPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await screen.findByText("readme.md");
 
@@ -167,7 +197,7 @@ describe("ChatPage", () => {
         <Routes>
           <Route path="/chat/:kbId" element={<ChatPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // Wait for KB name to appear
     expect(await screen.findByText("测试知识库")).toBeInTheDocument();
@@ -183,7 +213,7 @@ describe("ChatPage", () => {
         <Routes>
           <Route path="/chat/:kbId" element={<ChatPage />} />
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await screen.findByText("测试知识库");
 

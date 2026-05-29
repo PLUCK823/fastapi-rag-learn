@@ -144,11 +144,17 @@ async def test_kb_pagination(client: AsyncClient, auth_headers: dict):
     resp = await client.get("/kb?page=1&page_size=2", headers=auth_headers)
     assert resp.status_code == 200
     page1 = resp.json()
-    assert len(page1) == 2
+    assert page1["total"] == 3
+    assert page1["page"] == 1
+    assert page1["page_size"] == 2
+    assert page1["total_pages"] == 2
+    assert len(page1["items"]) == 2
 
     resp = await client.get("/kb?page=2&page_size=2", headers=auth_headers)
     page2 = resp.json()
-    assert len(page2) == 1
+    assert page2["total"] == 3
+    assert page2["page"] == 2
+    assert len(page2["items"]) == 1
 
 
 @pytest.mark.asyncio

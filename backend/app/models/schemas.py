@@ -1,8 +1,11 @@
 """Pydantic 请求/响应模型"""
 
 from datetime import datetime
+from typing import TypeVar
 
 from pydantic import BaseModel, field_validator
+
+T = TypeVar("T")
 
 # ── Ask ──
 
@@ -162,9 +165,10 @@ class PaginationParams:
         self.page_size = min(max(1, page_size), 100)
 
 
-class PaginatedResponse(BaseModel):
+class PaginatedResponse[T](BaseModel):
     """分页响应基类"""
 
+    items: list[T]
     total: int
     page: int
     page_size: int

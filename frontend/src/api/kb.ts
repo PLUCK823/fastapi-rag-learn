@@ -1,11 +1,11 @@
-import type { KBDetail, KnowledgeBase, Message, Session } from "../types";
+import type { KBDetail, KnowledgeBase, Message, PaginatedResponse, Session } from "../types";
 import api from "./client";
 
 export async function listKBs(includeDocs = false) {
-  const res = await api.get<KnowledgeBase[] | KBDetail[]>("/kb", {
+  const res = await api.get<PaginatedResponse<KnowledgeBase> | PaginatedResponse<KBDetail>>("/kb", {
     params: { include_docs: includeDocs },
   });
-  return res.data;
+  return res.data.items;
 }
 
 export async function createKB(name: string) {

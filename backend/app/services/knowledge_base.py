@@ -96,6 +96,16 @@ def list_kbs_with_docs(
     ]
 
 
+def count_kbs(session: Session, user_id: int) -> int:
+    """Count total knowledge bases for a user"""
+    from sqlalchemy import func
+
+    result = session.execute(
+        select(func.count(KnowledgeBase.id)).where(KnowledgeBase.user_id == user_id)
+    )
+    return result.scalar() or 0
+
+
 def _get_kb(session: Session, kb_id: int, user_id: int) -> KnowledgeBase:
     result = session.execute(
         select(KnowledgeBase).where(KnowledgeBase.id == kb_id)

@@ -10,7 +10,15 @@ import KBListPage from "./KBListPage";
 let kbState = [{ id: 1, name: "我的知识库", document_count: 3, created_at: "2025-01-01" }];
 
 const server = setupServer(
-  http.get("/kb", () => HttpResponse.json(kbState)),
+  http.get("/kb", () =>
+    HttpResponse.json({
+      items: kbState,
+      total: kbState.length,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+    }),
+  ),
   http.post("/kb", async ({ request }) => {
     const body = (await request.json()) as { name: string };
     const newKb = {
@@ -59,7 +67,17 @@ describe("KBListPage", () => {
   });
 
   it("shows empty state when no KBs", async () => {
-    server.use(http.get("/kb", () => HttpResponse.json([])));
+    server.use(
+      http.get("/kb", () =>
+        HttpResponse.json({
+          items: [],
+          total: 0,
+          page: 1,
+          page_size: 20,
+          total_pages: 0,
+        }),
+      ),
+    );
     localStorage.setItem("token", "fake");
     render(
       <MemoryRouter>

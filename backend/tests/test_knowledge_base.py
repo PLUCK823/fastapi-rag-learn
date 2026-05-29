@@ -16,9 +16,10 @@ async def test_create_and_list_kb(client: AsyncClient, auth_headers: dict):
 
     resp = await client.get("/kb", headers=auth_headers)
     assert resp.status_code == 200
-    kbs = resp.json()
-    assert len(kbs) == 1
-    assert kbs[0]["id"] == kb_id
+    result = resp.json()
+    assert result["total"] == 1
+    assert len(result["items"]) == 1
+    assert result["items"][0]["id"] == kb_id
 
 
 @pytest.mark.asyncio
@@ -44,7 +45,9 @@ async def test_delete_kb(client: AsyncClient, auth_headers: dict, kb_id: int):
     assert data["deleted_document_count"] == 0
 
     resp = await client.get("/kb", headers=auth_headers)
-    assert len(resp.json()) == 0
+    result = resp.json()
+    assert result["total"] == 0
+    assert len(result["items"]) == 0
 
 
 @pytest.mark.asyncio
