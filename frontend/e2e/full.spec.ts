@@ -71,8 +71,8 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByRole("button", { name: "确认删除" }).click();
     await page.waitForTimeout(500);
 
-    // KB should be deleted
-    await expect(page.getByText("待删除 KB")).not.toBeVisible({ timeout: 5000 });
+    // KB should be deleted - use role to be specific
+    await expect(page.getByRole("link", { name: "待删除 KB" })).not.toBeVisible({ timeout: 5000 });
 
     console.log("✅ KB CRUD test passed");
   });
