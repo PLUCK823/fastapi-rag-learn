@@ -108,6 +108,15 @@ export default function ChatPage() {
   const [editingDocName, setEditingDocName] = useState("");
   const docEditInputRef = useRef<HTMLInputElement>(null);
 
+  // Document search filter
+  const [docFilter, setDocFilter] = useState("");
+  const filteredDocs = docFilter.trim()
+    ? docs.filter((d) => d.filename.toLowerCase().includes(docFilter.trim().toLowerCase()))
+    : docs;
+
+  // Mobile sidebar toggle
+  const [showSidebar, setShowSidebar] = useState(false);
+
   // Focus edit input when editing starts
   useEffect(() => {
     if (editingDocId && docEditInputRef.current) {
@@ -319,10 +328,24 @@ export default function ChatPage() {
     : "新的对话";
 
   return (
-    <div className="flex gap-6 max-w-6xl mx-auto" style={{ height: "calc(100vh - 120px)" }}>
+    <div className="flex gap-4 md:gap-6 max-w-6xl mx-auto relative" style={{ height: "calc(100vh - 120px)" }}>
+      {/* Mobile sidebar overlay */}
+      {showSidebar && (
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ backgroundColor: "rgba(28,28,46,0.3)", backdropFilter: "blur(2px)" }}
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
       {/* Left sidebar: documents + sessions */}
-      <aside className="w-56 shrink-0 card p-4 flex flex-col overflow-hidden">
-        {/* KB name */}
+      <aside
+        className={
+          "w-56 shrink-0 card p-4 flex flex-col overflow-hidden z-50 " +
+          (showSidebar ? "fixed inset-y-0 left-0 " : "hidden ") +
+          "md:relative md:flex"
+        }
+      >
         <h2
           className="display-text text-sm font-semibold truncate mb-3"
           style={{ color: "var(--text-primary)" }}
@@ -433,13 +456,39 @@ export default function ChatPage() {
         </div>
 
         {/* Doc list */}
+        {/* Doc search */}
+        {docs.length > 0 && (
+          <div className="mb-2">
+            <input
+              value={docFilter}
+              onChange={(e) => setDocFilter(e.target.value)}
+              placeholder="搜索文档…"
+              className="w-full px-2 py-1.5 rounded-md text-[11px] outline-none transition-colors"
+              style={{
+                backgroundColor: "var(--surface-bg)",
+                border: "var(--border-light)",
+                color: "var(--text-primary)",
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "var(--color-copper)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "rgba(28,28,46,0.06)";
+              }}
+            />
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto -mx-4 px-4">
           {docs.length === 0 ? (
             <p className="text-xs text-center py-6" style={{ color: "var(--text-muted)" }}>
               暂无文档
             </p>
+          ) : filteredDocs.length === 0 ? (
+            <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>
+              无匹配文档
+            </p>
           ) : (
-            docs.map((d) => (
+            filteredDocs.map((d) => (
               <div
                 key={d.id}
                 className="flex items-center justify-between py-2 text-xs group"
@@ -509,6 +558,7 @@ export default function ChatPage() {
               </div>
             ))
           )}
+          {/* End filtered docs */}
         </div>
       </aside>
 
@@ -520,8 +570,24 @@ export default function ChatPage() {
           style={{ borderBottom: "var(--border-light)" }}
         >
           <div className="flex items-center gap-2">
+            {/* Mobile sidebar toggle */}
+            <button
+              type="button"
+              className="md:hidden p-1 rounded transition-colors shrink-0"
+              style={{ color: "var(--text-secondary)" }}
+              onClick={() => setShowSidebar(!showSidebar)}
+              aria-label={showSidebar ? "关闭侧栏" : "打开侧栏"}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                {showSidebar ? (
+                  <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
+                ) : (
+                  <><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></>
+                )}
+              </svg>
+            </button>
             <h2
-              className="display-text text-sm font-semibold truncate max-w-[300px]"
+              className="display-text text-sm font-semibold truncate max-w-[200px] md:max-w-[300px]"
               style={{ color: "var(--text-primary)" }}
             >
               {displayName}

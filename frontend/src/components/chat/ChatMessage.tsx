@@ -1,6 +1,63 @@
+import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message } from "../../types";
+
+/** 从 React children 中递归提取纯文本 */
+function extractText(children: React.ReactNode): string {
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  if (Array.isArray(children)) return children.map(extractText).join("");
+  if (React.isValidElement<{ children?: React.ReactNode }>(children)) {
+    return extractText((children.props as { children?: React.ReactNode }).children);
+  }
+  return "";
+}
+
+/** 代码块 + 复制按钮 */
+function CodeBlockWithCopy({ raw, children }: { raw: string; children: React.ReactNode }) {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(raw).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => {
+        // Fallback
+        const ta = document.createElement("textarea");
+        ta.value = raw;
+        ta.style.cssText = "position:fixed;opacity:0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+    );
+  };
+
+  return (
+    <div className="relative group my-2">
+      <button
+        type="button"
+        className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
+        onClick={handleCopy}
+        aria-label={copied ? "已复制" : "复制代码"}
+      >
+        {copied ? "已复制" : "复制"}
+      </button>
+      <pre
+        className="rounded-lg overflow-x-auto"
+        style={{ backgroundColor: "var(--color-ink)" }}
+      >
+        {children}
+      </pre>
+    </div>
+  );
+}
 
 /** 格式化时间戳：< 1 分钟 → "刚刚"，< 1 小时 → "X 分钟前"，同一天 → "HH:MM"，更早 → "MM-DD HH:MM" */
 function formatTime(iso?: string): string {
@@ -74,25 +131,18 @@ export default function ChatMessage({ msg }: { msg: Message }) {
                     }
                     return (
                       <code
-                        className="block px-3 py-2 rounded-lg text-xs font-mono overflow-x-auto"
-                        style={{
-                          backgroundColor: "var(--color-ink)",
-                          color: "var(--color-cream)",
-                        }}
+                        className="block px-3 py-2 text-xs font-mono overflow-x-auto"
+                        style={{ color: "var(--color-cream)" }}
                         {...props}
                       >
                         {children}
                       </code>
                     );
                   },
-                  pre: ({ children }) => (
-                    <pre
-                      className="my-2 rounded-lg overflow-x-auto"
-                      style={{ backgroundColor: "var(--color-ink)" }}
-                    >
-                      {children}
-                    </pre>
-                  ),
+                  pre: ({ children }) => {
+                    const raw = extractText(children);
+                    return <CodeBlockWithCopy raw={raw}>{children}</CodeBlockWithCopy>;
+                  },
                   // Style links
                   a: ({ href, children }) => (
                     <a
