@@ -10,14 +10,13 @@ load_dotenv()
 # 项目根目录（app/ 的上一级）
 ROOT_DIR = Path(__file__).parent.parent.parent
 
-# 数据库 URL — 默认 PostgreSQL
-# 本地开发: postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn
-# Docker:   postgresql+asyncpg://raguser:${DB_PASSWORD}@db:5432/raglearn
-# SQLite:   sqlite+aiosqlite:///./app.db（需要时手动设置）
-_DEFAULT_DB_URL = "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn"
-DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DB_URL)
-
-IS_POSTGRES = DATABASE_URL.startswith("postgresql")
+# 数据库 — PostgreSQL
+# 本地: postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn
+# Docker: postgresql+asyncpg://raguser:${DB_PASSWORD}@db:5432/raglearn
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn",
+)
 
 # 用户认证
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
