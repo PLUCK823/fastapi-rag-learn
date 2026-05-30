@@ -89,7 +89,6 @@ interface ChatMessageProps {
   onEditMessage?: (msgIndex: number, newContent: string) => void;
   onRegenerate?: (msgIndex: number) => void;
   msgIndex: number;
-  isStreaming?: boolean;
 }
 
 export default function ChatMessage({
@@ -212,11 +211,11 @@ export default function ChatMessage({
                 <div className="whitespace-pre-wrap break-words">{msg.content}</div>
               )
             ) : msg.isStreaming ? (
-              /* Streaming: render as plain text (fast, avoids Markdown parse on every frame) */
+              /* Streaming: plain text + cursor */
               <span>
                 <span className="whitespace-pre-wrap break-words">{msg.content}</span>
                 <span
-                  className="inline-block animate-pulse-soft ml-0.5"
+                  className="tw-cursor inline-block animate-pulse-soft ml-0.5"
                   style={{ color: "var(--accent)" }}
                 >
                   ▊

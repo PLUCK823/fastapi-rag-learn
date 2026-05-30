@@ -113,7 +113,7 @@ export default function ChatPage() {
   const [searching, setSearching] = useState(false);
 
   const extractKeywords = useCallback((text: string): string[] => {
-    const cleaned = text.replace(/[？?，,。！!、：:；;（）()【】\[\]]/g, " ");
+    const cleaned = text.replace(/[？?，,。！!、：:；;（）()【】[\]]/g, " ");
     const spaceWords = cleaned.split(/\s+/).filter((w) => w.length >= 2);
     const chineseOnly = text.replace(/[^一-鿿]/g, "");
     const ngrams: string[] = [];
@@ -209,9 +209,8 @@ export default function ChatPage() {
         setSearchResults(results);
       } catch {
         // Fallback: filter locally by first_question
-        const local = sessions.filter(
-          (s) =>
-            s.first_question?.toLowerCase().includes(q.trim().toLowerCase()),
+        const local = sessions.filter((s) =>
+          s.first_question?.toLowerCase().includes(q.trim().toLowerCase()),
         );
         setSearchResults(
           local.map((s) => ({
@@ -320,7 +319,12 @@ export default function ChatPage() {
   }, []);
 
   const handleCitationClick = useCallback(
-    async (documentId: number, documentName: string, questionKeywords: string[], snippet: string) => {
+    async (
+      documentId: number,
+      documentName: string,
+      questionKeywords: string[],
+      snippet: string,
+    ) => {
       try {
         const { content } = await getDocContent(kbIdNum, documentId);
         const snippetKeywords = extractKeywords(snippet);
@@ -421,8 +425,18 @@ export default function ChatPage() {
         className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
         style={{ backgroundColor: "var(--surface-bg)" }}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          strokeWidth="1.5" strokeLinecap="round" opacity="0.25" role="img" aria-label="对话">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          opacity="0.25"
+          role="img"
+          aria-label="对话"
+        >
           <title>对话</title>
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
@@ -440,10 +454,15 @@ export default function ChatPage() {
           { value: kbStats.message_count, label: "消息" },
         ].map((s) => (
           <div key={s.label} className="text-center">
-            <p className="display-text text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+            <p
+              className="display-text text-lg font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
               {s.value}
             </p>
-            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{s.label}</p>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+              {s.label}
+            </p>
           </div>
         ))}
       </div>
@@ -451,7 +470,10 @@ export default function ChatPage() {
       {/* Suggested questions */}
       {docs.length > 0 && (
         <div className="max-w-md mx-auto">
-          <p className="text-[10px] font-medium uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>
+          <p
+            className="text-[10px] font-medium uppercase tracking-wider mb-2"
+            style={{ color: "var(--text-muted)" }}
+          >
             建议问题
           </p>
           <div className="flex flex-wrap justify-center gap-1.5">
@@ -483,7 +505,9 @@ export default function ChatPage() {
                   onClick={() => {
                     setInput(q as string);
                     // Focus the input
-                    const inp = document.querySelector<HTMLInputElement>('input[placeholder*="Enter"]');
+                    const inp = document.querySelector<HTMLInputElement>(
+                      'input[placeholder*="Enter"]',
+                    );
                     inp?.focus();
                   }}
                 >
@@ -497,7 +521,10 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="flex gap-4 md:gap-6 max-w-6xl mx-auto relative" style={{ height: "calc(100vh - 120px)" }}>
+    <div
+      className="flex gap-4 md:gap-6 max-w-6xl mx-auto relative"
+      style={{ height: "calc(100vh - 120px)" }}
+    >
       {/* Mobile sidebar overlay */}
       {showSidebar && (
         <div
@@ -515,7 +542,10 @@ export default function ChatPage() {
           "md:relative md:flex"
         }
       >
-        <h2 className="display-text text-sm font-semibold truncate mb-3" style={{ color: "var(--text-primary)" }}>
+        <h2
+          className="display-text text-sm font-semibold truncate mb-3"
+          style={{ color: "var(--text-primary)" }}
+        >
           {kb?.name ?? "..."}
         </h2>
 
@@ -531,19 +561,32 @@ export default function ChatPage() {
           <button
             type="button"
             className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors disabled:opacity-50"
-            style={{ backgroundColor: "var(--surface-bg)", color: "var(--text-secondary)", border: "var(--border-medium)" }}
+            style={{
+              backgroundColor: "var(--surface-bg)",
+              color: "var(--text-secondary)",
+              border: "var(--border-medium)",
+            }}
             disabled={uploading}
             onClick={() => fileInputRef.current?.click()}
           >
             {uploading ? "上传中..." : "上传"}
           </button>
-          <input ref={fileInputRef} type="file" accept=".txt,.md,.pdf" className="hidden" onChange={handleFileUpload} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.md,.pdf"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
         </div>
 
         {/* Sessions section */}
         <div className="pb-2 mb-2" style={{ borderBottom: "var(--border-light)" }}>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+            <span
+              className="text-[10px] font-medium uppercase tracking-wider"
+              style={{ color: "var(--text-muted)" }}
+            >
               会话
             </span>
             <button
@@ -568,8 +611,12 @@ export default function ChatPage() {
                 border: "var(--border-light)",
                 color: "var(--text-primary)",
               }}
-              onFocus={(e) => { e.target.style.borderColor = "var(--color-copper)"; }}
-              onBlur={(e) => { e.target.style.borderColor = "var(--border-color-light)"; }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "var(--color-copper)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "var(--border-color-light)";
+              }}
             />
           </div>
 
@@ -598,7 +645,10 @@ export default function ChatPage() {
                       {r.first_question || "新的对话"}
                     </span>
                     {r.match_snippet && (
-                      <span className="block truncate text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      <span
+                        className="block truncate text-[10px] mt-0.5"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         …{r.match_snippet}…
                       </span>
                     )}
@@ -606,12 +656,17 @@ export default function ChatPage() {
                 ))
               )
             ) : sessions.length === 0 ? (
-              <p className="text-[10px] py-1" style={{ color: "var(--text-muted)" }}>暂无历史会话</p>
+              <p className="text-[10px] py-1" style={{ color: "var(--text-muted)" }}>
+                暂无历史会话
+              </p>
             ) : (
               sessions.map((s) => {
                 const isActive = s.session_id === activeSessionId;
                 return (
-                  <div key={s.session_id} className="flex items-center justify-between py-1 text-xs group">
+                  <div
+                    key={s.session_id}
+                    className="flex items-center justify-between py-1 text-xs group"
+                  >
                     <button
                       type="button"
                       className={`text-left truncate flex-1 mr-1 py-0.5 rounded px-1 transition-colors ${isActive ? "font-medium" : ""}`}
@@ -624,7 +679,9 @@ export default function ChatPage() {
                         setActiveSessionId(s.session_id);
                       }}
                     >
-                      <span className="block truncate text-[11px]">{s.first_question || "新的对话"}</span>
+                      <span className="block truncate text-[11px]">
+                        {s.first_question || "新的对话"}
+                      </span>
                       <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>
                         {fmtDate(s.updated_at)} · {s.message_count} 条
                       </span>
@@ -633,7 +690,10 @@ export default function ChatPage() {
                       type="button"
                       className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-[10px]"
                       style={{ color: "var(--text-muted)" }}
-                      onClick={(e) => { e.stopPropagation(); handleDeleteSession(s); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSession(s);
+                      }}
                     >
                       删
                     </button>
@@ -652,21 +712,36 @@ export default function ChatPage() {
               onChange={(e) => setDocFilter(e.target.value)}
               placeholder="搜索文档…"
               className="w-full px-2 py-1.5 rounded-md text-[11px] outline-none transition-colors"
-              style={{ backgroundColor: "var(--surface-bg)", border: "var(--border-light)", color: "var(--text-primary)" }}
-              onFocus={(e) => { e.target.style.borderColor = "var(--color-copper)"; }}
-              onBlur={(e) => { e.target.style.borderColor = "var(--border-color-light)"; }}
+              style={{
+                backgroundColor: "var(--surface-bg)",
+                border: "var(--border-light)",
+                color: "var(--text-primary)",
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "var(--color-copper)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "var(--border-color-light)";
+              }}
             />
           </div>
         )}
         <div className="flex-1 overflow-y-auto -mx-4 px-4">
           {docs.length === 0 ? (
-            <p className="text-xs text-center py-6" style={{ color: "var(--text-muted)" }}>暂无文档</p>
+            <p className="text-xs text-center py-6" style={{ color: "var(--text-muted)" }}>
+              暂无文档
+            </p>
           ) : filteredDocs.length === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>无匹配文档</p>
+            <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>
+              无匹配文档
+            </p>
           ) : (
             filteredDocs.map((d) => (
-              <div key={d.id} className="flex items-center justify-between py-2 text-xs group"
-                style={{ borderBottom: "var(--border-light)" }}>
+              <div
+                key={d.id}
+                className="flex items-center justify-between py-2 text-xs group"
+                style={{ borderBottom: "var(--border-light)" }}
+              >
                 {editingDocId === d.id ? (
                   <input
                     ref={docEditInputRef}
@@ -674,14 +749,25 @@ export default function ChatPage() {
                     onChange={(e) => setEditingDocName(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") executeRenameDoc();
-                      if (e.key === "Escape") { setEditingDocId(null); setEditingDocName(""); }
+                      if (e.key === "Escape") {
+                        setEditingDocId(null);
+                        setEditingDocName("");
+                      }
                     }}
                     onBlur={() => {
-                      if (editingDocName.trim() && editingDocName.trim() !== d.filename) executeRenameDoc();
-                      else { setEditingDocId(null); setEditingDocName(""); }
+                      if (editingDocName.trim() && editingDocName.trim() !== d.filename)
+                        executeRenameDoc();
+                      else {
+                        setEditingDocId(null);
+                        setEditingDocName("");
+                      }
                     }}
                     className="flex-1 px-2 py-1 rounded text-xs outline-none mr-2"
-                    style={{ backgroundColor: "var(--surface-bg)", border: "1px solid var(--color-copper)", color: "var(--text-primary)" }}
+                    style={{
+                      backgroundColor: "var(--surface-bg)",
+                      border: "1px solid var(--color-copper)",
+                      color: "var(--text-primary)",
+                    }}
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
@@ -700,7 +786,10 @@ export default function ChatPage() {
                       type="button"
                       className="opacity-0 group-hover:opacity-100 transition-opacity px-1 py-0.5 rounded text-xs"
                       style={{ color: "var(--text-muted)" }}
-                      onClick={(e) => { e.stopPropagation(); handleEditDocName(d); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditDocName(d);
+                      }}
                     >
                       改
                     </button>
@@ -723,7 +812,10 @@ export default function ChatPage() {
       {/* Chat area */}
       <div className="flex-1 flex flex-col card p-0 overflow-hidden">
         {/* Chat header */}
-        <div className="flex items-center justify-between px-5 py-3 shrink-0" style={{ borderBottom: "var(--border-light)" }}>
+        <div
+          className="flex items-center justify-between px-5 py-3 shrink-0"
+          style={{ borderBottom: "var(--border-light)" }}
+        >
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -732,19 +824,40 @@ export default function ChatPage() {
               onClick={() => setShowSidebar(!showSidebar)}
               aria-label={showSidebar ? "关闭侧栏" : "打开侧栏"}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
                 {showSidebar ? (
-                  <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
+                  <>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </>
                 ) : (
-                  <><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></>
+                  <>
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </>
                 )}
               </svg>
             </button>
-            <h2 className="display-text text-sm font-semibold truncate max-w-[200px] md:max-w-[300px]" style={{ color: "var(--text-primary)" }}>
+            <h2
+              className="display-text text-sm font-semibold truncate max-w-[200px] md:max-w-[300px]"
+              style={{ color: "var(--text-primary)" }}
+            >
               {displayName}
             </h2>
             {isStreaming && (
-              <span className="text-xs animate-pulse-soft" style={{ color: "var(--accent)" }}>回答中...</span>
+              <span className="text-xs animate-pulse-soft" style={{ color: "var(--accent)" }}>
+                回答中...
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -801,10 +914,7 @@ export default function ChatPage() {
         <div className="px-5 py-3 shrink-0" style={{ borderTop: "var(--border-light)" }}>
           {/* Prompt templates */}
           <div className="mb-2">
-            <PromptTemplates
-              onSelect={(prompt) => setInput(prompt)}
-              disabled={isStreaming}
-            />
+            <PromptTemplates onSelect={(prompt) => setInput(prompt)} disabled={isStreaming} />
           </div>
           <div className="flex gap-3">
             <input
@@ -823,8 +933,12 @@ export default function ChatPage() {
                 border: "var(--border-medium)",
                 color: "var(--text-primary)",
               }}
-              onFocus={(e) => { e.target.style.borderColor = "var(--color-copper)"; }}
-              onBlur={(e) => { e.target.style.borderColor = "var(--border-color-medium)"; }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "var(--color-copper)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "var(--border-color-medium)";
+              }}
               disabled={isStreaming}
             />
             <button
@@ -837,7 +951,10 @@ export default function ChatPage() {
               {isStreaming ? (
                 <span className="text-xs">...</span>
               ) : (
-                <><span className="text-sm font-medium">发送</span>{SEND_ICON}</>
+                <>
+                  <span className="text-sm font-medium">发送</span>
+                  {SEND_ICON}
+                </>
               )}
             </button>
           </div>
@@ -886,9 +1003,11 @@ export default function ChatPage() {
       {confirmClearChat && (
         <ConfirmDialog
           title="清空聊天记录"
-          message={activeSessionId
-            ? "清空当前会话的所有聊天记录？此操作不可撤销。"
-            : "清空所有未关联会话的聊天记录？此操作不可撤销。"}
+          message={
+            activeSessionId
+              ? "清空当前会话的所有聊天记录？此操作不可撤销。"
+              : "清空所有未关联会话的聊天记录？此操作不可撤销。"
+          }
           confirmLabel="确认清空"
           danger
           onConfirm={executeClearChat}

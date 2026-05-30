@@ -1,4 +1,11 @@
-import type { KBDetail, KnowledgeBase, Message, PaginatedResponse, SearchResult, Session } from "../types";
+import type {
+  KBDetail,
+  KnowledgeBase,
+  Message,
+  PaginatedResponse,
+  SearchResult,
+  Session,
+} from "../types";
 import api from "./client";
 
 export async function listKBs(includeDocs = false) {

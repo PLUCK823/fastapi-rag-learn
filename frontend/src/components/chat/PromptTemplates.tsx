@@ -2,10 +2,22 @@ import { useState } from "react";
 
 const TEMPLATES = [
   { icon: "📝", label: "总结文档", prompt: "请总结文档的核心内容和关键观点。" },
-  { icon: "📊", label: "提取关键数据", prompt: "请从文档中提取所有关键数据和数值信息，用表格列出。" },
-  { icon: "🔄", label: "对比分析", prompt: "请对比分析文档中提到的不同方案或数据，列出各自的优缺点。" },
+  {
+    icon: "📊",
+    label: "提取关键数据",
+    prompt: "请从文档中提取所有关键数据和数值信息，用表格列出。",
+  },
+  {
+    icon: "🔄",
+    label: "对比分析",
+    prompt: "请对比分析文档中提到的不同方案或数据，列出各自的优缺点。",
+  },
   { icon: "📋", label: "列出要点", prompt: "请用列表形式列出文档中的所有要点。" },
-  { icon: "🔍", label: "深度分析", prompt: "请对文档内容进行深度分析，包括背景、逻辑、影响和潜在问题。" },
+  {
+    icon: "🔍",
+    label: "深度分析",
+    prompt: "请对文档内容进行深度分析，包括背景、逻辑、影响和潜在问题。",
+  },
 ];
 
 interface PromptTemplatesProps {

@@ -151,9 +151,7 @@ export default function DocViewerModal({
                   text &&
                   highlightKeywords.some((kw) => text.toLowerCase().includes(kw.toLowerCase()))
                 ) {
-                  return (
-                    <p className="my-2">{highlightParagraph(children, highlightKeywords)}</p>
-                  );
+                  return <p className="my-2">{highlightParagraph(children, highlightKeywords)}</p>;
                 }
                 return <p className="my-2">{children}</p>;
               },
@@ -204,15 +202,10 @@ function extractTextContent(children: React.ReactNode): string {
   return "";
 }
 
-function highlightParagraph(
-  children: React.ReactNode,
-  keywords: string[],
-): React.ReactNode {
+function highlightParagraph(children: React.ReactNode, keywords: string[]): React.ReactNode {
   if (typeof children === "string") return highlightText(children, keywords);
   if (Array.isArray(children)) {
-    return children.map((child, i) => (
-      <span key={i}>{highlightParagraph(child, keywords)}</span>
-    ));
+    return children.map((child, i) => <span key={i}>{highlightParagraph(child, keywords)}</span>);
   }
   if (children && typeof children === "object" && "props" in children) {
     const el = children as { props?: { children?: React.ReactNode }; type?: unknown };
