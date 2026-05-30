@@ -46,6 +46,9 @@ jobs:
 
       - name: Unit tests (pytest)
         run: uv run pytest tests/ -v
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
 
   # ── Frontend: lint + type-check + test ──
   frontend:
@@ -121,6 +124,8 @@ jobs:
         run: uv run uvicorn app.main:app --port 8000 --host 127.0.0.1 &
         env:
           SECRET_KEY: ci-test-secret-key-at-least-32-bytes
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
 
       - name: Start frontend
         working-directory: frontend

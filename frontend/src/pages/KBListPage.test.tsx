@@ -130,7 +130,7 @@ describe("KBListPage", () => {
         <KBListPage />
       </MemoryRouter>,
     );
-    await screen.findByText("我的知识库");
+    await screen.findByRole("link", { name: "我的知识库" });
     await userEvent.click(screen.getByRole("button", { name: "编辑" }));
     // Should show an input with the current name
     const input = screen.getByDisplayValue("我的知识库");
@@ -144,7 +144,7 @@ describe("KBListPage", () => {
         <KBListPage />
       </MemoryRouter>,
     );
-    await screen.findByText("我的知识库");
+    await screen.findByRole("link", { name: "我的知识库" });
     await userEvent.click(screen.getByRole("button", { name: "编辑" }));
     const input = screen.getByDisplayValue("我的知识库");
     await userEvent.clear(input);
