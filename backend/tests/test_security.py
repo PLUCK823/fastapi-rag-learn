@@ -166,8 +166,9 @@ class TestJWTSecurity:
         resp = await client.post("/auth/login", data={"username": "tamper@test.com", "password": "test123456"})
         valid_token = resp.json()["access_token"]
 
-        # 篡改 Token（修改最后一个字符）
-        tampered_token = valid_token[:-1] + "X"
+        # 篡改 Token（翻转中间字符，确保签名校验失败）
+        mid = len(valid_token) // 2
+        tampered_token = valid_token[:mid] + ("0" if valid_token[mid] != "0" else "1") + valid_token[mid+1:]
 
         resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {tampered_token}"})
         assert resp.status_code == 401
