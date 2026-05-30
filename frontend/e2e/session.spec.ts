@@ -51,7 +51,7 @@ test("session behavior tests", async ({ page }) => {
   await page.waitForTimeout(500);
   await page.getByRole("button", { name: "创建文档" }).click();
   await page.waitForTimeout(2000);
-  await expect(page.locator("text=test.md")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("aside").locator("text=test.md")).toBeVisible({ timeout: 10000 });
 
   // Send a chat message - this will create the session
   const chatInput = page.getByPlaceholder("输入问题，Enter 发送…");

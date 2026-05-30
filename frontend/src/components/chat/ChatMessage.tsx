@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { submitFeedback } from "../../api/kb";
@@ -95,16 +95,51 @@ interface ChatMessageProps {
     /** 该来源的匹配文本片段，用于提取来源侧高亮关键词 */
     snippet: string,
   ) => void;
+  /** Callback when user edits their message */
+  onEditMessage?: (msgIndex: number, newContent: string) => void;
+  /** Callback when user wants to regenerate AI response */
+  onRegenerate?: (msgIndex: number) => void;
+  /** Index of this message in the messages array */
+  msgIndex: number;
+  /** Whether streaming is in progress (disable edit/regenerate during streaming) */
+  isStreaming?: boolean;
 }
 
 export default function ChatMessage({
   msg,
   citationKeywords = [],
   onCitationClick,
+  onEditMessage,
+  onRegenerate,
+  msgIndex,
+  isStreaming = false,
 }: ChatMessageProps) {
   const isUser = msg.role === "user";
   const [feedback, setFeedback] = useState<boolean | null | undefined>(msg.feedback);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(msg.content);
+  const editInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.setSelectionRange(editText.length, editText.length);
+    }
+  }, [editing, editText.length]);
+
+  const handleEditConfirm = useCallback(() => {
+    const trimmed = editText.trim();
+    if (trimmed && trimmed !== msg.content) {
+      onEditMessage?.(msgIndex, trimmed);
+    }
+    setEditing(false);
+  }, [editText, msg.content, msgIndex, onEditMessage]);
+
+  const handleEditCancel = useCallback(() => {
+    setEditText(msg.content);
+    setEditing(false);
+  }, [msg.content]);
 
   const handleFeedback = useCallback(
     async (value: boolean) => {
@@ -149,7 +184,56 @@ export default function ChatMessage({
         >
           {msg.content ? (
             isUser ? (
-              <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+              editing ? (
+                <div>
+                  <textarea
+                    ref={editInputRef}
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleEditConfirm();
+                      }
+                      if (e.key === "Escape") {
+                        handleEditCancel();
+                      }
+                    }}
+                    className="w-full min-w-[200px] px-2 py-1.5 rounded-md text-sm outline-none resize-none"
+                    style={{
+                      backgroundColor: "var(--on-ink-subtle)",
+                      color: "var(--color-cream)",
+                      border: "1px solid var(--on-ink-dim)",
+                    }}
+                    rows={2}
+                  />
+                  <div className="flex gap-2 mt-1.5">
+                    <button
+                      type="button"
+                      className="text-[10px] px-2 py-0.5 rounded transition-colors"
+                      style={{
+                        backgroundColor: "var(--color-cream)",
+                        color: "var(--color-ink)",
+                      }}
+                      onClick={handleEditConfirm}
+                    >
+                      保存并发送
+                    </button>
+                    <button
+                      type="button"
+                      className="text-[10px] px-2 py-0.5 rounded transition-colors"
+                      style={{
+                        color: "var(--on-ink-dim)",
+                      }}
+                      onClick={handleEditCancel}
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+              )
             ) : (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
@@ -307,12 +391,39 @@ export default function ChatMessage({
           )}
         </div>
 
-        {/* Timestamp + Feedback */}
+        {/* Timestamp + Feedback + Edit/Regenerate */}
         <div className="flex items-center gap-2 mt-1 px-1">
           {msg.created_at && (
             <span className="text-[10px] select-none" style={{ color: "var(--text-muted)" }}>
               {formatTime(msg.created_at)}
             </span>
+          )}
+          {/* Edit button for user messages */}
+          {isUser && onEditMessage && !isStreaming && !editing && (
+            <button
+              type="button"
+              className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity px-1 py-0.5 rounded"
+              style={{ color: "var(--text-muted)" }}
+              onClick={() => {
+                setEditText(msg.content);
+                setEditing(true);
+              }}
+              title="编辑消息"
+            >
+              编辑
+            </button>
+          )}
+          {/* Regenerate button for assistant messages */}
+          {!isUser && onRegenerate && !isStreaming && !msg.isStreaming && (
+            <button
+              type="button"
+              className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity px-1 py-0.5 rounded"
+              style={{ color: "var(--text-muted)" }}
+              onClick={() => onRegenerate(msgIndex)}
+              title="重新生成回答"
+            >
+              重新生成
+            </button>
           )}
           {!isUser && typeof msg.id === "number" && msg.id > 0 && (
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

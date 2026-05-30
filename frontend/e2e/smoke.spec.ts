@@ -43,8 +43,8 @@ test("full user flow", async ({ page }) => {
   // Wait for modal to close and doc to appear
   await page.waitForTimeout(2000);
 
-  // Modal should close and doc should appear - check by text content
-  await expect(page.locator("text=hello.md")).toBeVisible({ timeout: 10000 });
+  // Modal should close and doc should appear - check in sidebar
+  await expect(page.locator("aside").locator("text=hello.md")).toBeVisible({ timeout: 10000 });
 
   // 6. Chat - fill input and send
   // Note: No session exists yet, will be created when message is sent

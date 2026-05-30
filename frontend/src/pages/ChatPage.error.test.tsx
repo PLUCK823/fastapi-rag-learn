@@ -98,10 +98,11 @@ describe("ChatPage Error Handling", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("空知识库");
+    const kbNames = await screen.findAllByText("空知识库");
+    expect(kbNames.length).toBeGreaterThanOrEqual(1);
 
     // Should show empty state for documents
-    const emptyState = screen.queryByText(/暂无文档|没有文档|新建文档/);
+    const emptyState = screen.queryByText(/暂无文档/);
     expect(emptyState).toBeTruthy();
   });
 
@@ -117,15 +118,16 @@ describe("ChatPage Error Handling", () => {
     );
 
     // Wait for KB to load
-    await screen.findByText("测试知识库");
+    const kbNames = await screen.findAllByText("测试知识库");
+    expect(kbNames.length).toBeGreaterThanOrEqual(1);
 
     // Sessions section should exist (even if empty)
     // The page should render without crashing
     await waitFor(
       () => {
         // Just verify the page is rendered
-        const kbName = screen.queryByText("测试知识库");
-        expect(kbName).toBeTruthy();
+        const found = screen.queryAllByText("测试知识库");
+        expect(found.length).toBeGreaterThanOrEqual(1);
       },
       { timeout: 1000 },
     );
@@ -144,7 +146,7 @@ describe("ChatPage Boundary Tests", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("测试知识库");
+    await screen.findAllByText("测试知识库");
 
     const input = screen.getByPlaceholderText("输入问题，Enter 发送…");
 
@@ -167,7 +169,7 @@ describe("ChatPage Boundary Tests", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("测试知识库");
+    await screen.findAllByText("测试知识库");
 
     const input = screen.getByPlaceholderText("输入问题，Enter 发送…");
 
@@ -189,7 +191,7 @@ describe("ChatPage Boundary Tests", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("测试知识库");
+    await screen.findAllByText("测试知识库");
 
     const input = screen.getByPlaceholderText("输入问题，Enter 发送…");
 

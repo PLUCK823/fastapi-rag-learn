@@ -344,6 +344,54 @@ def list_session_messages(
     return result.scalars().all()
 
 
+@router.get("/{kb_id}/search-messages")
+def search_messages(
+    kb_id: int,
+    q: str = Query(..., min_length=1, description="搜索关键词"),
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    """搜索知识库下的消息内容，返回匹配的消息所在会话"""
+    kb_service._get_kb(session, kb_id, user.id)
+    results = session.execute(
+        sa_select(ChatMessage)
+        .where(
+            ChatMessage.kb_id == kb_id,
+            ChatMessage.user_id == user.id,
+            ChatMessage.content.contains(q),
+        )
+        .order_by(ChatMessage.created_at.desc())
+        .limit(50)
+    )
+    msgs = results.scalars().all()
+
+    # Deduplicate by session_id and build session summaries
+    seen_sessions: dict[str, dict] = {}
+    for msg in msgs:
+        sid = msg.session_id or ""
+        if sid not in seen_sessions:
+            # Get the first user message of this session for preview
+            first_user = session.execute(
+                sa_select(ChatMessage)
+                .where(
+                    ChatMessage.kb_id == kb_id,
+                    ChatMessage.user_id == user.id,
+                    ChatMessage.session_id == sid,
+                    ChatMessage.role == "user",
+                )
+                .order_by(ChatMessage.created_at)
+                .limit(1)
+            ).scalar()
+            seen_sessions[sid] = {
+                "session_id": sid,
+                "first_question": first_user.content if first_user else "",
+                "match_snippet": msg.content[:120],
+                "updated_at": msg.created_at,
+            }
+
+    return list(seen_sessions.values())
+
+
 @router.delete("/{kb_id}/sessions/{session_id}")
 def delete_session(
     kb_id: int,

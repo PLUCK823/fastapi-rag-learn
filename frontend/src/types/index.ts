@@ -68,3 +68,18 @@ export interface PaginatedResponse<T> {
   page_size: number;
   total_pages: number;
 }
+
+export interface SearchResult {
+  session_id: string;
+  first_question: string;
+  match_snippet: string;
+  updated_at: string;
+}
+
+export interface KBStats {
+  doc_count: number;
+  chunk_count: number;
+  session_count: number;
+  message_count: number;
+  last_activity: string | null;
+}

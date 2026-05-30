@@ -129,7 +129,7 @@ test.describe("Full E2E Test Suite", () => {
 
     await page.getByRole("button", { name: "创建文档" }).click();
     await page.waitForTimeout(2000);
-    await expect(page.locator("text=test-doc.md")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("aside").locator("text=test-doc.md")).toBeVisible({ timeout: 10000 });
 
     // Edit document - click on the document name in sidebar
     await page.getByRole("button", { name: "test-doc.md" }).click();
@@ -149,7 +149,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.waitForTimeout(1000);
 
     // Verify document still exists after edit
-    await expect(page.locator("text=test-doc.md")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("aside").locator("text=test-doc.md")).toBeVisible({ timeout: 5000 });
 
     // Delete document
     const deleteDocItem = page.locator("button").filter({ hasText: "test-doc.md" });
@@ -164,7 +164,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByRole("button", { name: "确认删除" }).click();
     await page.waitForTimeout(500);
 
-    await expect(page.locator("text=test-doc.md")).not.toBeVisible({ timeout: 5000 });
+    await expect(page.locator("aside").locator("text=test-doc.md")).not.toBeVisible({ timeout: 5000 });
 
     console.log("✅ Document CRUD test passed");
   });

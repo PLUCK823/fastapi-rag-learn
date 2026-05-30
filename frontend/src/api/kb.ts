@@ -1,4 +1,4 @@
-import type { KBDetail, KnowledgeBase, Message, PaginatedResponse, Session } from "../types";
+import type { KBDetail, KnowledgeBase, Message, PaginatedResponse, SearchResult, Session } from "../types";
 import api from "./client";
 
 export async function listKBs(includeDocs = false) {
@@ -95,4 +95,11 @@ export async function submitFeedback(messageId: number, feedback: boolean) {
   return api.patch(`/messages/${messageId}/feedback`, null, {
     params: { feedback },
   });
+}
+
+export async function searchMessages(kbId: number, q: string) {
+  const res = await api.get<SearchResult[]>(`/kb/${kbId}/search-messages`, {
+    params: { q },
+  });
+  return res.data;
 }

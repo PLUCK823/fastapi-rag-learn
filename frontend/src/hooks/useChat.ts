@@ -16,16 +16,12 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const doneRef = useRef(false);
   const sessionIdRef = useRef(sessionId);
-  const shouldLoadMessages = useRef(true); // Prevent reload during send
+  const shouldLoadMessages = useRef(true);
 
-  // Keep ref in sync with prop
   useEffect(() => {
     sessionIdRef.current = sessionId;
-    // DO NOT reset the flag here - it should only be reset when user explicitly selects a session
-    // The flag is managed by prepareSend() and the session selection handler
   }, [sessionId]);
 
-  // Load session messages when sessionId changes
   useEffect(() => {
     if (sessionId && shouldLoadMessages.current) {
       listSessionMessages(kbId, sessionId)
@@ -34,40 +30,19 @@ export function useChatWS(kbId: number, sessionId: string | null) {
     } else if (!sessionId) {
       setMessages([]);
     }
-    // Do NOT reset flag here - let it stay false until next sessionId change
   }, [kbId, sessionId]);
 
-  // Prepare for send - prevent useEffect from loading messages
   const prepareSend = useCallback(() => {
     shouldLoadMessages.current = false;
   }, []);
 
-  // Reset flag to allow loading messages (used when user selects a session)
   const resetLoadFlag = useCallback(() => {
     shouldLoadMessages.current = true;
   }, []);
 
-  const send = useCallback(
-    (question: string, overrideSessionId?: string) => {
-      const token = localStorage.getItem("token");
-      const sid = overrideSessionId ?? sessionIdRef.current;
-
-      if (!token || !sid) return;
-
-      const aiId = nextId();
-      const userMsg: Message = {
-        id: nextId(),
-        role: "user",
-        content: question,
-      };
-      const aiMsg: Message = {
-        id: aiId,
-        role: "assistant",
-        content: "",
-        isStreaming: true,
-      };
-
-      setMessages((prev) => [...prev, userMsg, aiMsg]);
+  /** Shared WebSocket streaming logic */
+  const _startStream = useCallback(
+    (aiId: string, question: string, token: string, sid: string) => {
       setIsStreaming(true);
       doneRef.current = false;
 
@@ -82,7 +57,6 @@ export function useChatWS(kbId: number, sessionId: string | null) {
 
       ws.onmessage = (e) => {
         if (doneRef.current) return;
-        // 只对 JSON 结构消息做解析（以 { 开头），纯文本 token 直接追加
         if (typeof e.data === "string" && e.data.startsWith("{")) {
           try {
             const data = JSON.parse(e.data);
@@ -90,11 +64,7 @@ export function useChatWS(kbId: number, sessionId: string | null) {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === aiId
-                    ? {
-                        ...m,
-                        content: `[错误: ${data.error}]`,
-                        isStreaming: false,
-                      }
+                    ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false }
                     : m,
                 ),
               );
@@ -109,15 +79,12 @@ export function useChatWS(kbId: number, sessionId: string | null) {
               setIsStreaming(false);
               doneRef.current = true;
             }
-            // data 是 JSON 但没有 error/done → 忽略
           } catch {
-            // 看起来像 JSON 但解析失败 → 按文本追加
             setMessages((prev) =>
               prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
             );
           }
         } else {
-          // 纯文本 token
           setMessages((prev) =>
             prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
           );
@@ -134,11 +101,7 @@ export function useChatWS(kbId: number, sessionId: string | null) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === aiId
-              ? {
-                  ...m,
-                  content: m.content || "[错误: WebSocket 连接失败，请刷新页面重试]",
-                  isStreaming: false,
-                }
+              ? { ...m, content: m.content || "[错误: WebSocket 连接失败，请刷新页面重试]", isStreaming: false }
               : m,
           ),
         );
@@ -146,17 +109,58 @@ export function useChatWS(kbId: number, sessionId: string | null) {
         doneRef.current = true;
       };
     },
-    [kbId, sessionId],
+    [kbId],
+  );
+
+  const send = useCallback(
+    (question: string, overrideSessionId?: string) => {
+      const token = localStorage.getItem("token");
+      const sid = overrideSessionId ?? sessionIdRef.current;
+
+      if (!token || !sid) return;
+
+      const aiId = nextId();
+      const userMsg: Message = { id: nextId(), role: "user", content: question };
+      const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true };
+
+      setMessages((prev) => [...prev, userMsg, aiMsg]);
+      _startStream(aiId, question, token, sid);
+    },
+    [_startStream],
+  );
+
+  /** Resend without adding user message (for edit/regenerate) */
+  const resend = useCallback(
+    (question: string) => {
+      const token = localStorage.getItem("token");
+      const sid = sessionIdRef.current;
+
+      if (!token || !sid) return;
+
+      const aiId = nextId();
+      const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true };
+
+      setMessages((prev) => [...prev, aiMsg]);
+      _startStream(aiId, question, token, sid);
+    },
+    [_startStream],
   );
 
   const clear = useCallback(() => setMessages([]), []);
+
+  /** Replace messages from a given index (for edit — keeps messages before idx, removes rest) */
+  const truncateAt = useCallback((index: number) => {
+    setMessages((prev) => prev.slice(0, index));
+  }, []);
 
   return {
     messages,
     isStreaming,
     send,
+    resend,
     clear,
     setMessages,
+    truncateAt,
     prepareSend,
     resetLoadFlag,
   };
