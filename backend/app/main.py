@@ -70,6 +70,9 @@ async def lifespan(_app: FastAPI):
     # 启动：运行数据库迁移
     _run_migrations()
     yield
+    # 测试环境不销毁 engine（conftest 自己管理 engine 生命周期）
+    if _os.environ.get("PYTEST_RUNNING"):
+        return
     # 关闭：释放数据库连接池
     from app.core.database import async_engine, sync_engine
 

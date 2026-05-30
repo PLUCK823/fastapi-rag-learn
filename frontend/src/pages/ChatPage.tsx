@@ -17,6 +17,7 @@ import DocEditorModal from "../components/chat/DocEditorModal";
 import DocViewerModal from "../components/chat/DocViewerModal";
 import PromptTemplates from "../components/chat/PromptTemplates";
 import ConfirmDialog from "../components/shared/ConfirmDialog";
+import { ChatSkeleton, DocListSkeleton } from "../components/shared/Skeleton";
 import { useChatWS } from "../hooks/useChat";
 import { toast } from "../stores/toastStore";
 import type { Document, KBDetail, SearchResult, Session } from "../types";
@@ -87,8 +88,17 @@ export default function ChatPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const { messages, isStreaming, send, resend, clear, truncateAt, prepareSend, resetLoadFlag } =
-    useChatWS(kbIdNum, activeSessionId);
+  const {
+    messages,
+    isStreaming,
+    messagesLoading,
+    send,
+    resend,
+    clear,
+    truncateAt,
+    prepareSend,
+    resetLoadFlag,
+  } = useChatWS(kbIdNum, activeSessionId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,6 +106,9 @@ export default function ChatPage() {
   const [editDoc, setEditDoc] = useState<Document | null>(null);
   const [editContent, setEditContent] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [docsLoading, setDocsLoading] = useState(true);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
   const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
   const [confirmClearChat, setConfirmClearChat] = useState(false);
@@ -163,6 +176,7 @@ export default function ChatPage() {
 
   const refreshDocs = useCallback(async () => {
     try {
+      setDocsLoading(true);
       const kbs = (await listKBs(true)) as KBDetail[];
       const current = kbs.find((k) => k.id === kbIdNum);
       if (current) {
@@ -171,6 +185,8 @@ export default function ChatPage() {
       }
     } catch (err) {
       toast(getErrorMessage(err));
+    } finally {
+      setDocsLoading(false);
     }
   }, [kbIdNum]);
 
@@ -355,10 +371,8 @@ export default function ChatPage() {
     }
   }, [kbIdNum, editingDocId, editingDocName, refreshDocs]);
 
-  const handleFileUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const uploadAndRefresh = useCallback(
+    async (file: File) => {
       setUploading(true);
       try {
         await uploadFile(kbIdNum, file);
@@ -368,10 +382,65 @@ export default function ChatPage() {
         toast(getErrorMessage(err));
       } finally {
         setUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
     [kbIdNum, refreshDocs],
+  );
+
+  const handleFileUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await uploadAndRefresh(file);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [uploadAndRefresh],
+  );
+
+  /* ── Drag-and-drop upload ── */
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.items?.length > 0) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      if (!ext || ![".txt", ".md", ".pdf"].some((valid) => `.${ext}` === valid)) {
+        toast("仅支持 .txt、.md、.pdf 文件", "error");
+        return;
+      }
+
+      await uploadAndRefresh(file);
+    },
+    [uploadAndRefresh],
   );
 
   const handleSend = useCallback(() => {
@@ -524,7 +593,47 @@ export default function ChatPage() {
     <div
       className="flex gap-4 md:gap-6 max-w-6xl mx-auto relative"
       style={{ height: "calc(100vh - 120px)" }}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center rounded-xl animate-fade-in-up"
+          style={{
+            backgroundColor: "var(--overlay)",
+            border: "2px dashed var(--color-copper)",
+          }}
+        >
+          <div className="text-center pointer-events-none">
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              className="mx-auto mb-2"
+              style={{ color: "var(--color-copper)" }}
+              aria-hidden="true"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <p className="text-sm font-medium" style={{ color: "var(--color-copper)" }}>
+              释放文件以上传
+            </p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              支持 .txt、.md、.pdf
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Mobile sidebar overlay */}
       {showSidebar && (
         <div
@@ -727,7 +836,9 @@ export default function ChatPage() {
           </div>
         )}
         <div className="flex-1 overflow-y-auto -mx-4 px-4">
-          {docs.length === 0 ? (
+          {docsLoading ? (
+            <DocListSkeleton />
+          ) : docs.length === 0 ? (
             <p className="text-xs text-center py-6" style={{ color: "var(--text-muted)" }}>
               暂无文档
             </p>
@@ -886,27 +997,31 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {messages.length === 0
-            ? renderDashboard()
-            : messages.map((m, i) => {
-                const prevMsg = i > 0 ? messages[i - 1] : null;
-                const citationKeywords =
-                  m.role === "assistant" && prevMsg?.role === "user"
-                    ? extractKeywords(prevMsg.content)
-                    : [];
-                return (
-                  <ChatMessage
-                    key={m.id}
-                    msg={m}
-                    msgIndex={i}
-                    citationKeywords={citationKeywords}
-                    onCitationClick={handleCitationClick}
-                    onEditMessage={handleEditMessage}
-                    onRegenerate={handleRegenerate}
-                    isStreaming={isStreaming}
-                  />
-                );
-              })}
+          {messagesLoading ? (
+            <ChatSkeleton />
+          ) : messages.length === 0 ? (
+            renderDashboard()
+          ) : (
+            messages.map((m, i) => {
+              const prevMsg = i > 0 ? messages[i - 1] : null;
+              const citationKeywords =
+                m.role === "assistant" && prevMsg?.role === "user"
+                  ? extractKeywords(prevMsg.content)
+                  : [];
+              return (
+                <ChatMessage
+                  key={m.id}
+                  msg={m}
+                  msgIndex={i}
+                  citationKeywords={citationKeywords}
+                  onCitationClick={handleCitationClick}
+                  onEditMessage={handleEditMessage}
+                  onRegenerate={handleRegenerate}
+                  isStreaming={isStreaming}
+                />
+              );
+            })
+          )}
           <div ref={bottomRef} />
         </div>
 

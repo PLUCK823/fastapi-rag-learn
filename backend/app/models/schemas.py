@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TypeVar
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 T = TypeVar("T")
 
@@ -40,7 +40,7 @@ class AskResponse(BaseModel):
 
 
 class KBCreateRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=255)
 
     @field_validator("name")
     @classmethod
@@ -51,7 +51,7 @@ class KBCreateRequest(BaseModel):
 
 
 class KBRenameRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=255)
 
     @field_validator("name")
     @classmethod

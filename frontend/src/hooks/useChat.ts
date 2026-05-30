@@ -23,6 +23,7 @@ const TICK_MS = 35; // ~30fps — smooth enough, non-blocking
 export function useChatWS(kbId: number, sessionId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const doneRef = useRef(false);
   const sessionIdRef = useRef(sessionId);
@@ -38,11 +39,14 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   }, [sessionId]);
   useEffect(() => {
     if (sessionId && shouldLoadMessages.current) {
+      setMessagesLoading(true);
       listSessionMessages(kbId, sessionId)
         .then(setMessages)
-        .catch((err) => toast(getErrorMessage(err)));
+        .catch((err) => toast(getErrorMessage(err)))
+        .finally(() => setMessagesLoading(false));
     } else if (!sessionId) {
       setMessages([]);
+      setMessagesLoading(false);
     }
   }, [kbId, sessionId]);
 
@@ -185,6 +189,7 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   return {
     messages,
     isStreaming,
+    messagesLoading,
     send,
     resend,
     clear,
