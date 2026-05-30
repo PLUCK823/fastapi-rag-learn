@@ -49,7 +49,7 @@ test("session behavior tests", async ({ page }) => {
   // 6. Test 3: Create document and send message to create session
   await page.getByRole("button", { name: "+ 新建" }).first().click();
   await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
-  await page.getByPlaceholder("例如: readme（默认 .md）").fill("test");
+  await page.getByPlaceholder("例如: readme").fill("test");
 
   const editorTextarea = page.locator(".bytemd-editor textarea");
   await editorTextarea.waitFor({ state: "visible", timeout: 3000 });

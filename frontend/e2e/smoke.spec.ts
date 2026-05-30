@@ -33,7 +33,7 @@ test("full user flow", async ({ page }) => {
   await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
 
   // 5. Fill filename and Markdown content
-  await page.getByPlaceholder("例如: readme（默认 .md）").fill("hello");
+  await page.getByPlaceholder("例如: readme").fill("hello");
 
   // Wait for ByteMD editor to be ready and fill content via the textarea
   const editorTextarea = page.locator(".bytemd-editor textarea");
