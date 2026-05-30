@@ -86,7 +86,7 @@ export default function DocEditorModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6 animate-fade-in"
-      style={{ backgroundColor: "rgba(28, 28, 46, 0.4)", backdropFilter: "blur(3px)" }}
+      style={{ backgroundColor: "var(--overlay-heavy)", backdropFilter: "blur(3px)" }}
       onClick={onClose}
     >
       <div

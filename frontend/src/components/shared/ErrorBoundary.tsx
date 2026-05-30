@@ -39,11 +39,14 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
 
 function DefaultFallback({ error, onReset }: { error: Error | null; onReset: () => void }) {
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: "var(--surface-bg)" }}>
+    <div
+      className="min-h-screen flex items-center justify-center p-6"
+      style={{ backgroundColor: "var(--surface-bg)" }}
+    >
       <div className="card p-8 max-w-md w-full text-center animate-fade-in-up">
         <div
           className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5"
-          style={{ backgroundColor: "rgba(181,91,91,0.1)" }}
+          style={{ backgroundColor: "var(--danger-bg)" }}
         >
           <svg
             width="24"
@@ -70,7 +73,7 @@ function DefaultFallback({ error, onReset }: { error: Error | null; onReset: () 
           <pre
             className="text-xs mb-6 px-3 py-2 rounded-md text-left overflow-auto max-h-32"
             style={{
-              backgroundColor: "rgba(181,91,91,0.06)",
+              backgroundColor: "var(--danger-bg)",
               color: "var(--danger)",
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",

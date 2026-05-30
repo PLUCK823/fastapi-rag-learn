@@ -43,16 +43,13 @@ function CodeBlockWithCopy({ raw, children }: { raw: string; children: React.Rea
       <button
         type="button"
         className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ backgroundColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
+        style={{ backgroundColor: "var(--on-ink-subtle)", color: "var(--on-ink-muted)" }}
         onClick={handleCopy}
         aria-label={copied ? "已复制" : "复制代码"}
       >
         {copied ? "已复制" : "复制"}
       </button>
-      <pre
-        className="rounded-lg overflow-x-auto"
-        style={{ backgroundColor: "var(--color-ink)" }}
-      >
+      <pre className="rounded-lg overflow-x-auto" style={{ backgroundColor: "var(--color-ink)" }}>
         {children}
       </pre>
     </div>
@@ -211,7 +208,7 @@ export default function ChatMessage({ msg }: { msg: Message }) {
             <div
               className="mt-3 pt-3 flex flex-wrap gap-1.5"
               style={{
-                borderTop: isUser ? "1px solid rgba(255,255,255,0.15)" : "var(--border-light)",
+                borderTop: isUser ? "var(--on-ink-divider)" : "var(--border-light)",
               }}
             >
               {msg.sources.map((s) => (
@@ -221,8 +218,8 @@ export default function ChatMessage({ msg }: { msg: Message }) {
                   style={
                     isUser
                       ? {
-                          backgroundColor: "rgba(255,255,255,0.1)",
-                          color: "rgba(255,255,255,0.7)",
+                          backgroundColor: "var(--on-ink-subtle)",
+                          color: "var(--on-ink-dim)",
                         }
                       : {
                           backgroundColor: "var(--surface-card)",
@@ -233,7 +230,7 @@ export default function ChatMessage({ msg }: { msg: Message }) {
                 >
                   <span
                     className="font-medium"
-                    style={{ color: isUser ? "rgba(255,255,255,0.9)" : "var(--accent)" }}
+                    style={{ color: isUser ? "var(--on-ink-bright)" : "var(--accent)" }}
                   >
                     [{s.index}]
                   </span>

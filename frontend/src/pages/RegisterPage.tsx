@@ -63,7 +63,7 @@ export default function RegisterPage() {
             <div
               className="mb-6 px-4 py-3 rounded-lg text-sm"
               style={{
-                backgroundColor: "rgba(181, 91, 91, 0.08)",
+                backgroundColor: "var(--danger-bg)",
                 color: "var(--danger)",
               }}
             >
@@ -94,7 +94,7 @@ export default function RegisterPage() {
                   e.target.style.borderColor = "var(--color-copper)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(28,28,46,0.1)";
+                  e.target.style.borderColor = "var(--border-color-medium)";
                 }}
                 required
               />
@@ -121,7 +121,7 @@ export default function RegisterPage() {
                   e.target.style.borderColor = "var(--color-copper)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(28,28,46,0.1)";
+                  e.target.style.borderColor = "var(--border-color-medium)";
                 }}
                 required
                 minLength={6}

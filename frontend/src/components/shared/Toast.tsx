@@ -2,18 +2,18 @@ import { useToastStore } from "../../stores/toastStore";
 
 const typeStyles: Record<string, { bg: string; border: string; icon: string }> = {
   error: {
-    bg: "rgba(181,91,91,0.12)",
-    border: "rgba(181,91,91,0.35)",
+    bg: "var(--toast-error-bg)",
+    border: "var(--toast-error-border)",
     icon: "✕",
   },
   success: {
-    bg: "rgba(91,143,91,0.12)",
-    border: "rgba(91,143,91,0.35)",
+    bg: "var(--toast-success-bg)",
+    border: "var(--toast-success-border)",
     icon: "✓",
   },
   info: {
-    bg: "rgba(125,125,160,0.12)",
-    border: "rgba(125,125,160,0.35)",
+    bg: "var(--toast-info-bg)",
+    border: "var(--toast-info-border)",
     icon: "i",
   },
 };

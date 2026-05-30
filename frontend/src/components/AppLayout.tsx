@@ -3,6 +3,7 @@ import { Link, Outlet, useNavigate } from "react-router-dom";
 import { changePassword, getProfile, updateNickname } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
 import { getErrorMessage } from "../utils/error";
+import ThemeToggle from "./shared/ThemeToggle";
 import Toast from "./shared/Toast";
 
 /* ── Static JSX hoisted outside component ── */
@@ -67,7 +68,7 @@ function SettingsModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
-      style={{ backgroundColor: "rgba(28, 28, 46, 0.3)", backdropFilter: "blur(2px)" }}
+      style={{ backgroundColor: "var(--overlay)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
@@ -93,8 +94,7 @@ function SettingsModal({
           <p
             className="text-xs mb-4 px-3 py-2 rounded-md"
             style={{
-              backgroundColor:
-                msgType === "success" ? "rgba(122,139,110,0.1)" : "rgba(181,91,91,0.08)",
+              backgroundColor: msgType === "success" ? "var(--success-bg)" : "var(--danger-bg)",
               color: msgType === "success" ? "var(--accent-sage)" : "var(--danger)",
             }}
           >
@@ -241,57 +241,61 @@ export default function AppLayout() {
           </Link>
         </div>
 
-        <div className="relative" ref={menuRef}>
-          <button
-            type="button"
-            className="text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-            style={{ color: "var(--text-secondary)" }}
-            onClick={() => setShowMenu(!showMenu)}
-          >
-            {displayName}
-          </button>
-          {showMenu && (
-            <div
-              className="absolute right-0 mt-2 w-44 card py-1 animate-fade-in-up z-10 overflow-hidden"
-              style={{ animationDuration: "150ms" }}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              className="text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+              style={{ color: "var(--text-secondary)" }}
+              onClick={() => setShowMenu(!showMenu)}
             >
-              <button
-                type="button"
-                className="w-full text-left px-4 py-2.5 text-sm transition-colors"
-                style={{ color: "var(--text-secondary)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--surface-bg)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-                onClick={() => {
-                  setShowSettings(true);
-                  setShowMenu(false);
-                }}
+              {displayName}
+            </button>
+            {showMenu && (
+              <div
+                className="absolute right-0 mt-2 w-44 card py-1 animate-fade-in-up z-10 overflow-hidden"
+                style={{ animationDuration: "150ms" }}
               >
-                个人设置
-              </button>
-              <div style={{ borderTop: "var(--border-light)" }} />
-              <button
-                type="button"
-                className="w-full text-left px-4 py-2.5 text-sm transition-colors"
-                style={{ color: "var(--danger)" }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "var(--surface-bg)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-                onClick={() => {
-                  logout();
-                  navigate("/login");
-                }}
-              >
-                退出登录
-              </button>
-            </div>
-          )}
+                <button
+                  type="button"
+                  className="w-full text-left px-4 py-2.5 text-sm transition-colors"
+                  style={{ color: "var(--text-secondary)" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--surface-bg)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  onClick={() => {
+                    setShowSettings(true);
+                    setShowMenu(false);
+                  }}
+                >
+                  个人设置
+                </button>
+                <div style={{ borderTop: "var(--border-light)" }} />
+                <button
+                  type="button"
+                  className="w-full text-left px-4 py-2.5 text-sm transition-colors"
+                  style={{ color: "var(--danger)" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--surface-bg)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  onClick={() => {
+                    logout();
+                    navigate("/login");
+                  }}
+                >
+                  退出登录
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 

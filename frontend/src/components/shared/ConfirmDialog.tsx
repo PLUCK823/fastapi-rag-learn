@@ -20,7 +20,7 @@ export default function ConfirmDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
-      style={{ backgroundColor: "rgba(28, 28, 46, 0.3)", backdropFilter: "blur(2px)" }}
+      style={{ backgroundColor: "var(--overlay)", backdropFilter: "blur(2px)" }}
       onClick={onCancel}
     >
       <div
@@ -33,7 +33,7 @@ export default function ConfirmDialog({
           <div
             className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
             style={{
-              backgroundColor: danger ? "rgba(181,91,91,0.1)" : "var(--surface-bg)",
+              backgroundColor: danger ? "var(--danger-bg)" : "var(--surface-bg)",
             }}
           >
             <svg
@@ -94,7 +94,7 @@ export default function ConfirmDialog({
             className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             style={
               danger
-                ? { backgroundColor: "var(--danger)", color: "#fff" }
+                ? { backgroundColor: "var(--danger)", color: "var(--color-cream)" }
                 : { backgroundColor: "var(--color-ink)", color: "var(--color-cream)" }
             }
             onClick={onConfirm}

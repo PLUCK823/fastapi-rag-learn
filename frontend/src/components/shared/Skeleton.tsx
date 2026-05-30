@@ -22,7 +22,13 @@ function SkeletonLine({ width = "100%", last }: { width?: string; last?: boolean
   );
 }
 
-export default function Skeleton({ className, lines = 3, type = "text", width, height }: SkeletonProps) {
+export default function Skeleton({
+  className,
+  lines = 3,
+  type = "text",
+  width,
+  height,
+}: SkeletonProps) {
   if (type === "circle") {
     return (
       <div

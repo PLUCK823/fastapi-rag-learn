@@ -157,7 +157,7 @@ export default function KBListPage() {
             e.target.style.borderColor = "var(--color-copper)";
           }}
           onBlur={(e) => {
-            e.target.style.borderColor = "rgba(28,28,46,0.1)";
+            e.target.style.borderColor = "var(--border-color-medium)";
           }}
         />
         <button
@@ -273,7 +273,7 @@ export default function KBListPage() {
                   className="text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
                   style={{ color: "var(--text-muted)" }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(181, 91, 91, 0.08)";
+                    e.currentTarget.style.backgroundColor = "var(--danger-bg)";
                     e.currentTarget.style.color = "var(--danger)";
                   }}
                   onMouseLeave={(e) => {

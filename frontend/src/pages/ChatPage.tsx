@@ -328,12 +328,15 @@ export default function ChatPage() {
     : "新的对话";
 
   return (
-    <div className="flex gap-4 md:gap-6 max-w-6xl mx-auto relative" style={{ height: "calc(100vh - 120px)" }}>
+    <div
+      className="flex gap-4 md:gap-6 max-w-6xl mx-auto relative"
+      style={{ height: "calc(100vh - 120px)" }}
+    >
       {/* Mobile sidebar overlay */}
       {showSidebar && (
         <div
           className="fixed inset-0 z-40 md:hidden"
-          style={{ backgroundColor: "rgba(28,28,46,0.3)", backdropFilter: "blur(2px)" }}
+          style={{ backgroundColor: "var(--overlay)", backdropFilter: "blur(2px)" }}
           onClick={() => setShowSidebar(false)}
         />
       )}
@@ -473,7 +476,7 @@ export default function ChatPage() {
                 e.target.style.borderColor = "var(--color-copper)";
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = "rgba(28,28,46,0.06)";
+                e.target.style.borderColor = "var(--border-color-light)";
               }}
             />
           </div>
@@ -578,11 +581,27 @@ export default function ChatPage() {
               onClick={() => setShowSidebar(!showSidebar)}
               aria-label={showSidebar ? "关闭侧栏" : "打开侧栏"}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
                 {showSidebar ? (
-                  <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
+                  <>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </>
                 ) : (
-                  <><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></>
+                  <>
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </>
                 )}
               </svg>
             </button>
@@ -640,7 +659,7 @@ export default function ChatPage() {
               e.target.style.borderColor = "var(--color-copper)";
             }}
             onBlur={(e) => {
-              e.target.style.borderColor = "rgba(28,28,46,0.1)";
+              e.target.style.borderColor = "var(--border-color-medium)";
             }}
             disabled={isStreaming}
           />
