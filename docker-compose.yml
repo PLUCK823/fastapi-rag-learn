@@ -48,6 +48,8 @@ services:
       - ./backend/.env
     environment:
       - DB_PASSWORD=${DB_PASSWORD:-change-me-in-production}
+      - DATABASE_URL=postgresql+asyncpg://raguser:${DB_PASSWORD:-change-me-in-production}@db:5432/raglearn
+      - SECRET_KEY=${SECRET_KEY:-docker-secret-change-in-production}
     volumes:
       - chroma_data:/app/chroma_db
     depends_on:
@@ -87,7 +89,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
       interval: 30s
       timeout: 3s
       retries: 3

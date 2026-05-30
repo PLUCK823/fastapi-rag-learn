@@ -32,9 +32,6 @@ EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
 # 向量库
 CHROMA_DIR = ROOT_DIR / "chroma_db"
 
-# 文档目录
-DOCUMENTS_DIR = ROOT_DIR / "documents"
-
 # 文本切分
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 120

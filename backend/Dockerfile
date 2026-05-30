@@ -20,10 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # 预下载 BGE 中文向量模型（避免首次请求等很久）
 # 国内部署可取消注释下面这行用镜像加速:
 # ENV HF_ENDPOINT=https://hf-mirror.com
-RUN .venv/bin/python3 -c "
-from sentence_transformers import SentenceTransformer
-SentenceTransformer('BAAI/bge-small-zh-v1.5')
-"
+RUN .venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')"
 
 # ============================================================
 # 阶段 2: 运行
@@ -44,9 +41,12 @@ RUN groupadd -r appuser && useradd -r -g appuser -u 1001 appuser
 COPY --from=builder /app/.venv .venv
 COPY --from=builder /root/.cache/huggingface /home/appuser/.cache/huggingface
 
-# 应用代码
+# 应用代码（仅代码，数据通过 volume 挂载）
 COPY app/ ./app/
-COPY documents/ ./documents/
+
+# Alembic 迁移配置
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 
 # 权限
 RUN chown -R appuser:appuser /app /home/appuser/.cache

@@ -2,11 +2,9 @@ import logging
 import os as _os
 from contextlib import asynccontextmanager
 
-from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from alembic import command
 from app.api.auth import router as auth_router
 from app.api.knowledge_base import router as kb_router
 from app.api.routes import router
@@ -30,6 +28,14 @@ def _run_migrations() -> None:
 
     from app.core.database import sync_engine
 
+    try:
+        from alembic.config import Config
+
+        from alembic import command  # noqa: F811
+    except ImportError:
+        logger.warning("Alembic not installed, skipping migrations")
+        return
+
     alembic_ini = _os.path.join(_BACKEND_DIR, "alembic.ini")
     if not _os.path.exists(alembic_ini):
         logger.warning("alembic.ini not found at %s, skipping migrations", alembic_ini)
@@ -47,11 +53,9 @@ def _run_migrations() -> None:
             command.upgrade(alembic_cfg, "head")
             logger.info("Database migrations upgraded to head")
         elif has_data:
-            # 表已存在但没有 alembic_version（如 create_all），标记为当前版本
             command.stamp(alembic_cfg, "head")
             logger.info("Database stamped as head (tables already exist)")
         else:
-            # 全新数据库
             command.upgrade(alembic_cfg, "head")
             logger.info("Database migrations applied successfully")
     except Exception:

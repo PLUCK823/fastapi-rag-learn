@@ -29,8 +29,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # 复制 nginx 配置（覆盖默认 server block）
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# 安全加固：以 nginx 用户运行（alpine nginx 镜像内置 nginx 用户）
-RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx && \
+# 安装 curl（healthcheck 需要）+ 安全加固
+RUN apk add --no-cache curl && \
+    chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx && \
     touch /var/run/nginx.pid && \
     chown nginx:nginx /var/run/nginx.pid
 
