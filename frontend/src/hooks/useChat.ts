@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { listSessionMessages } from "../api/kb";
 import { toast } from "../stores/toastStore";
 import type { Message } from "../types";
@@ -11,6 +10,11 @@ function nextId(): string {
   return `msg_${_msgId}_${Date.now()}`;
 }
 
+/** Delay between visual updates during streaming (ms) — ~300 chars/min typing pace */
+const TYPEWRITER_DELAY = 40;
+/** Minimum chars to show per visual update */
+const CHARS_PER_TICK = 3;
+
 export function useChatWS(kbId: number, sessionId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -18,6 +22,12 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   const doneRef = useRef(false);
   const sessionIdRef = useRef(sessionId);
   const shouldLoadMessages = useRef(true);
+
+  // Typewriter buffer: tokens accumulate here at WS speed, flushed to state at typing pace
+  const bufferRef = useRef("");
+  const shownRef = useRef(0); // how many chars already shown
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiIdRef = useRef("");
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -41,11 +51,43 @@ export function useChatWS(kbId: number, sessionId: string | null) {
     shouldLoadMessages.current = true;
   }, []);
 
-  /** Shared WebSocket streaming logic — uses flushSync for true token-by-token rendering */
+  const _typewriterTick = useCallback((aiId: string) => {
+    if (doneRef.current) return;
+
+    const total = bufferRef.current.length;
+    // Show a few more chars each tick
+    const next = Math.min(shownRef.current + CHARS_PER_TICK, total);
+    shownRef.current = next;
+
+    const content = bufferRef.current.slice(0, next);
+    setMessages((prev) =>
+      prev.map((m) => (m.id === aiId ? { ...m, content, isStreaming: true } : m)),
+    );
+
+    if (next < total) {
+      // More content to show — schedule next tick
+      timerRef.current = setTimeout(() => _typewriterTick(aiId), TYPEWRITER_DELAY);
+    } else {
+      // Caught up with buffer — poll for more
+      timerRef.current = setTimeout(() => _typewriterTick(aiId), TYPEWRITER_DELAY);
+    }
+  }, []);
+
+  const _finalFlush = useCallback((aiId: string) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const content = bufferRef.current;
+    return content;
+  }, []);
+
   const _startStream = useCallback(
     (aiId: string, question: string, token: string, sid: string) => {
       setIsStreaming(true);
       doneRef.current = false;
+      bufferRef.current = "";
+      shownRef.current = 0;
+      aiIdRef.current = aiId;
+
+      if (timerRef.current) clearTimeout(timerRef.current);
 
       const proto = window.location.protocol === "https:" ? "wss" : "ws";
       const host = window.location.host;
@@ -54,7 +96,11 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
-      ws.onopen = () => ws.send(question);
+      ws.onopen = () => {
+        ws.send(question);
+        // Start typewriter polling
+        timerRef.current = setTimeout(() => _typewriterTick(aiId), TYPEWRITER_DELAY);
+      };
 
       ws.onmessage = (e) => {
         if (doneRef.current) return;
@@ -62,64 +108,61 @@ export function useChatWS(kbId: number, sessionId: string | null) {
           try {
             const data = JSON.parse(e.data);
             if (data.error) {
-              flushSync(() => {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === aiId
-                      ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false }
-                      : m,
-                  ),
-                );
-                setIsStreaming(false);
-              });
               doneRef.current = true;
+              if (timerRef.current) clearTimeout(timerRef.current);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId
+                    ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false }
+                    : m,
+                ),
+              );
+              setIsStreaming(false);
             } else if (data.done) {
-              flushSync(() => {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === aiId ? { ...m, isStreaming: false, sources: data.sources } : m,
-                  ),
-                );
-                setIsStreaming(false);
-              });
               doneRef.current = true;
+              const content = _finalFlush(aiId);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId ? { ...m, content, isStreaming: false, sources: data.sources } : m,
+                ),
+              );
+              setIsStreaming(false);
             }
           } catch {
-            flushSync(() => {
-              setMessages((prev) =>
-                prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
-              );
-            });
+            bufferRef.current += e.data;
           }
         } else {
-          // 纯文本 token — flushSync 强制同步渲染，实现逐字打字效果
-          flushSync(() => {
-            setMessages((prev) =>
-              prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
-            );
-          });
+          bufferRef.current += e.data;
         }
       };
 
       ws.onclose = () => {
-        setMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, isStreaming: false } : m)));
-        setIsStreaming(false);
         doneRef.current = true;
+        const content = _finalFlush(aiId);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === aiId ? { ...m, content, isStreaming: false } : m)),
+        );
+        setIsStreaming(false);
       };
 
       ws.onerror = () => {
+        doneRef.current = true;
+        const content = _finalFlush(aiId);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === aiId
-              ? { ...m, content: m.content || "[错误: WebSocket 连接失败，请刷新页面重试]", isStreaming: false }
+              ? {
+                  ...m,
+                  content: content || "[错误: WebSocket 连接失败，请刷新页面重试]",
+                  isStreaming: false,
+                }
               : m,
           ),
         );
         setIsStreaming(false);
-        doneRef.current = true;
       };
     },
-    [kbId],
+    [kbId, _typewriterTick, _finalFlush],
   );
 
   const send = useCallback(
@@ -139,7 +182,6 @@ export function useChatWS(kbId: number, sessionId: string | null) {
     [_startStream],
   );
 
-  /** Resend without adding user message (for edit/regenerate) */
   const resend = useCallback(
     (question: string) => {
       const token = localStorage.getItem("token");
