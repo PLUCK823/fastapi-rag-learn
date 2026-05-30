@@ -89,6 +89,7 @@ interface ChatMessageProps {
   onEditMessage?: (msgIndex: number, newContent: string) => void;
   onRegenerate?: (msgIndex: number) => void;
   msgIndex: number;
+  isStreaming?: boolean;
 }
 
 export default function ChatMessage({

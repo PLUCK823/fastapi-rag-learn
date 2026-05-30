@@ -18,6 +18,10 @@ chroma_db/
 # Claude Code (local only)
 CLAUDE.md
 
+# Frontend artifacts（防止从根目录误跑）
+node_modules/
+test-results/
+
 # macOS
 .DS_Store
 test.db

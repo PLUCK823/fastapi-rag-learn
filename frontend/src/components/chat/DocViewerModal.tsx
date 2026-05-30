@@ -1,3 +1,4 @@
+import { isValidElement, cloneElement } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -207,13 +208,13 @@ function highlightParagraph(children: React.ReactNode, keywords: string[]): Reac
   if (Array.isArray(children)) {
     return children.map((child, i) => <span key={i}>{highlightParagraph(child, keywords)}</span>);
   }
-  if (children && typeof children === "object" && "props" in children) {
-    const el = children as { props?: { children?: React.ReactNode }; type?: unknown };
-    if (el.props?.children) {
-      return {
-        ...el,
-        props: { ...el.props, children: highlightParagraph(el.props.children, keywords) },
-      };
+  if (isValidElement(children)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const el = children as React.ReactElement<any>;
+    if (el.props.children) {
+      return cloneElement(el, {
+        children: highlightParagraph(el.props.children, keywords),
+      });
     }
   }
   return children;

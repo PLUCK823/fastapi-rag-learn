@@ -1,0 +1,38 @@
+# ============================================================
+# RAG Learn — Docker 部署
+#
+# 启动:  docker compose up --build -d
+# 停止:  docker compose down
+# 日志:  docker compose logs -f
+# ============================================================
+
+services:
+  # ── 后端: FastAPI + LangGraph + ChromaDB ──
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - chroma_data:/app/chroma_db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ── 前端: React + Nginx ──
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
