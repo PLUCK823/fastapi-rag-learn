@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { createKB, deleteKB, listKBs, renameKB } from "../api/kb";
 import ConfirmDialog from "../components/shared/ConfirmDialog";
+import { toast } from "../stores/toastStore";
 import type { KBDetail, KnowledgeBase } from "../types";
+import { getErrorMessage } from "../utils/error";
 
 /* ── Hoisted static empty state ── */
 const EMPTY_STATE = (
@@ -55,7 +57,9 @@ export default function KBListPage() {
   }, [editingKb]);
 
   const refresh = useCallback(() => {
-    listKBs(true).then(setKBs);
+    listKBs(true).then(setKBs).catch((err) => {
+      toast(getErrorMessage(err));
+    });
   }, []);
 
   useEffect(() => {
@@ -64,10 +68,18 @@ export default function KBListPage() {
 
   const handleCreate = useCallback(async () => {
     const name = newName.trim();
-    if (!name) return;
-    await createKB(name);
-    setNewName("");
-    refresh();
+    if (!name) {
+      toast("请输入知识库名称", "info");
+      return;
+    }
+    try {
+      await createKB(name);
+      setNewName("");
+      refresh();
+      toast("知识库创建成功", "success");
+    } catch (err) {
+      toast(getErrorMessage(err));
+    }
   }, [newName, refresh]);
 
   const handleDelete = useCallback((kb: KnowledgeBase | KBDetail) => {
@@ -82,10 +94,15 @@ export default function KBListPage() {
   const executeRename = useCallback(async () => {
     const name = editingName.trim();
     if (!editingKb || !name) return;
-    await renameKB(editingKb.id, name);
-    setEditingKb(null);
-    setEditingName("");
-    refresh();
+    try {
+      await renameKB(editingKb.id, name);
+      setEditingKb(null);
+      setEditingName("");
+      refresh();
+      toast("知识库已重命名", "success");
+    } catch (err) {
+      toast(getErrorMessage(err));
+    }
   }, [editingKb, editingName, refresh]);
 
   const executeDelete = useCallback(async () => {
@@ -94,9 +111,9 @@ export default function KBListPage() {
       await deleteKB(confirmDelete.id);
       setConfirmDelete(null);
       refresh();
+      toast("知识库已删除", "success");
     } catch (err) {
-      console.error("Delete KB failed:", err);
-      // Still dismiss dialog on error so user isn't stuck
+      toast(getErrorMessage(err));
       setConfirmDelete(null);
     }
   }, [confirmDelete, refresh]);

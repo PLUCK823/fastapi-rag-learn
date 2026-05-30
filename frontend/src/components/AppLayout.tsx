@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { changePassword, getProfile, updateNickname } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
+import { toast } from "../stores/toastStore";
+import { getErrorMessage } from "../utils/error";
+import Toast from "./shared/Toast";
 
 /* ── Static JSX hoisted outside component ── */
 const NAV_BRAND = (
@@ -38,9 +41,13 @@ function SettingsModal({
   };
 
   const handleNickname = useCallback(async () => {
-    await updateNickname(newNick);
-    onNicknameChanged(newNick);
-    showMsg("昵称已更新");
+    try {
+      await updateNickname(newNick);
+      onNicknameChanged(newNick);
+      showMsg("昵称已更新");
+    } catch (err) {
+      showMsg(getErrorMessage(err), "error");
+    }
   }, [newNick, onNicknameChanged]);
 
   const handlePassword = useCallback(async () => {
@@ -188,10 +195,14 @@ export default function AppLayout() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getProfile().then((p) => {
-      setNickname(p.nickname || "");
-      setEmail(p.email);
-    });
+    getProfile()
+      .then((p) => {
+        setNickname(p.nickname || "");
+        setEmail(p.email);
+      })
+      .catch(() => {
+        // Profile load failure is non-critical; silently fall back to defaults
+      });
   }, []);
 
   // Close menu on outside click
@@ -299,6 +310,9 @@ export default function AppLayout() {
           onNicknameChanged={setNickname}
         />
       )}
+
+      {/* Global Toast */}
+      <Toast />
     </div>
   );
 }

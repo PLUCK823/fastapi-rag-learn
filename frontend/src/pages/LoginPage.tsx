@@ -24,7 +24,14 @@ const EMPTY_STATE_ILLUSTRATION = (
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    const msg = sessionStorage.getItem("login_message");
+    if (msg) {
+      sessionStorage.removeItem("login_message");
+      return msg;
+    }
+    return "";
+  });
   const [loading, setLoading] = useState(false);
   const setToken = useAuthStore((s) => s.setToken);
   const navigate = useNavigate();

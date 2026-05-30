@@ -15,7 +15,9 @@ import ChatMessage from "../components/chat/ChatMessage";
 import DocEditorModal from "../components/chat/DocEditorModal";
 import ConfirmDialog from "../components/shared/ConfirmDialog";
 import { useChatWS } from "../hooks/useChat";
+import { toast } from "../stores/toastStore";
 import type { Document, KBDetail, Session } from "../types";
+import { getErrorMessage } from "../utils/error";
 
 const SEND_ICON = (
   <svg
@@ -116,31 +118,37 @@ export default function ChatPage() {
   }, [messages]);
 
   const refreshDocs = useCallback(async () => {
-    const kbs = (await listKBs(true)) as KBDetail[];
-    const current = kbs.find((k) => k.id === kbIdNum);
-    if (current) {
-      setKb(current);
-      setDocs(current.documents ?? []);
+    try {
+      const kbs = (await listKBs(true)) as KBDetail[];
+      const current = kbs.find((k) => k.id === kbIdNum);
+      if (current) {
+        setKb(current);
+        setDocs(current.documents ?? []);
+      }
+    } catch (err) {
+      toast(getErrorMessage(err));
     }
   }, [kbIdNum]);
 
   const refreshSessions = useCallback(async () => {
-    const list = await listSessions(kbIdNum);
-    setSessions(list);
-    return list;
+    try {
+      const list = await listSessions(kbIdNum);
+      setSessions(list);
+      return list;
+    } catch (err) {
+      toast(getErrorMessage(err));
+      return [];
+    }
   }, [kbIdNum]);
 
   // Init: load docs + sessions, select latest session if exists
   useEffect(() => {
     refreshDocs();
     refreshSessions().then((list) => {
-      // Only select existing session, don't create empty one
       if (list.length > 0) {
-        // Reset flag before setting session so messages will be loaded
         resetLoadFlag();
         setActiveSessionId(list[0].session_id);
       }
-      // If no sessions, activeSessionId stays null (no empty session created)
     });
   }, [refreshDocs, refreshSessions, resetLoadFlag]);
 
@@ -167,27 +175,38 @@ export default function ChatPage() {
   const executeDeleteSession = useCallback(async () => {
     if (!confirmDeleteSession) return;
     const sid = confirmDeleteSession.session_id;
-    await deleteSession(kbIdNum, sid);
-    setConfirmDeleteSession(null);
-    const list = await refreshSessions();
-    // If deleted current session, switch to latest
-    if (activeSessionId === sid) {
-      if (list.length > 0) {
-        resetLoadFlag();
-        setActiveSessionId(list[0].session_id);
-      } else {
-        setActiveSessionId(null);
-        clear();
+    try {
+      await deleteSession(kbIdNum, sid);
+      setConfirmDeleteSession(null);
+      const list = await refreshSessions();
+      if (activeSessionId === sid) {
+        if (list.length > 0) {
+          resetLoadFlag();
+          setActiveSessionId(list[0].session_id);
+        } else {
+          setActiveSessionId(null);
+          clear();
+        }
       }
+      toast("会话已删除", "success");
+    } catch (err) {
+      toast(getErrorMessage(err));
+      setConfirmDeleteSession(null);
     }
   }, [kbIdNum, confirmDeleteSession, activeSessionId, refreshSessions, resetLoadFlag, clear]);
 
   const executeClearChat = useCallback(async () => {
-    await clearMessages(kbIdNum, activeSessionId);
-    setConfirmClearChat(false);
-    clear();
-    if (activeSessionId) {
-      refreshSessions();
+    try {
+      await clearMessages(kbIdNum, activeSessionId);
+      setConfirmClearChat(false);
+      clear();
+      if (activeSessionId) {
+        refreshSessions();
+      }
+      toast("聊天记录已清空", "success");
+    } catch (err) {
+      toast(getErrorMessage(err));
+      setConfirmClearChat(false);
     }
   }, [kbIdNum, activeSessionId, clear, refreshSessions]);
 
@@ -201,10 +220,14 @@ export default function ChatPage() {
 
   const openEdit = useCallback(
     async (doc: Document) => {
-      setEditDoc(doc);
-      const { content } = await getDocContent(kbIdNum, doc.id);
-      setEditContent(content);
-      setModalOpen(true);
+      try {
+        setEditDoc(doc);
+        const { content } = await getDocContent(kbIdNum, doc.id);
+        setEditContent(content);
+        setModalOpen(true);
+      } catch (err) {
+        toast(getErrorMessage(err));
+      }
     },
     [kbIdNum],
   );
@@ -215,9 +238,15 @@ export default function ChatPage() {
 
   const executeDeleteDoc = useCallback(async () => {
     if (!confirmDelete) return;
-    await deleteDocument(kbIdNum, confirmDelete.id);
-    setConfirmDelete(null);
-    refreshDocs();
+    try {
+      await deleteDocument(kbIdNum, confirmDelete.id);
+      setConfirmDelete(null);
+      refreshDocs();
+      toast("文档已删除", "success");
+    } catch (err) {
+      toast(getErrorMessage(err));
+      setConfirmDelete(null);
+    }
   }, [kbIdNum, confirmDelete, refreshDocs]);
 
   const handleEditDocName = useCallback((doc: Document) => {
@@ -228,10 +257,15 @@ export default function ChatPage() {
   const executeRenameDoc = useCallback(async () => {
     const name = editingDocName.trim();
     if (!editingDocId || !name) return;
-    await renameDocument(kbIdNum, editingDocId, name);
-    setEditingDocId(null);
-    setEditingDocName("");
-    refreshDocs();
+    try {
+      await renameDocument(kbIdNum, editingDocId, name);
+      setEditingDocId(null);
+      setEditingDocName("");
+      refreshDocs();
+      toast("文档已重命名", "success");
+    } catch (err) {
+      toast(getErrorMessage(err));
+    }
   }, [kbIdNum, editingDocId, editingDocName, refreshDocs]);
 
   const handleFileUpload = useCallback(
@@ -242,6 +276,9 @@ export default function ChatPage() {
       try {
         await uploadFile(kbIdNum, file);
         refreshDocs();
+        toast("文件上传成功", "success");
+      } catch (err) {
+        toast(getErrorMessage(err));
       } finally {
         setUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = "";

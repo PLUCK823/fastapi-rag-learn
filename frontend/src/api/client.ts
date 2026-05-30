@@ -51,6 +51,7 @@ api.interceptors.response.use(
       // Clear token and redirect to login for 401
       if (err.response?.status === 401) {
         localStorage.removeItem("token");
+        sessionStorage.setItem("login_message", "登录已过期，请重新登录");
         window.location.href = "/login";
       }
       return Promise.reject(err);
@@ -81,6 +82,7 @@ api.interceptors.response.use(
     } catch (refreshError) {
       processQueue(refreshError, null);
       localStorage.removeItem("token");
+      sessionStorage.setItem("login_message", "登录已过期，请重新登录");
       window.location.href = "/login";
       return Promise.reject(refreshError);
     } finally {

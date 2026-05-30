@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listSessionMessages } from "../api/kb";
+import { toast } from "../stores/toastStore";
 import type { Message } from "../types";
+import { getErrorMessage } from "../utils/error";
 
 let _msgId = 0;
 function nextId(): string {
@@ -25,22 +27,12 @@ export function useChatWS(kbId: number, sessionId: string | null) {
 
   // Load session messages when sessionId changes
   useEffect(() => {
-    console.log("useEffect triggered:", {
-      sessionId,
-      shouldLoadMessages: shouldLoadMessages.current,
-      kbId,
-    });
     if (sessionId && shouldLoadMessages.current) {
-      console.log("useEffect: loading messages from backend for session:", sessionId);
-      listSessionMessages(kbId, sessionId).then((msgs) => {
-        console.log("useEffect: loaded messages:", msgs.length);
-        setMessages(msgs);
-      });
+      listSessionMessages(kbId, sessionId)
+        .then(setMessages)
+        .catch((err) => toast(getErrorMessage(err)));
     } else if (!sessionId) {
-      console.log("useEffect: clearing messages (no sessionId)");
       setMessages([]);
-    } else {
-      console.log("useEffect: skipping load (shouldLoadMessages=false)");
     }
     // Do NOT reset flag here - let it stay false until next sessionId change
   }, [kbId, sessionId]);
@@ -58,21 +50,14 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   const send = useCallback(
     (question: string, overrideSessionId?: string) => {
       const token = localStorage.getItem("token");
-      // Use override if provided, otherwise use current ref value
       const sid = overrideSessionId ?? sessionIdRef.current;
 
-      console.log("send() called:", { question, overrideSessionId, sid, token: !!token, kbId });
-
-      if (!token || !sid) {
-        console.log("send() early return: missing token or sid");
-        return;
-      }
+      if (!token || !sid) return;
 
       const aiId = nextId();
       const userMsg: Message = { id: nextId(), role: "user", content: question };
       const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true };
 
-      console.log("send() adding messages:", { userMsg, aiMsg });
       setMessages((prev) => [...prev, userMsg, aiMsg]);
       setIsStreaming(true);
       doneRef.current = false;
@@ -81,23 +66,16 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       const host = window.location.host;
       const url = `${proto}://${host}/ws/${kbId}?token=${token}&session_id=${sid}`;
 
-      console.log("send() WebSocket URL:", url);
-
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
-      ws.onopen = () => {
-        console.log("WebSocket opened, sending question:", question);
-        ws.send(question);
-      };
+      ws.onopen = () => ws.send(question);
 
       ws.onmessage = (e) => {
-        console.log("WebSocket message received:", e.data.substring(0, 100));
         if (doneRef.current) return;
         try {
           const data = JSON.parse(e.data);
           if (data.error) {
-            console.log("WebSocket error message:", data.error);
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === aiId ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false } : m,
@@ -106,7 +84,6 @@ export function useChatWS(kbId: number, sessionId: string | null) {
             setIsStreaming(false);
             doneRef.current = true;
           } else if (data.done) {
-            console.log("WebSocket done, sources:", data.sources);
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === aiId ? { ...m, isStreaming: false, sources: data.sources } : m,
@@ -116,23 +93,26 @@ export function useChatWS(kbId: number, sessionId: string | null) {
             doneRef.current = true;
           }
         } catch {
-          console.log("WebSocket streaming chunk:", e.data);
           setMessages((prev) =>
             prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
           );
         }
       };
 
-      ws.onclose = (event) => {
-        console.log("WebSocket closed:", event.code, event.reason);
+      ws.onclose = () => {
         setMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, isStreaming: false } : m)));
         setIsStreaming(false);
         doneRef.current = true;
       };
 
-      ws.onerror = (event) => {
-        console.log("WebSocket error:", event);
-        setMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, isStreaming: false } : m)));
+      ws.onerror = () => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiId
+              ? { ...m, content: m.content || "[错误: WebSocket 连接失败，请刷新页面重试]", isStreaming: false }
+              : m,
+          ),
+        );
         setIsStreaming(false);
         doneRef.current = true;
       };

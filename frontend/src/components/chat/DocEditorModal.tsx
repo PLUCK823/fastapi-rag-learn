@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import "bytemd/dist/index.css";
 import "highlight.js/styles/github.css";
 import { addDocument, updateDocument } from "../../api/kb";
+import { toast } from "../../stores/toastStore";
 import type { Document } from "../../types";
+import { getErrorMessage } from "../../utils/error";
 
 const plugins = [gfm(), highlight()];
 
@@ -51,7 +53,14 @@ export default function DocEditorModal({
   }, [initialContent]);
 
   const handleSave = async () => {
-    if (!filename.trim() || !mdContent.trim()) return;
+    if (!filename.trim()) {
+      toast("请输入文件名", "info");
+      return;
+    }
+    if (!mdContent.trim()) {
+      toast("请输入文档内容", "info");
+      return;
+    }
     const name = filename.trim();
     const dot = name.lastIndexOf(".");
     const base = dot > 0 ? name.slice(0, dot) : name;
@@ -60,11 +69,15 @@ export default function DocEditorModal({
     try {
       if (editDoc) {
         await updateDocument(kbId, editDoc.id, mdContent);
+        toast("文档已更新", "success");
       } else {
         await addDocument(kbId, mdContent, finalName);
+        toast("文档创建成功", "success");
       }
       onSaved();
       onClose();
+    } catch (err) {
+      toast(getErrorMessage(err));
     } finally {
       setSaving(false);
     }
