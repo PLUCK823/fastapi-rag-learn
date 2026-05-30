@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { createKB, deleteKB, listKBs, renameKB } from "../api/kb";
 import ConfirmDialog from "../components/shared/ConfirmDialog";
+import { KBListSkeleton } from "../components/shared/Skeleton";
 import { toast } from "../stores/toastStore";
 import type { KBDetail, KnowledgeBase } from "../types";
 import { getErrorMessage } from "../utils/error";
@@ -43,6 +44,7 @@ const EMPTY_STATE = (
 
 export default function KBListPage() {
   const [kbs, setKBs] = useState<(KnowledgeBase | KBDetail)[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<(KnowledgeBase | KBDetail) | null>(null);
   const [editingKb, setEditingKb] = useState<(KnowledgeBase | KBDetail) | null>(null);
@@ -57,11 +59,13 @@ export default function KBListPage() {
   }, [editingKb]);
 
   const refresh = useCallback(() => {
+    setLoading(true);
     listKBs(true)
       .then(setKBs)
       .catch((err) => {
         toast(getErrorMessage(err));
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -170,7 +174,9 @@ export default function KBListPage() {
       </div>
 
       {/* KB List */}
-      {kbs.length === 0 ? (
+      {loading ? (
+        <KBListSkeleton />
+      ) : kbs.length === 0 ? (
         EMPTY_STATE
       ) : (
         <div className="space-y-3">

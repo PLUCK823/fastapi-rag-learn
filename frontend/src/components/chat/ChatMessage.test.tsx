@@ -12,10 +12,11 @@ describe("ChatMessage", () => {
     };
     render(<ChatMessage msg={msg} />);
     expect(screen.getByText("什么是 RAG？")).toBeInTheDocument();
-    // User message is right-aligned: text → div.content → div.bubble → div.flex(justify-end)
+    // User message is right-aligned: text → div.bubble → div.flex-col(items-end) → div.flex(justify-end)
     const textEl = screen.getByText("什么是 RAG？");
-    const bubble = textEl.parentElement;
-    const flexContainer = bubble?.parentElement;
+    const bubble = textEl.parentElement;       // .rounded-2xl
+    const column = bubble?.parentElement;       // .flex-col items-end
+    const flexContainer = column?.parentElement; // .chat-message.flex justify-end
     expect(flexContainer?.className).toContain("justify-end");
   });
 
@@ -27,10 +28,11 @@ describe("ChatMessage", () => {
     };
     render(<ChatMessage msg={msg} />);
     expect(screen.getByText("RAG 是检索增强生成。")).toBeInTheDocument();
-    // Assistant message is left-aligned
+    // Assistant message is left-aligned: text → div.bubble → div.flex-col(items-start) → div.flex(justify-start)
     const textEl = screen.getByText("RAG 是检索增强生成。");
-    const bubble = textEl.parentElement;
-    const flexContainer = bubble?.parentElement;
+    const bubble = textEl.parentElement;       // .rounded-2xl
+    const column = bubble?.parentElement;       // .flex-col items-start
+    const flexContainer = column?.parentElement; // .chat-message.flex justify-start
     expect(flexContainer?.className).toContain("justify-start");
   });
 

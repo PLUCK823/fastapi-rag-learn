@@ -19,6 +19,35 @@ from app.models.user import User
 router = APIRouter()
 
 
+# 多轮对话保留最近消息轮数
+_MAX_HISTORY_ROUNDS = 5
+
+
+def _fetch_history(
+    session: Session,
+    kb_id: int,
+    user_id: int,
+    session_id: str | None,
+) -> list[tuple[str, str]]:
+    """获取会话最近 N 轮对话历史，返回 [(role, content), ...]"""
+    if not session_id:
+        return []
+    msgs = (
+        session.query(ChatMessage)
+        .filter(
+            ChatMessage.kb_id == kb_id,
+            ChatMessage.user_id == user_id,
+            ChatMessage.session_id == session_id,
+        )
+        .order_by(ChatMessage.created_at.desc())
+        .limit(_MAX_HISTORY_ROUNDS * 2)
+        .all()
+    )
+    # 反转时间顺序为对话顺序
+    msgs.reverse()
+    return [(m.role, m.content) for m in msgs]
+
+
 def _save_message(
     session: Session,
     kb_id: int,
@@ -46,8 +75,11 @@ def ask_endpoint(
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
+    # 获取会话历史（多轮对话上下文）
+    history = _fetch_history(session, req.kb_id, user.id, req.session_id)
+
     try:
-        answer, sources = ask(req.text, req.kb_id)
+        answer, sources = ask(req.text, req.kb_id, history if history else None)
     except Exception as e:
         # Handle LLM/embedding failures gracefully
         error_msg = str(e)
@@ -66,8 +98,8 @@ def ask_endpoint(
             detail=f"生成回答时发生错误: {error_msg}"
         )
 
-    _save_message(session, req.kb_id, user.id, "user", req.text, None)
-    _save_message(session, req.kb_id, user.id, "assistant", answer, sources)
+    _save_message(session, req.kb_id, user.id, "user", req.text, None, req.session_id)
+    _save_message(session, req.kb_id, user.id, "assistant", answer, sources, req.session_id)
     return AskResponse(question=req.text, answer=answer, sources=sources)
 
 
@@ -111,8 +143,21 @@ async def ws_ask(
 
     from app.core.database import sync_session_factory
 
+    # fastapi-users JWT uses 'sub' field for user_id
+    user_id_str = payload.get("sub", "0")
+    user_id = int(user_id_str) if user_id_str else 0
+    sid = session_id if session_id else None
+
+    # 获取多轮对话历史
+    history: list[tuple[str, str]] = []
+    if sid and user_id:
+        with sync_session_factory() as history_session:
+            history = _fetch_history(history_session, kb_id, user_id, sid)
+
     try:
-        stream, sources = ask_stream_with_sources(data, kb_id)
+        stream, sources = ask_stream_with_sources(
+            data, kb_id, history if history else None
+        )
         for chunk in stream:
             full_answer_parts.append(chunk)
             await websocket.send_text(chunk)
@@ -129,11 +174,7 @@ async def ws_ask(
 
         # 保存对话记录
         full_answer = "".join(full_answer_parts)
-        # fastapi-users JWT uses 'sub' field for user_id, not 'user_id'
-        user_id_str = payload.get("sub", "0")
-        user_id = int(user_id_str) if user_id_str else 0
         if user_id:
-            sid = session_id if session_id else None
             with sync_session_factory() as session:
                 _save_message(session, kb_id, user_id, "user", data, None, sid)
                 _save_message(session, kb_id, user_id, "assistant", full_answer, sources, sid)

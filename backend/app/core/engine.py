@@ -125,9 +125,11 @@ def extract_sources(docs: list[Document]) -> list[SourceInfo]:
 
 
 def _retrieve_context(
-    question: str, kb_id: int
+    question: str,
+    kb_id: int,
+    history: list[tuple[str, str]] | None = None,
 ) -> tuple[str, list[Document]]:
-    """检索并构建 prompt，同时返回检索到的文档用于来源追溯"""
+    """检索并构建 prompt（可选注入多轮对话历史），返回检索到的文档用于来源追溯"""
     vectorstore = _get_kb_vectorstore(kb_id)
     retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
     docs: list[Document] = retriever.invoke(question)
@@ -138,7 +140,13 @@ def _retrieve_context(
         parts.append(f"来源{i}({name}): {d.page_content}")
     docs_text = "\n".join(parts)
 
-    prompt = f"""根据以下资料回答问题。如果资料里没有答案，就说不知道。
+    # 多轮对话历史
+    history_block = ""
+    if history:
+        lines = [f"{role}: {content}" for role, content in history]
+        history_block = "对话历史:\n" + "\n".join(lines) + "\n\n"
+
+    prompt = f"""{history_block}根据以下资料回答问题。如果资料里没有答案，就说不知道。
 
 资料:
 {docs_text}
@@ -149,12 +157,16 @@ def _retrieve_context(
     return prompt, docs
 
 
-def ask(question: str, kb_id: int) -> tuple[str, list[SourceInfo]]:
-    """非流式 RAG 问答"""
+def ask(
+    question: str,
+    kb_id: int,
+    history: list[tuple[str, str]] | None = None,
+) -> tuple[str, list[SourceInfo]]:
+    """非流式 RAG 问答（支持多轮对话历史）"""
     _init_shared()
     assert _llm is not None
 
-    prompt, docs = _retrieve_context(question, kb_id)
+    prompt, docs = _retrieve_context(question, kb_id, history)
     response = _llm.invoke(prompt)
     sources = extract_sources(docs)
     return str(response.content), sources
@@ -177,12 +189,16 @@ def get_document_content(kb_id: int, document_id: int) -> str:
 
 # ── 流式问答 ──
 
-def ask_stream(question: str, kb_id: int) -> Iterator[str]:
-    """真正的 LLM token 级流式输出，每个 chunk 是一个 token"""
+def ask_stream(
+    question: str,
+    kb_id: int,
+    history: list[tuple[str, str]] | None = None,
+) -> Iterator[str]:
+    """真正的 LLM token 级流式输出，每个 chunk 是一个 token（支持多轮对话历史）"""
     _init_shared()
     assert _llm is not None
 
-    prompt, _docs = _retrieve_context(question, kb_id)
+    prompt, _docs = _retrieve_context(question, kb_id, history)
     for chunk in _llm.stream(prompt):
         c = chunk.content
         if isinstance(c, str) and c:
@@ -190,13 +206,15 @@ def ask_stream(question: str, kb_id: int) -> Iterator[str]:
 
 
 def ask_stream_with_sources(
-    question: str, kb_id: int
+    question: str,
+    kb_id: int,
+    history: list[tuple[str, str]] | None = None,
 ) -> tuple[Iterator[str], list[SourceInfo]]:
-    """流式输出 + 来源信息，一次检索供两用"""
+    """流式输出 + 来源信息，一次检索供两用（支持多轮对话历史）"""
     _init_shared()
     assert _llm is not None
 
-    prompt, docs = _retrieve_context(question, kb_id)
+    prompt, docs = _retrieve_context(question, kb_id, history)
     sources = extract_sources(docs)
 
     def _stream() -> Iterator[str]:
