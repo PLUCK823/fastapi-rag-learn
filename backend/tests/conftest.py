@@ -17,11 +17,13 @@ os.environ["SECRET_KEY"] = "test-secret-key-for-jwt-signing-must-be-at-least-32-
 
 @pytest.fixture
 async def client() -> AsyncClient:
+    """每个测试使用独立数据库（create_all 快速建表，生产用 Alembic migration）"""
     from app.core.database import Base, sync_engine
-    from app.main import app
 
     Base.metadata.drop_all(sync_engine)
     Base.metadata.create_all(sync_engine)
+
+    from app.main import app
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -52,3 +54,14 @@ async def kb_id(client: AsyncClient, auth_headers: dict) -> int:
     resp = await client.post("/kb", json={"name": "测试知识库"}, headers=auth_headers)
     assert resp.status_code == 200
     return resp.json()["id"]
+
+
+@pytest.fixture
+def mock_engine():
+    """替换 engine 模块的 LLM 和 Embedding 为假实现，不加载真实模型。
+    需要测试真实 LLM/Embedding 行为时，不引入此 fixture。
+    """
+    from tests.mocks import mock_engine_init
+
+    with mock_engine_init():
+        yield
