@@ -18,6 +18,12 @@ test("session behavior tests", async ({ page }) => {
   await page.getByRole("button", { name: "创建" }).click();
   await expect(page.getByText("Session 测试库")).toBeVisible({ timeout: 5000 });
 
+  // 2.5 Dismiss onboarding guide if shown (first KB triggers it)
+  const skipBtn = page.getByText("跳过引导");
+  if (await skipBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await skipBtn.click();
+  }
+
   // 3. Navigate to chat
   await page.getByText("Session 测试库").click();
   await expect(page).toHaveURL(/\/chat\/\d+/);

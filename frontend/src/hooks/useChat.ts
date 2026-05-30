@@ -19,6 +19,8 @@ function nextId(): string {
  */
 
 const TICK_MS = 35; // ~30fps — smooth enough, non-blocking
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 1000; // 1s, then 2s, then 4s
 
 export function useChatWS(kbId: number, sessionId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -58,7 +60,7 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   }, []);
 
   const _startStream = useCallback(
-    (aiId: string, question: string, token: string, sid: string) => {
+    (aiId: string, question: string, token: string, sid: string, attempt: number = 0) => {
       setIsStreaming(true);
       doneRef.current = false;
       bufferRef.current = "";
@@ -123,28 +125,35 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       };
 
       ws.onclose = () => {
-        doneRef.current = true;
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === aiId ? { ...m, content: bufferRef.current, isStreaming: false } : m,
-          ),
-        );
-        setIsStreaming(false);
+        // If we received content already, just finalize it
+        if (bufferRef.current.length > 0) {
+          doneRef.current = true;
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiId ? { ...m, content: bufferRef.current, isStreaming: false } : m,
+            ),
+          );
+          setIsStreaming(false);
+        } else if (attempt < MAX_RETRIES) {
+          // No content received yet → retry with backoff
+          const delay = RETRY_BASE_MS * 2 ** attempt;
+          setTimeout(() => _startStream(aiId, question, token, sid, attempt + 1), delay);
+        } else {
+          // Max retries reached
+          doneRef.current = true;
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiId ? { ...m, content: "[错误: 连接失败，请重试]", isStreaming: false } : m,
+            ),
+          );
+          setIsStreaming(false);
+        }
       };
 
       ws.onerror = () => {
-        doneRef.current = true;
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        const content = bufferRef.current;
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === aiId
-              ? { ...m, content: content || "[错误: 连接失败]", isStreaming: false }
-              : m,
-          ),
-        );
-        setIsStreaming(false);
+        // onclose will fire after onerror — let onclose handle retry logic
       };
     },
     [kbId],

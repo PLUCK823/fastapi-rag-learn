@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { changePassword, getProfile, updateNickname } from "../api/auth";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { useAuthStore } from "../stores/authStore";
 import { getErrorMessage } from "../utils/error";
+import CommandPalette from "./shared/CommandPalette";
 import ConfirmDialog from "./shared/ConfirmDialog";
 import ThemeToggle from "./shared/ThemeToggle";
 import Toast from "./shared/Toast";
@@ -193,7 +195,9 @@ export default function AppLayout() {
   const [showMenu, setShowMenu] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showCmdPalette, setShowCmdPalette] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
     getProfile()
@@ -218,10 +222,35 @@ export default function AppLayout() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showMenu]);
 
+  // Global ⌘K / Ctrl+K → command palette
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowCmdPalette((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   const displayName = nickname || email || "用户";
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "var(--surface-bg)" }}>
+      {/* Offline banner */}
+      {!isOnline && (
+        <div
+          className="sticky top-0 z-50 px-4 py-2 text-center text-xs font-medium animate-fade-in"
+          style={{
+            backgroundColor: "var(--danger)",
+            color: "#fff",
+          }}
+        >
+          网络连接已断开，部分功能不可用
+        </div>
+      )}
+
       {/* Nav */}
       <nav
         className="sticky top-0 z-40 px-6 py-3 flex items-center justify-between border-b"
@@ -330,6 +359,9 @@ export default function AppLayout() {
           onCancel={() => setShowLogoutConfirm(false)}
         />
       )}
+
+      {/* Command palette */}
+      <CommandPalette open={showCmdPalette} onClose={() => setShowCmdPalette(false)} />
 
       {/* Global Toast */}
       <Toast />
