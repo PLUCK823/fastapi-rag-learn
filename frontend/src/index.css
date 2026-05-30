@@ -306,3 +306,311 @@ body::before {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
+
+/* ── ByteMD Dark Mode Overrides ── */
+[data-theme="dark"] .bytemd {
+  color: var(--text-primary);
+  border-color: var(--border-color-medium);
+  background-color: var(--surface-card);
+}
+
+[data-theme="dark"] .bytemd-toolbar {
+  background-color: var(--surface-bg);
+  border-bottom-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-toolbar-tab {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .bytemd-toolbar-icon:hover {
+  background-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-toolbar-icon {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .bytemd-toolbar-icon svg {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .bytemd-toolbar-tab-active {
+  color: var(--accent);
+}
+
+[data-theme="dark"] .bytemd-status {
+  border-top-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-split .bytemd-preview {
+  border-left-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-sidebar {
+  border-left-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-dropdown-item:hover {
+  background-color: var(--surface-bg);
+}
+
+[data-theme="dark"] .bytemd-help ul {
+  color: var(--text-muted);
+}
+
+/* ── CodeMirror Dark Mode Overrides ── */
+[data-theme="dark"] .bytemd .CodeMirror {
+  color: var(--text-primary);
+  background: var(--surface-card);
+}
+
+[data-theme="dark"] .bytemd .CodeMirror-gutters {
+  background-color: var(--surface-bg);
+  border-right-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd .CodeMirror-linenumber {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .bytemd .CodeMirror-cursor {
+  border-left-color: var(--text-primary);
+}
+
+[data-theme="dark"] .bytemd .CodeMirror-selected {
+  background: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd .CodeMirror-focused .CodeMirror-selected {
+  background: rgba(212, 148, 92, 0.2);
+}
+
+[data-theme="dark"] .bytemd .CodeMirror-activeline-background {
+  background: var(--surface-bg);
+}
+
+[data-theme="dark"] .bytemd .CodeMirror pre.CodeMirror-placeholder {
+  color: var(--text-muted);
+}
+
+/* CodeMirror syntax — soften default bright colors for dark bg */
+[data-theme="dark"] .bytemd .cm-s-default .cm-header { color: #89b4fa; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-quote { color: #a6e3a1; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-keyword { color: #cba6f7; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-atom { color: #89b4fa; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-number { color: #fab387; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-def { color: #89dceb; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-variable-2 { color: #74c7ec; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-type { color: #a6e3a1; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-comment { color: #6c7086; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-string { color: #a6e3a1; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-string-2 { color: #fab387; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-meta { color: #a6adc8; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-qualifier { color: #a6adc8; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-builtin { color: #89b4fa; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-bracket { color: #9399b2; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-tag { color: #cba6f7; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-attribute { color: #89dceb; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-hr { color: #6c7086; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-link { color: #89b4fa; }
+
+[data-theme="dark"] .bytemd .cm-negative { color: var(--danger); }
+[data-theme="dark"] .bytemd .cm-positive { color: var(--accent-sage); }
+
+/* ── Tooltip (tippy) Dark Mode Overrides ── */
+[data-theme="dark"] .bytemd .tippy-box {
+  background-color: var(--surface-card);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .bytemd .tippy-arrow {
+  color: var(--surface-card);
+}
+
+[data-theme="dark"] .bytemd .tippy-box[data-theme~="light-border"] {
+  background-color: var(--surface-card);
+  border-color: var(--border-color-medium);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ── Markdown Preview Dark Mode Overrides ── */
+[data-theme="dark"] .bytemd-preview .markdown-body {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body h1,
+[data-theme="dark"] .bytemd-preview .markdown-body h2,
+[data-theme="dark"] .bytemd-preview .markdown-body h3,
+[data-theme="dark"] .bytemd-preview .markdown-body h4,
+[data-theme="dark"] .bytemd-preview .markdown-body h5,
+[data-theme="dark"] .bytemd-preview .markdown-body h6 {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body blockquote {
+  color: var(--text-secondary);
+  border-left-color: var(--accent);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body code {
+  background-color: var(--surface-bg);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body pre {
+  background-color: var(--surface-bg);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body table {
+  border-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body th,
+[data-theme="dark"] .bytemd-preview .markdown-body td {
+  border-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body tr {
+  background-color: var(--surface-card);
+  border-top-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body tr:nth-child(2n) {
+  background-color: var(--surface-bg);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body hr {
+  background-color: var(--border-color-medium);
+}
+
+[data-theme="dark"] .bytemd-preview .markdown-body a {
+  color: var(--accent);
+}
+
+/* ── highlight.js Dark Theme ── */
+/* github-dark-dimmed colors, scoped to dark mode */
+[data-theme="dark"] .bytemd .hljs {
+  color: #adbac7;
+  background: #22272e;
+}
+
+[data-theme="dark"] .bytemd .hljs-doctag,
+[data-theme="dark"] .bytemd .hljs-keyword,
+[data-theme="dark"] .bytemd .hljs-meta .hljs-keyword,
+[data-theme="dark"] .bytemd .hljs-template-tag,
+[data-theme="dark"] .bytemd .hljs-template-variable,
+[data-theme="dark"] .bytemd .hljs-type,
+[data-theme="dark"] .bytemd .hljs-variable.language_ {
+  color: #f47067;
+}
+
+[data-theme="dark"] .bytemd .hljs-title,
+[data-theme="dark"] .bytemd .hljs-title.class_,
+[data-theme="dark"] .bytemd .hljs-title.class_.inherited__,
+[data-theme="dark"] .bytemd .hljs-title.function_ {
+  color: #dcbdfb;
+}
+
+[data-theme="dark"] .bytemd .hljs-attr,
+[data-theme="dark"] .bytemd .hljs-attribute,
+[data-theme="dark"] .bytemd .hljs-literal,
+[data-theme="dark"] .bytemd .hljs-meta,
+[data-theme="dark"] .bytemd .hljs-number,
+[data-theme="dark"] .bytemd .hljs-operator,
+[data-theme="dark"] .bytemd .hljs-variable,
+[data-theme="dark"] .bytemd .hljs-selector-attr,
+[data-theme="dark"] .bytemd .hljs-selector-class,
+[data-theme="dark"] .bytemd .hljs-selector-id {
+  color: #6cb6ff;
+}
+
+[data-theme="dark"] .bytemd .hljs-regexp,
+[data-theme="dark"] .bytemd .hljs-string,
+[data-theme="dark"] .bytemd .hljs-meta .hljs-string {
+  color: #96d0ff;
+}
+
+[data-theme="dark"] .bytemd .hljs-built_in,
+[data-theme="dark"] .bytemd .hljs-symbol {
+  color: #f69d50;
+}
+
+[data-theme="dark"] .bytemd .hljs-comment,
+[data-theme="dark"] .bytemd .hljs-code,
+[data-theme="dark"] .bytemd .hljs-formula {
+  color: #768390;
+}
+
+[data-theme="dark"] .bytemd .hljs-name,
+[data-theme="dark"] .bytemd .hljs-quote,
+[data-theme="dark"] .bytemd .hljs-selector-tag,
+[data-theme="dark"] .bytemd .hljs-selector-pseudo {
+  color: #8ddb8c;
+}
+
+[data-theme="dark"] .bytemd .hljs-subst {
+  color: #adbac7;
+}
+
+[data-theme="dark"] .bytemd .hljs-section {
+  color: #316dca;
+  font-weight: bold;
+}
+
+[data-theme="dark"] .bytemd .hljs-bullet {
+  color: #eac55f;
+}
+
+[data-theme="dark"] .bytemd .hljs-emphasis {
+  color: #adbac7;
+  font-style: italic;
+}
+
+[data-theme="dark"] .bytemd .hljs-strong {
+  color: #adbac7;
+  font-weight: bold;
+}
+
+[data-theme="dark"] .bytemd .hljs-addition {
+  color: #8ddb8c;
+  background-color: #113417;
+}
+
+[data-theme="dark"] .bytemd .hljs-deletion {
+  color: #f47067;
+  background-color: #441516;
+}
+
+/* ── ByteMD full-height in editor modals ── */
+/* The @bytemd/react Editor wrapper <div> needs explicit height to pass
+   down to .bytemd, which uses height:100%. Without this the chain
+   breaks and the editor collapses. */
+.bytemd-host > div {
+  height: 100%;
+}
+
+.bytemd {
+  height: 100% !important;
+  border: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.bytemd-body {
+  flex: 1 !important;
+  height: auto !important;
+  overflow: hidden !important;
+}
+
+.bytemd-editor,
+.bytemd-preview {
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.bytemd-editor .CodeMirror {
+  height: 100% !important;
+}

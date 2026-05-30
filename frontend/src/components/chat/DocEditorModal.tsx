@@ -4,7 +4,7 @@ import { Editor } from "@bytemd/react";
 import { useEffect, useRef, useState } from "react";
 import "bytemd/dist/index.css";
 import "highlight.js/styles/github.css";
-import { addDocument, updateDocument } from "../../api/kb";
+import { addDocument, renameDocument, updateDocument } from "../../api/kb";
 import { toast } from "../../stores/toastStore";
 import type { Document } from "../../types";
 import { getErrorMessage } from "../../utils/error";
@@ -27,7 +27,10 @@ export default function DocEditorModal({
   onSaved,
 }: DocEditorModalProps) {
   const [mdContent, setMdContent] = useState(initialContent);
-  const [filename, setFilename] = useState(editDoc?.filename ?? "");
+  const baseFilename = editDoc?.filename
+    ? editDoc.filename.replace(/\.md$/i, "")
+    : "";
+  const [filename, setFilename] = useState(baseFilename);
   const [saving, setSaving] = useState(false);
 
   // Inject content into CodeMirror after mount (ByteMD uses CodeMirror internally)
@@ -62,13 +65,14 @@ export default function DocEditorModal({
       return;
     }
     const name = filename.trim();
-    const dot = name.lastIndexOf(".");
-    const base = dot > 0 ? name.slice(0, dot) : name;
-    const finalName = `${base}.md`;
+    const finalName = `${name}.md`;
     setSaving(true);
     try {
       if (editDoc) {
         await updateDocument(kbId, editDoc.id, mdContent);
+        if (finalName !== editDoc.filename) {
+          await renameDocument(kbId, editDoc.id, finalName);
+        }
         toast("文档已更新", "success");
       } else {
         await addDocument(kbId, mdContent, finalName);
@@ -130,22 +134,38 @@ export default function DocEditorModal({
           >
             文件名
           </label>
-          <input
-            value={filename}
-            onChange={(e) => setFilename(e.target.value)}
-            placeholder="例如: readme（默认 .md）"
-            className="flex-1 px-3 py-1.5 rounded-md text-sm outline-none"
-            style={{
-              backgroundColor: "var(--surface-card)",
-              border: "var(--border-medium)",
-              color: "var(--text-primary)",
-            }}
-          />
+          <div
+            className="flex-1 flex items-center rounded-md overflow-hidden"
+            style={{ border: "var(--border-medium)" }}
+          >
+            <input
+              value={filename}
+              onChange={(e) => setFilename(e.target.value)}
+              placeholder="例如: readme"
+              className="flex-1 px-3 py-1.5 text-sm outline-none"
+              style={{
+                backgroundColor: "var(--surface-card)",
+                color: "var(--text-primary)",
+              }}
+            />
+            <span
+              className="px-2.5 py-1.5 text-sm font-medium select-none shrink-0"
+              style={{
+                backgroundColor: "var(--surface-bg)",
+                color: "var(--text-muted)",
+                borderLeft: "var(--border-light)",
+              }}
+            >
+              .md
+            </span>
+          </div>
         </div>
 
-        {/* Editor */}
-        <div className="flex-1 overflow-hidden">
-          <Editor value={mdContent} plugins={plugins} onChange={(v) => setMdContent(v)} />
+        {/* Editor — bytemd-host bridges height from flex container into ByteMD */}
+        <div className="flex-1 overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
+          <div className="flex-1 bytemd-host" style={{ minHeight: 0 }}>
+            <Editor value={mdContent} plugins={plugins} onChange={(v) => setMdContent(v)} />
+          </div>
         </div>
 
         {/* Footer */}
