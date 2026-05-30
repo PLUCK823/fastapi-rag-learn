@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { createKB, deleteKB, listKBs, renameKB } from "../api/kb";
 import ConfirmDialog from "../components/shared/ConfirmDialog";
+import OnboardingGuide, { hasOnboardingDone } from "../components/shared/OnboardingGuide";
 import { KBListSkeleton } from "../components/shared/Skeleton";
 import { toast } from "../stores/toastStore";
 import type { KBDetail, KnowledgeBase } from "../types";
@@ -46,6 +47,7 @@ export default function KBListPage() {
   const [kbs, setKBs] = useState<(KnowledgeBase | KBDetail)[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<(KnowledgeBase | KBDetail) | null>(null);
   const [editingKb, setEditingKb] = useState<(KnowledgeBase | KBDetail) | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -78,15 +80,19 @@ export default function KBListPage() {
       toast("请输入知识库名称", "info");
       return;
     }
+    const isFirstKB = kbs.length === 0;
     try {
       await createKB(name);
       setNewName("");
       refresh();
       toast("知识库创建成功", "success");
+      if (isFirstKB && !hasOnboardingDone()) {
+        setShowOnboarding(true);
+      }
     } catch (err) {
       toast(getErrorMessage(err));
     }
-  }, [newName, refresh]);
+  }, [newName, refresh, kbs.length]);
 
   const handleDelete = useCallback((kb: KnowledgeBase | KBDetail) => {
     setConfirmDelete(kb);
@@ -301,6 +307,9 @@ export default function KBListPage() {
           onCancel={() => setConfirmDelete(null)}
         />
       )}
+
+      {/* Onboarding guide — shown after creating first KB */}
+      <OnboardingGuide open={showOnboarding} onDone={() => setShowOnboarding(false)} />
     </div>
   );
 }
