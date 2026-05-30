@@ -27,9 +27,7 @@ export default function DocEditorModal({
   onSaved,
 }: DocEditorModalProps) {
   const [mdContent, setMdContent] = useState(initialContent);
-  const baseFilename = editDoc?.filename
-    ? editDoc.filename.replace(/\.md$/i, "")
-    : "";
+  const baseFilename = editDoc?.filename ? editDoc.filename.replace(/\.md$/i, "") : "";
   const [filename, setFilename] = useState(baseFilename);
   const [saving, setSaving] = useState(false);
 

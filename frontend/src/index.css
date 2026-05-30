@@ -395,28 +395,70 @@ body::before {
 }
 
 /* CodeMirror syntax — soften default bright colors for dark bg */
-[data-theme="dark"] .bytemd .cm-s-default .cm-header { color: #89b4fa; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-quote { color: #a6e3a1; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-keyword { color: #cba6f7; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-atom { color: #89b4fa; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-number { color: #fab387; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-def { color: #89dceb; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-variable-2 { color: #74c7ec; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-type { color: #a6e3a1; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-comment { color: #6c7086; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-string { color: #a6e3a1; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-string-2 { color: #fab387; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-meta { color: #a6adc8; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-qualifier { color: #a6adc8; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-builtin { color: #89b4fa; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-bracket { color: #9399b2; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-tag { color: #cba6f7; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-attribute { color: #89dceb; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-hr { color: #6c7086; }
-[data-theme="dark"] .bytemd .cm-s-default .cm-link { color: #89b4fa; }
+[data-theme="dark"] .bytemd .cm-s-default .cm-header {
+  color: #89b4fa;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-quote {
+  color: #a6e3a1;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-keyword {
+  color: #cba6f7;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-atom {
+  color: #89b4fa;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-number {
+  color: #fab387;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-def {
+  color: #89dceb;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-variable-2 {
+  color: #74c7ec;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-type {
+  color: #a6e3a1;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-comment {
+  color: #6c7086;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-string {
+  color: #a6e3a1;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-string-2 {
+  color: #fab387;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-meta {
+  color: #a6adc8;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-qualifier {
+  color: #a6adc8;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-builtin {
+  color: #89b4fa;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-bracket {
+  color: #9399b2;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-tag {
+  color: #cba6f7;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-attribute {
+  color: #89dceb;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-hr {
+  color: #6c7086;
+}
+[data-theme="dark"] .bytemd .cm-s-default .cm-link {
+  color: #89b4fa;
+}
 
-[data-theme="dark"] .bytemd .cm-negative { color: var(--danger); }
-[data-theme="dark"] .bytemd .cm-positive { color: var(--accent-sage); }
+[data-theme="dark"] .bytemd .cm-negative {
+  color: var(--danger);
+}
+[data-theme="dark"] .bytemd .cm-positive {
+  color: var(--accent-sage);
+}
 
 /* ── Tooltip (tippy) Dark Mode Overrides ── */
 [data-theme="dark"] .bytemd .tippy-box {
