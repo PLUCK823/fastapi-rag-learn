@@ -15,6 +15,9 @@ wheels/
 # Vector DB
 chroma_db/
 
+# Claude Code (local only)
+CLAUDE.md
+
 # macOS
 .DS_Store
 test.db
