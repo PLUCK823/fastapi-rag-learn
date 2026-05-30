@@ -1,7 +1,8 @@
 """错误恢复测试 - LLM 服务不可用、数据库错误"""
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from httpx import AsyncClient
 
 

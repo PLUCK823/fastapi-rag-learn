@@ -1,5 +1,6 @@
 """RAG 引擎 — 检索 + LLM 生成，按知识库隔离向量库"""
 
+import logging
 from collections.abc import Iterator
 
 from langchain_chroma import Chroma
@@ -15,6 +16,8 @@ from app.core.config import (
     RETRIEVAL_K,
 )
 from app.models.schemas import SourceInfo
+
+logger = logging.getLogger(__name__)
 
 _initialized = False
 _embeddings: HuggingFaceEmbeddings | None = None
@@ -52,19 +55,57 @@ def get_vectorstore(kb_id: int) -> Chroma:
 
 
 def delete_collection(kb_id: int) -> None:
+    """删除整个知识库的向量集合（不可逆）"""
     vs = _get_kb_vectorstore(kb_id)
     try:
         vs.delete_collection()
-    except Exception:
-        pass  # collection may not exist yet
+        logger.info("Deleted ChromaDB collection for kb_id=%d", kb_id)
+    except AttributeError:
+        # Some versions of langchain_chroma don't have delete_collection
+        # Fall back to native ChromaDB client
+        try:
+            vs._collection.delete()
+            logger.info("Deleted ChromaDB collection (native) for kb_id=%d", kb_id)
+        except Exception as e:
+            logger.warning("Failed to delete collection for kb_id=%d: %s", kb_id, e)
+    except Exception as e:
+        logger.warning("Failed to delete collection for kb_id=%d: %s", kb_id, e)
 
 
-def delete_document_chunks(kb_id: int, document_id: int) -> None:
+def delete_document_chunks(kb_id: int, document_id: int) -> int:
+    """删除文档的所有向量分块，返回删除前分块数。失败时抛出异常。"""
     vs = _get_kb_vectorstore(kb_id)
+    before = len(vs.get(where={"document_id": document_id})["ids"])
+    if before == 0:
+        logger.info("No chunks to delete for kb_id=%d doc_id=%d", kb_id, document_id)
+        return 0
+
     try:
         vs.delete(where={"document_id": document_id})
-    except Exception:
-        pass
+    except Exception as e:
+        # LangChain wrapper delete failed — try native ChromaDB client
+        logger.warning(
+            "LangChain delete failed for kb_id=%d doc_id=%d (%s), trying native client",
+            kb_id, document_id, e,
+        )
+        try:
+            vs._collection.delete(where={"document_id": document_id})
+        except Exception as e2:
+            raise RuntimeError(
+                f"Failed to delete chunks for doc_id={document_id} in kb_id={kb_id}: {e2}"
+            ) from e2
+
+    # Verify deletion
+    after = len(vs.get(where={"document_id": document_id})["ids"])
+    if after > 0:
+        raise RuntimeError(
+            f"Deletion incomplete: {after} chunks remain for doc_id={document_id} in kb_id={kb_id}"
+        )
+
+    logger.info(
+        "Deleted %d chunks for kb_id=%d doc_id=%d", before, kb_id, document_id,
+    )
+    return before
 
 
 def extract_sources(docs: list[Document]) -> list[SourceInfo]:

@@ -252,15 +252,18 @@ def list_messages(
 @router.delete("/{kb_id}/messages")
 def clear_messages(
     kb_id: int,
+    session_id: str | None = None,
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
+    """清空聊天记录。如果指定 session_id，只清空该会话；否则清空全部。"""
     kb_service._get_kb(session, kb_id, user.id)
-    session.execute(
-        delete(ChatMessage).where(
-            ChatMessage.kb_id == kb_id, ChatMessage.user_id == user.id
-        )
+    stmt = delete(ChatMessage).where(
+        ChatMessage.kb_id == kb_id, ChatMessage.user_id == user.id
     )
+    if session_id:
+        stmt = stmt.where(ChatMessage.session_id == session_id)
+    session.execute(stmt)
     session.commit()
     return {"message": "聊天记录已清空"}
 

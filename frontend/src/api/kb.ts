@@ -63,8 +63,9 @@ export async function listMessages(kbId: number, page = 1, pageSize = 50) {
   return res.data;
 }
 
-export async function clearMessages(kbId: number) {
-  return api.delete(`/kb/${kbId}/messages`);
+export async function clearMessages(kbId: number, sessionId?: string | null) {
+  const params = sessionId ? { session_id: sessionId } : {};
+  return api.delete(`/kb/${kbId}/messages`, { params });
 }
 
 export async function refreshToken() {

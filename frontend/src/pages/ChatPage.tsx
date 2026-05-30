@@ -96,6 +96,7 @@ export default function ChatPage() {
   const [uploading, setUploading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
   const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
+  const [confirmClearChat, setConfirmClearChat] = useState(false);
 
   // Document rename state
   const [editingDocId, setEditingDocId] = useState<number | null>(null);
@@ -180,6 +181,15 @@ export default function ChatPage() {
       }
     }
   }, [kbIdNum, confirmDeleteSession, activeSessionId, refreshSessions, resetLoadFlag, clear]);
+
+  const executeClearChat = useCallback(async () => {
+    await clearMessages(kbIdNum, activeSessionId);
+    setConfirmClearChat(false);
+    clear();
+    if (activeSessionId) {
+      refreshSessions();
+    }
+  }, [kbIdNum, activeSessionId, clear, refreshSessions]);
 
   /* ── Document actions ── */
 
@@ -487,10 +497,7 @@ export default function ChatPage() {
               type="button"
               className="text-xs font-medium transition-colors px-2 py-1 rounded-md"
               style={{ color: "var(--text-muted)" }}
-              onClick={async () => {
-                await clearMessages(kbIdNum);
-                clear();
-              }}
+              onClick={() => setConfirmClearChat(true)}
             >
               清空聊天
             </button>
@@ -585,6 +592,22 @@ export default function ChatPage() {
           danger
           onConfirm={executeDeleteSession}
           onCancel={() => setConfirmDeleteSession(null)}
+        />
+      )}
+
+      {/* Confirm Clear Chat Dialog */}
+      {confirmClearChat && (
+        <ConfirmDialog
+          title="清空聊天记录"
+          message={
+            activeSessionId
+              ? "清空当前会话的所有聊天记录？此操作不可撤销。"
+              : "清空所有未关联会话的聊天记录？此操作不可撤销。"
+          }
+          confirmLabel="确认清空"
+          danger
+          onConfirm={executeClearChat}
+          onCancel={() => setConfirmClearChat(false)}
         />
       )}
     </div>

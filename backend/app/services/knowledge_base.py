@@ -164,9 +164,18 @@ def add_document(
 
     doc = Document(kb_id=kb_id, filename=filename)
     session.add(doc)
-    session.flush()
+    session.flush()  # 获取 doc.id
 
-    chunk_count = _ingest_to_kb(content, filename, kb_id, doc.id)
+    # Ingest to ChromaDB — if this fails, rollback SQL
+    try:
+        chunk_count = _ingest_to_kb(content, filename, kb_id, doc.id)
+    except Exception:
+        session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="向量化文档失败，请稍后重试",
+        )
+
     doc.chunk_count = chunk_count
     session.commit()
     session.refresh(doc)
@@ -204,7 +213,15 @@ def update_document(
 ) -> Document:
     doc = get_document(session, kb_id, doc_id, user_id)
 
-    delete_document_chunks(kb_id, doc_id)
+    # Delete old chunks first — if this fails, don't proceed (avoid duplicate chunks)
+    try:
+        delete_document_chunks(kb_id, doc_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"删除旧向量分块失败: {e}",
+        )
+
     chunk_count = _ingest_to_kb(content, doc.filename, kb_id, doc_id)
     doc.chunk_count = chunk_count
     doc.updated_at = datetime.now(UTC)
@@ -238,7 +255,13 @@ def rename_document(
 
 def delete_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> None:
     doc = get_document(session, kb_id, doc_id, user_id)
-    delete_document_chunks(kb_id, doc_id)
+    try:
+        delete_document_chunks(kb_id, doc_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"删除文档向量分块失败: {e}",
+        )
     session.delete(doc)
     session.commit()
 
