@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { listSessionMessages } from "../api/kb";
 import { toast } from "../stores/toastStore";
 import type { Message } from "../types";
@@ -55,20 +56,20 @@ export function useChatWS(kbId: number, sessionId: string | null) {
     if (doneRef.current) return;
 
     const total = bufferRef.current.length;
-    // Show a few more chars each tick
     const next = Math.min(shownRef.current + CHARS_PER_TICK, total);
     shownRef.current = next;
 
     const content = bufferRef.current.slice(0, next);
-    setMessages((prev) =>
-      prev.map((m) => (m.id === aiId ? { ...m, content, isStreaming: true } : m)),
-    );
+    // flushSync: force immediate DOM commit so bubble expands frame-by-frame
+    flushSync(() => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === aiId ? { ...m, content, isStreaming: true } : m)),
+      );
+    });
 
     if (next < total) {
-      // More content to show — schedule next tick
       timerRef.current = setTimeout(() => _typewriterTick(aiId), TYPEWRITER_DELAY);
     } else {
-      // Caught up with buffer — poll for more
       timerRef.current = setTimeout(() => _typewriterTick(aiId), TYPEWRITER_DELAY);
     }
   }, []);
