@@ -138,6 +138,11 @@ jobs:
         working-directory: backend
         run: uv sync --frozen
 
+      - name: Create test database
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          psql "postgresql://raguser:citest@localhost:5432/raglearn" -c "CREATE DATABASE raglearn_test;" || true
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
