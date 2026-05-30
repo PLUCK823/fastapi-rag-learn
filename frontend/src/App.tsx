@@ -3,9 +3,9 @@ import ErrorBoundary from "./components/shared/ErrorBoundary";
 import { router } from "./router";
 
 export default function App() {
-	return (
-		<ErrorBoundary>
-			<RouterProvider router={router} />
-		</ErrorBoundary>
-	);
+  return (
+    <ErrorBoundary>
+      <RouterProvider router={router} />
+    </ErrorBoundary>
+  );
 }

@@ -1,6 +1,10 @@
 """RAG 引擎 — 检索 + LLM 生成，按知识库隔离向量库"""
 
 import logging
+import re
+import subprocess
+import sys
+import traceback
 from collections.abc import Iterator
 
 from langchain_chroma import Chroma
@@ -18,6 +22,23 @@ from app.core.config import (
 from app.models.schemas import SourceInfo
 
 logger = logging.getLogger(__name__)
+
+# 匹配 Python 代码块
+_PYTHON_BLOCK_RE = re.compile(r"```python\s*\n(.*?)```", re.DOTALL)
+
+# 延迟加载 jieba（首次调用才初始化，避免拖慢启动）
+_jieba_loaded = False
+
+
+def _init_jieba() -> None:
+    global _jieba_loaded
+    if _jieba_loaded:
+        return
+    import jieba
+
+    jieba.setLogLevel(logging.WARNING)
+    jieba.initialize()
+    _jieba_loaded = True
 
 _initialized = False
 _embeddings: HuggingFaceEmbeddings | None = None
@@ -108,33 +129,140 @@ def delete_document_chunks(kb_id: int, document_id: int) -> int:
     return before
 
 
-def extract_sources(docs: list[Document]) -> list[SourceInfo]:
+def _extract_keywords(question: str) -> list[str]:
+    """从问题中提取有意义的关键词，支持中文分词 + 英文空格分词"""
+    import jieba
+
+    _init_jieba()
+
+    # 移除标点，保留中英文、数字
+    cleaned = re.sub(r"[^一-鿿\w]", " ", question)
+
+    # jieba 中文分词
+    words: list[str] = []
+    for seg in jieba.cut(cleaned):
+        w = seg.strip()
+        if len(w) >= 2:
+            words.append(w)
+
+    # 同时保留空格分出的英文/数字词（补充 jieba 可能漏掉的）
+    space_words = [w.strip() for w in cleaned.split() if len(w.strip()) >= 2]
+    for sw in space_words:
+        if sw not in words:
+            words.append(sw)
+
+    # 去重，保持顺序
+    seen: set[str] = set()
+    result: list[str] = []
+    for w in words:
+        wl = w.lower()
+        if wl not in seen:
+            seen.add(wl)
+            result.append(w)
+
+    return result
+
+
+def _best_snippet(text: str, keywords: list[str], max_len: int = 200) -> str:
+    """找到文本中最匹配关键词的片段作为摘要，而非简单截取前 N 个字符"""
+    if not keywords or not text:
+        return text[:max_len]
+
+    text_lower = text.lower()
+    best_start = 0
+    best_score = 0
+
+    # 滑动窗口：找包含最多 keyword 的窗口
+    for i in range(0, len(text), 20):
+        window_end = min(i + max_len, len(text))
+        window = text_lower[i:window_end]
+        score = sum(1 for kw in keywords if kw.lower() in window)
+        if score > best_score:
+            best_score = score
+            best_start = i
+
+    # 避免截断单词
+    start = max(0, best_start - 20)
+    while start > 0 and text[start - 1] not in (" ", "\n"):
+        start -= 1
+
+    snippet = text[start : start + max_len]
+    return (snippet[:max_len] + "…").strip() if len(snippet) > max_len else snippet.strip()
+
+
+def extract_sources(docs: list[Document], question: str = "") -> list[SourceInfo]:
     seen: set[int] = set()
     sources: list[SourceInfo] = []
+    keywords = _extract_keywords(question) if question else []
     for idx, d in enumerate(docs, start=1):
-        doc_id = d.metadata.get("document_id")
+        doc_id = d.metadata.get("document_id") if d.metadata else None
         if doc_id and doc_id not in seen:
             seen.add(doc_id)
+            snippet = _best_snippet(d.page_content, keywords)
             sources.append(SourceInfo(
                 index=idx,
                 document_id=int(doc_id),
-                document_name=str(d.metadata.get("document_name", "")),
-                snippet=d.page_content[:200],
+                document_name=str(d.metadata.get("document_name", "") if d.metadata else ""),
+                snippet=snippet,
             ))
     return sources
 
 
+# ── Python 代码执行 ──
+
+def _execute_python(code: str) -> str:
+    """安全地执行 Python 代码，返回 stdout 输出或错误信息"""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env={**__import__("os").environ, "PYTHONIOENCODING": "utf-8"},
+        )
+        if result.returncode == 0:
+            out = result.stdout.strip()
+            return out if out else "(执行完毕，无输出)"
+        err = result.stderr.strip()
+        return f"执行错误: {err}" if err else f"退出码: {result.returncode}"
+    except subprocess.TimeoutExpired:
+        return "执行超时（超过 10 秒），请简化运算"
+    except Exception:
+        return f"执行失败: {traceback.format_exc(limit=1)}"
+
+
+def _execute_code_blocks(text: str) -> str:
+    """查找并执行文本中的所有 Python 代码块，将结果追回文本末尾"""
+    matches = list(_PYTHON_BLOCK_RE.finditer(text))
+    if not matches:
+        return text
+
+    results: list[str] = []
+    for i, m in enumerate(matches, start=1):
+        code = m.group(1).strip()
+        if not code:
+            continue
+        logger.info("Executing Python block %d (%d chars)", i, len(code))
+        results.append(f"**运算结果 {i}:**\n```\n{_execute_python(code)}\n```")
+
+    if results:
+        text += "\n\n---\n" + "\n\n".join(results)
+    return text
+
+
+# ── 检索 ──
+
 def _keyword_search(
     question: str, kb_id: int, exclude_ids: set[str], k: int = 3
 ) -> list[Document]:
-    """关键词检索：在知识库所有分块中匹配关键词，作为向量检索的补充"""
+    """BM25 关键词检索：TF-IDF 评分，远优于简单关键词计数"""
+    from rank_bm25 import BM25Okapi
+
     vs = _get_kb_vectorstore(kb_id)
-    # 提取有意义的词（长度 >= 2）
-    keywords = [w for w in question.replace("？", " ").replace("?", " ").split() if len(w) >= 2]
+    keywords = _extract_keywords(question)
     if not keywords:
         return []
 
-    matched: list[Document] = []
     try:
         raw = vs._collection.get(include=["documents", "metadatas"])
     except Exception:
@@ -144,22 +272,50 @@ def _keyword_search(
     docs_raw = raw.get("documents", [])
     metadatas = raw.get("metadatas", [])
 
+    # 构建 BM25 语料库
+    corpus: list[list[str]] = []
+    index_map: list[int] = []  # corpus_idx → original_idx
     for i, chunk_id in enumerate(ids):
         if chunk_id in exclude_ids:
             continue
         text = docs_raw[i] if isinstance(docs_raw[i], str) else ""
-        # 任一关键词匹配
-        if any(kw.lower() in text.lower() for kw in keywords):
-            meta = metadatas[i] if i < len(metadatas) else {}
-            matched.append(Document(
-                id=chunk_id,
-                page_content=text,
-                metadata=meta or {},
-            ))
-        if len(matched) >= k:
+        if not text.strip():
+            continue
+        # jieba 分词
+        tokens = _extract_keywords(text)
+        if not tokens:
+            continue
+        corpus.append(tokens)
+        index_map.append(i)
+
+    if not corpus:
+        return []
+
+    # BM25 检索
+    bm25 = BM25Okapi(corpus)
+    scores = bm25.get_scores(keywords)
+
+    # 取 top-k
+    ranked = sorted(
+        [(scores[j], index_map[j]) for j in range(len(scores))],
+        key=lambda x: x[0],
+        reverse=True,
+    )
+
+    result: list[Document] = []
+    for score, orig_idx in ranked:
+        if score <= 0:
+            continue
+        meta = metadatas[orig_idx] if orig_idx < len(metadatas) else {}
+        result.append(Document(
+            id=ids[orig_idx],
+            page_content=docs_raw[orig_idx] if isinstance(docs_raw[orig_idx], str) else "",
+            metadata=meta or {},
+        ))
+        if len(result) >= k:
             break
 
-    return matched
+    return result
 
 
 def _retrieve_context(
@@ -167,17 +323,33 @@ def _retrieve_context(
     kb_id: int,
     history: list[tuple[str, str]] | None = None,
 ) -> tuple[str, list[Document]]:
-    """混合检索（向量 + 关键词）+ 构建 prompt，支持多轮对话历史"""
+    """混合检索（向量 + BM25）+ RRF 融合 + 构建 prompt，支持多轮对话历史"""
     vectorstore = _get_kb_vectorstore(kb_id)
     retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
     vec_docs: list[Document] = retriever.invoke(question)
 
-    # 关键词检索补充（排除已命中的 chunk）
+    # BM25 关键词检索
     seen_ids = {d.id for d in vec_docs if d.id}
-    kw_docs = _keyword_search(question, kb_id, seen_ids, k=2)
+    kw_docs = _keyword_search(question, kb_id, seen_ids, k=RETRIEVAL_K)
 
-    # 合并：向量结果优先，关键词结果补充
-    docs = vec_docs + kw_docs
+    # RRF (Reciprocal Rank Fusion) 合并两个排序列表
+    rrf_k = 60
+    scores: dict[str, float] = {}
+    id_to_doc: dict[str, Document] = {}
+
+    for rank, d in enumerate(vec_docs):
+        doc_id = d.id or f"vec_{rank}"
+        scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (rrf_k + rank + 1)
+        id_to_doc[doc_id] = d
+
+    for rank, d in enumerate(kw_docs):
+        doc_id = d.id or f"kw_{rank}"
+        scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (rrf_k + rank + 1)
+        id_to_doc[doc_id] = d
+
+    # 按 RRF 分数排序，取 top
+    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    docs = [id_to_doc[doc_id] for doc_id, _ in ranked[:RETRIEVAL_K + 3]]
 
     parts: list[str] = []
     for i, d in enumerate(docs, start=1):
@@ -191,7 +363,13 @@ def _retrieve_context(
         lines = [f"{role}: {content}" for role, content in history]
         history_block = "对话历史:\n" + "\n".join(lines) + "\n\n"
 
-    prompt = f"""{history_block}根据以下资料回答问题。如果资料里没有答案，就说不知道。
+    prompt = f"""{history_block}你是精确的 RAG 问答助手。严格依据资料回答。
+
+要求:
+1. 涉及数值、统计、计算时，先列出资料中相关数据，再逐步推算。
+2. 涉及加减乘除等运算时，用 ```python 代码块写出计算过程。
+3. 表格数据要逐行分析，不要遗漏。
+4. 资料没有的信息就说不知道，不要编造。
 
 资料:
 {docs_text}
@@ -213,8 +391,9 @@ def ask(
 
     prompt, docs = _retrieve_context(question, kb_id, history)
     response = _llm.invoke(prompt)
-    sources = extract_sources(docs)
-    return str(response.content), sources
+    answer = _execute_code_blocks(str(response.content))
+    sources = extract_sources(docs, question)
+    return answer, sources
 
 
 # ── 文档内容 ──
@@ -260,7 +439,7 @@ def ask_stream_with_sources(
     assert _llm is not None
 
     prompt, docs = _retrieve_context(question, kb_id, history)
-    sources = extract_sources(docs)
+    sources = extract_sources(docs, question)
 
     def _stream() -> Iterator[str]:
         for chunk in _llm.stream(prompt):

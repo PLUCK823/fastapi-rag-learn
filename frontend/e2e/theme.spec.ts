@@ -8,7 +8,7 @@ test("theme toggle works across pages and persists", async ({ page }) => {
   await page.goto("http://127.0.0.1:5173/register");
   await page.fill('input[placeholder="name@example.com"]', EMAIL);
   await page.fill('input[placeholder="至少 6 个字符"]', PASSWORD);
-  await page.click('button:has-text("注册并登录")');
+  await page.click('button:has-text("注册")');
   await page.waitForURL("http://127.0.0.1:5173/");
 
   // 2. Default should be light theme

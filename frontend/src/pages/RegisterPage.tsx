@@ -1,197 +1,239 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login, register } from "../api/auth";
+import AuthHeader from "../components/shared/AuthHeader";
 import { useAuthStore } from "../stores/authStore";
 import { getErrorMessage } from "../utils/error";
 
 export default function RegisterPage() {
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
-	const [error, setError] = useState("");
-	const [loading, setLoading] = useState(false);
-	const setToken = useAuthStore((s) => s.setToken);
-	const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const setToken = useAuthStore((s) => s.setToken);
+  const navigate = useNavigate();
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!email.trim()) {
-			setError("请输入邮箱地址");
-			return;
-		}
-		if (!password.trim()) {
-			setError("请输入密码");
-			return;
-		}
-		if (password.length < 6) {
-			setError("密码至少需要 6 个字符");
-			return;
-		}
-		setError("");
-		setLoading(true);
-		try {
-			await register(email, password);
-			const data = await login(email, password);
-			setToken(data.access_token);
-			navigate("/");
-		} catch (err) {
-			setError(getErrorMessage(err));
-		} finally {
-			setLoading(false);
-		}
-	};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setError("请输入邮箱地址");
+      return;
+    }
+    if (!password.trim()) {
+      setError("请输入密码");
+      return;
+    }
+    if (password.length < 6) {
+      setError("密码至少需要 6 个字符");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      await register(email, password);
+      const data = await login(email, password);
+      setToken(data.access_token);
+      navigate("/");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	return (
-		<div
-			className="min-h-screen flex"
-			style={{ backgroundColor: "var(--surface-bg)" }}
-		>
-			{/* Left — register form */}
-			<div className="flex-1 flex items-center justify-center px-8">
-				<div className="w-full max-w-sm animate-fade-in-up">
-					<h1
-						className="display-text text-2xl text-center mb-8 lg:hidden"
-						style={{ color: "var(--color-ink)" }}
-					>
-						RAG Learn
-					</h1>
+  return (
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--surface-bg)" }}>
+      <AuthHeader />
 
-					<h2
-						className="display-text text-xl mb-1"
-						style={{ color: "var(--text-primary)" }}
-					>
-						注册
-					</h2>
-					<p className="text-sm mb-8" style={{ color: "var(--text-muted)" }}>
-						创建账号，开始构建你的知识库
-					</p>
+      {/* Centered card */}
+      <div className="flex-1 flex items-center justify-center px-4 pb-12">
+        <div className="w-full max-w-md">
+          <div
+            className="px-6 sm:px-10 py-10 sm:py-12 rounded-2xl"
+            style={{
+              backgroundColor: "var(--surface-card)",
+              border: "var(--border-light)",
+              boxShadow: "var(--shadow-lg)",
+            }}
+          >
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1
+                className="display-text text-2xl sm:text-3xl mb-2"
+                style={{ color: "var(--text-primary)" }}
+              >
+                创建你的账号
+              </h1>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                开始构建你的专属知识库
+              </p>
+            </div>
 
-					{error && (
-						<div
-							className="mb-6 px-4 py-3 rounded-lg text-sm"
-							style={{
-								backgroundColor: "var(--danger-bg)",
-								color: "var(--danger)",
-							}}
-						>
-							{error}
-						</div>
-					)}
+            {/* Error */}
+            {error && (
+              <div
+                className="mb-5 px-4 py-3 rounded-xl text-sm flex items-start gap-2.5"
+                style={{
+                  backgroundColor: "var(--danger-bg)",
+                  border: "1px solid var(--danger-border)",
+                  color: "var(--danger)",
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  className="mt-px shrink-0"
+                  aria-hidden="true"
+                >
+                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+                  <line
+                    x1="8"
+                    y1="4.5"
+                    x2="8"
+                    y2="8.5"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="8" cy="11.2" r="0.7" fill="currentColor" />
+                </svg>
+                <span>{error}</span>
+              </div>
+            )}
 
-					<form onSubmit={handleSubmit} className="space-y-5">
-						<div>
-							<label
-								className="block text-xs font-medium mb-1.5"
-								style={{ color: "var(--text-secondary)" }}
-							>
-								邮箱
-							</label>
-							<input
-								type="email"
-								placeholder="name@example.com"
-								value={email}
-								onChange={(e) => setEmail(e.target.value)}
-								className="w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors"
-								style={{
-									backgroundColor: "var(--surface-card)",
-									border: "var(--border-medium)",
-									color: "var(--text-primary)",
-								}}
-								onFocus={(e) => {
-									e.target.style.borderColor = "var(--color-copper)";
-								}}
-								onBlur={(e) => {
-									e.target.style.borderColor = "var(--border-color-medium)";
-								}}
-								required
-							/>
-						</div>
-						<div>
-							<label
-								className="block text-xs font-medium mb-1.5"
-								style={{ color: "var(--text-secondary)" }}
-							>
-								密码
-							</label>
-							<input
-								type="password"
-								placeholder="至少 6 个字符"
-								value={password}
-								onChange={(e) => setPassword(e.target.value)}
-								className="w-full px-4 py-2.5 rounded-lg text-sm outline-none transition-colors"
-								style={{
-									backgroundColor: "var(--surface-card)",
-									border: "var(--border-medium)",
-									color: "var(--text-primary)",
-								}}
-								onFocus={(e) => {
-									e.target.style.borderColor = "var(--color-copper)";
-								}}
-								onBlur={(e) => {
-									e.target.style.borderColor = "var(--border-color-medium)";
-								}}
-								required
-								minLength={6}
-							/>
-						</div>
-						<button
-							type="submit"
-							disabled={loading}
-							className="w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50"
-							style={{
-								backgroundColor: "var(--color-ink)",
-								color: "var(--color-cream)",
-							}}
-						>
-							{loading ? "注册中..." : "注册并登录"}
-						</button>
-					</form>
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  邮箱地址
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200"
+                  style={{
+                    backgroundColor: "var(--surface-bg)",
+                    border: "var(--border-medium)",
+                    color: "var(--text-primary)",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "var(--color-ink)";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(28, 28, 46, 0.06)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "var(--border-color-medium)";
+                    e.target.style.boxShadow = "none";
+                  }}
+                  required
+                />
+              </div>
 
-					<p
-						className="text-center text-xs mt-8"
-						style={{ color: "var(--text-muted)" }}
-					>
-						已有账号？{" "}
-						<Link
-							to="/login"
-							className="font-medium hover:underline transition-colors"
-							style={{ color: "var(--accent)" }}
-						>
-							登录
-						</Link>
-					</p>
-				</div>
-			</div>
+              <div>
+                <label
+                  className="block text-sm font-medium mb-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  密码
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="至少 6 个字符"
+                    className="w-full px-4 py-3 pr-12 rounded-xl text-sm outline-none transition-all duration-200"
+                    style={{
+                      backgroundColor: "var(--surface-bg)",
+                      border: "var(--border-medium)",
+                      color: "var(--text-primary)",
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "var(--color-ink)";
+                      e.target.style.boxShadow = "0 0 0 3px rgba(28, 28, 46, 0.06)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "var(--border-color-medium)";
+                      e.target.style.boxShadow = "none";
+                    }}
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors hover:opacity-60"
+                    style={{ color: "var(--text-muted)" }}
+                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  >
+                    {showPassword ? (
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      >
+                        <title>隐藏密码</title>
+                        <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <title>显示密码</title>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
 
-			{/* Right — decorative panel */}
-			<div
-				className="hidden lg:flex w-5/12 relative overflow-hidden flex-col items-center justify-center px-12"
-				style={{ backgroundColor: "var(--color-ink)" }}
-			>
-				<div
-					className="absolute inset-0 opacity-[0.03]"
-					style={{
-						backgroundImage:
-							"radial-gradient(circle at 80% 50%, var(--color-cream) 1px, transparent 1px)",
-						backgroundSize: "24px 24px",
-					}}
-				/>
-				<div className="relative z-10 text-center max-w-sm">
-					<h1
-						className="display-text text-3xl mb-4 tracking-tight"
-						style={{ color: "var(--color-cream)" }}
-					>
-						一切从知识开始
-					</h1>
-					<p
-						className="text-sm leading-relaxed"
-						style={{ color: "var(--color-ink-muted)" }}
-					>
-						上传文档、提问、获取答案。
-						<br />
-						RAG 让 AI 真正理解你的内容。
-					</p>
-				</div>
-			</div>
-		</div>
-	);
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-50 active:scale-[0.99]"
+                style={{
+                  backgroundColor: "var(--color-ink)",
+                  color: "var(--color-cream)",
+                }}
+              >
+                {loading ? "注册中..." : "注册"}
+              </button>
+            </form>
+
+            {/* Footer */}
+            <p className="text-center text-sm mt-8" style={{ color: "var(--text-muted)" }}>
+              已有账号？{" "}
+              <Link
+                to="/login"
+                className="font-semibold hover:underline"
+                style={{ color: "var(--accent)" }}
+              >
+                登录
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

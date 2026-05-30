@@ -1,5 +1,6 @@
 """知识库 CRUD + 文档管理（同步 SQLAlchemy，避免 greenlet）"""
 
+import re
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
@@ -12,12 +13,29 @@ from app.core.config import CHUNK_OVERLAP, CHUNK_SIZE
 from app.core.engine import delete_collection, delete_document_chunks, get_vectorstore
 from app.models.knowledge_base import Document, KnowledgeBase
 
+# 表格检测正则（markdown table: header line + separator line + at least one row）
+_TABLE_RE = re.compile(
+    r"(\|.+\|\s*\n\|[-| :]+\|\s*\n(?:\|.+\|\s*\n?)+)", re.MULTILINE
+)
+
+# Markdown 标题检测（用于上下文富化）
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
+
 
 def _splitter() -> RecursiveCharacterTextSplitter:
+    """中文优化分隔符：段落→换行→中文句末标点→中文句中→英文标点→空格"""
     return RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
-        separators=["\n\n", "\n", "。", ".", " "],
+        separators=[
+            "\n\n",
+            "\n",
+            "。", "？", "！",  # 中文句末标点
+            "；", "：", "，",  # 中文句中标点
+            ". ", "? ", "! ",
+            "; ", ": ", ", ",
+            " ",
+        ],
     )
 
 
@@ -269,15 +287,77 @@ def delete_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> 
 # ── Internal ──
 
 def _ingest_to_kb(content: str, filename: str, kb_id: int, doc_id: int) -> int:
-    lc_doc = LCDocument(page_content=content, metadata={"source": filename})
-    chunks = _splitter().split_documents([lc_doc])
+    """将文档内容向量化存入 ChromaDB，带上下文富化 + 表格保留"""
+    # 0. 提取所有 markdown 标题，构建位置→标题映射
+    heading_map: dict[int, str] = {}  # char_pos → heading text
+    for m in _HEADING_RE.finditer(content):
+        heading_map[m.start()] = m.group(2).strip()
 
-    for i, chunk in enumerate(chunks):
+    def _get_context(char_pos: int) -> str:
+        """获取指定字符位置所属的最近标题"""
+        ctx = f"文档: {filename}"
+        prev = ""
+        for pos, heading in sorted(heading_map.items()):
+            if pos < char_pos:
+                prev = heading
+            else:
+                break
+        if prev:
+            ctx += f"\n章节: {prev}"
+        return ctx
+
+    # 1. 提取 markdown 表格（保持表格完整性，不切分）
+    tables: list[tuple[str, int]] = []  # (table_text, position)
+
+    def _extract(m: re.Match) -> str:
+        tables.append((m.group(1), m.start()))
+        return f"\n\n[表格 {len(tables)}]\n\n"
+
+    remaining = _TABLE_RE.sub(_extract, content)
+
+    # 2. 表格各自作为一个独立 chunk，并附上上下文
+    table_chunks: list[LCDocument] = []
+    for t_idx, (table_text, pos) in enumerate(tables):
+        ctx = _get_context(pos)
+        enriched = f"{ctx}\n\n{table_text.strip()}"
+        table_chunks.append(LCDocument(
+            page_content=enriched,
+            metadata={
+                "source": filename,
+                "is_table": True,
+                "table_index": t_idx,
+            },
+        ))
+
+    # 3. 剩余文本用 splitter 切分 + 上下文富化
+    raw_chunks = _splitter().split_documents(
+        [LCDocument(page_content=remaining, metadata={"source": filename})]
+    )
+
+    # 为每个 chunk 查找原始文档中的位置并添加上下文
+    text_chunks: list[LCDocument] = []
+    search_start = 0
+    for rc in raw_chunks:
+        # 在 remaining 文本中定位此 chunk（取前 80 字符做匹配）
+        snippet = rc.page_content[:80].strip()
+        pos = content.find(snippet, search_start)
+        if pos < 0:
+            pos = search_start  # fallback
+        else:
+            search_start = pos + len(snippet)
+        ctx = _get_context(pos)
+        rc.page_content = f"{ctx}\n\n{rc.page_content}"
+        text_chunks.append(rc)
+
+    # 4. 合并所有 chunk
+    all_chunks = text_chunks + table_chunks
+
+    for i, chunk in enumerate(all_chunks):
         chunk.metadata["kb_id"] = kb_id
         chunk.metadata["document_id"] = doc_id
         chunk.metadata["document_name"] = filename
         chunk.metadata["chunk_index"] = i
 
     vs = get_vectorstore(kb_id)
-    vs.add_documents(chunks)
-    return len(chunks)
+    vs.add_documents(all_chunks)
+    return len(all_chunks)

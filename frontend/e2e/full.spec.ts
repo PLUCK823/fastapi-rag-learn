@@ -19,7 +19,7 @@ test.describe("Full E2E Test Suite", () => {
     // Fill registration form
     await page.getByPlaceholder("name@example.com").fill(user.email);
     await page.getByPlaceholder("至少 6 个字符").fill(user.password);
-    await page.getByRole("button", { name: "注册并登录" }).click();
+    await page.getByRole("button", { name: "注册" }).click();
 
     // Should redirect to home page
     await expect(page).toHaveURL("/", { timeout: 10000 });
@@ -39,7 +39,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.goto("http://localhost:5173/register");
     await page.getByPlaceholder("name@example.com").fill(user.email);
     await page.getByPlaceholder("至少 6 个字符").fill(user.password);
-    await page.getByRole("button", { name: "注册并登录" }).click();
+    await page.getByRole("button", { name: "注册" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });
 
     // Create KB
@@ -104,7 +104,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.goto("http://localhost:5173/register");
     await page.getByPlaceholder("name@example.com").fill(user.email);
     await page.getByPlaceholder("至少 6 个字符").fill(user.password);
-    await page.getByRole("button", { name: "注册并登录" }).click();
+    await page.getByRole("button", { name: "注册" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });
 
     // Create KB
@@ -176,7 +176,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.goto("http://localhost:5173/register");
     await page.getByPlaceholder("name@example.com").fill(user.email);
     await page.getByPlaceholder("至少 6 个字符").fill(user.password);
-    await page.getByRole("button", { name: "注册并登录" }).click();
+    await page.getByRole("button", { name: "注册" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });
 
     // Create KB
@@ -249,7 +249,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.goto("http://localhost:5173/register");
     await page.getByPlaceholder("name@example.com").fill(user.email);
     await page.getByPlaceholder("至少 6 个字符").fill(user.password);
-    await page.getByRole("button", { name: "注册并登录" }).click();
+    await page.getByRole("button", { name: "注册" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });
 
     // Create KB
@@ -285,7 +285,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.goto("http://localhost:5173/register");
     await page.getByPlaceholder("name@example.com").fill(user.email);
     await page.getByPlaceholder("至少 6 个字符").fill(user.password);
-    await page.getByRole("button", { name: "注册并登录" }).click();
+    await page.getByRole("button", { name: "注册" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });
 
     // Click on user email to open profile menu
@@ -322,7 +322,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.goto("http://localhost:5173/register");
     await page.getByPlaceholder("name@example.com").fill(user.email);
     await page.getByPlaceholder("至少 6 个字符").fill(user.password);
-    await page.getByRole("button", { name: "注册并登录" }).click();
+    await page.getByRole("button", { name: "注册" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });
 
     // Verify logged in
@@ -358,7 +358,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.goto("http://localhost:5173/register");
     await page.getByPlaceholder("name@example.com").fill(user.email);
     await page.getByPlaceholder("至少 6 个字符").fill(user.password);
-    await page.getByRole("button", { name: "注册并登录" }).click();
+    await page.getByRole("button", { name: "注册" }).click();
     await expect(page).toHaveURL("/", { timeout: 10000 });
 
     // Get current token

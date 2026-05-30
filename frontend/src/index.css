@@ -3,306 +3,306 @@
 
 /* ── Shared Design Tokens (non-color) ── */
 :root {
-	/* Spacing rhythm */
-	--space-xs: 0.25rem;
-	--space-sm: 0.5rem;
-	--space-md: 1rem;
-	--space-lg: 1.5rem;
-	--space-xl: 2rem;
-	--space-2xl: 3rem;
+  /* Spacing rhythm */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
 
-	/* Radius */
-	--radius-sm: 6px;
-	--radius-md: 10px;
-	--radius-lg: 16px;
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
 
-	/* Animation */
-	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-	--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-	--duration-fast: 150ms;
-	--duration-normal: 300ms;
-	--duration-slow: 500ms;
+  /* Animation */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
 
-	/* Typography */
-	--font-display: "Noto Serif SC", serif;
-	--font-body: "Noto Sans SC", sans-serif;
+  /* Typography */
+  --font-display: "Noto Serif SC", serif;
+  --font-body: "Noto Sans SC", sans-serif;
 }
 
 /* ── Light Theme (default) ── */
 :root,
 [data-theme="light"] {
-	--color-ink: #1c1c2e;
-	--color-ink-light: #3a3a52;
-	--color-ink-muted: #6b6b80;
-	--color-cream: #faf8f5;
-	--color-cream-warm: #f3efe8;
-	--color-paper: #fefdfb;
-	--color-copper: #c17e43;
-	--color-copper-light: #d4945c;
-	--color-sage: #7a8b6e;
-	--color-sage-light: #a3b296;
-	--color-rose: #b55b5b;
-	--color-rose-light: #c97070;
+  --color-ink: #1c1c2e;
+  --color-ink-light: #3a3a52;
+  --color-ink-muted: #6b6b80;
+  --color-cream: #faf8f5;
+  --color-cream-warm: #f3efe8;
+  --color-paper: #fefdfb;
+  --color-copper: #c17e43;
+  --color-copper-light: #d4945c;
+  --color-sage: #7a8b6e;
+  --color-sage-light: #a3b296;
+  --color-rose: #b55b5b;
+  --color-rose-light: #c97070;
 
-	/* Surfaces */
-	--surface-card: var(--color-paper);
-	--surface-bg: var(--color-cream);
-	--surface-nav: rgba(254, 253, 251, 0.85);
+  /* Surfaces */
+  --surface-card: var(--color-paper);
+  --surface-bg: var(--color-cream);
+  --surface-nav: rgba(254, 253, 251, 0.85);
 
-	/* Text */
-	--text-primary: var(--color-ink);
-	--text-secondary: var(--color-ink-light);
-	--text-muted: var(--color-ink-muted);
+  /* Text */
+  --text-primary: var(--color-ink);
+  --text-secondary: var(--color-ink-light);
+  --text-muted: var(--color-ink-muted);
 
-	/* Accent */
-	--accent: var(--color-copper);
-	--accent-hover: var(--color-copper-light);
-	--accent-sage: var(--color-sage);
+  /* Accent */
+  --accent: var(--color-copper);
+  --accent-hover: var(--color-copper-light);
+  --accent-sage: var(--color-sage);
 
-	/* State */
-	--danger: var(--color-rose);
-	--danger-hover: var(--color-rose-light);
-	--danger-bg: rgba(181, 91, 91, 0.08);
-	--danger-border: rgba(181, 91, 91, 0.2);
-	--success-bg: rgba(122, 139, 110, 0.1);
-	--success-border: rgba(122, 139, 110, 0.25);
-	--info-bg: rgba(125, 125, 160, 0.1);
-	--info-border: rgba(125, 125, 160, 0.25);
+  /* State */
+  --danger: var(--color-rose);
+  --danger-hover: var(--color-rose-light);
+  --danger-bg: rgba(181, 91, 91, 0.08);
+  --danger-border: rgba(181, 91, 91, 0.2);
+  --success-bg: rgba(122, 139, 110, 0.1);
+  --success-border: rgba(122, 139, 110, 0.25);
+  --info-bg: rgba(125, 125, 160, 0.1);
+  --info-border: rgba(125, 125, 160, 0.25);
 
-	/* Toast */
-	--toast-error-bg: rgba(181, 91, 91, 0.12);
-	--toast-error-border: rgba(181, 91, 91, 0.35);
-	--toast-success-bg: rgba(122, 139, 110, 0.12);
-	--toast-success-border: rgba(122, 139, 110, 0.35);
-	--toast-info-bg: rgba(125, 125, 160, 0.12);
-	--toast-info-border: rgba(125, 125, 160, 0.35);
+  /* Toast */
+  --toast-error-bg: rgba(181, 91, 91, 0.12);
+  --toast-error-border: rgba(181, 91, 91, 0.35);
+  --toast-success-bg: rgba(122, 139, 110, 0.12);
+  --toast-success-border: rgba(122, 139, 110, 0.35);
+  --toast-info-bg: rgba(125, 125, 160, 0.12);
+  --toast-info-border: rgba(125, 125, 160, 0.35);
 
-	/* Shadows — dark-ink based */
-	--shadow-sm: 0 1px 2px rgba(28, 28, 46, 0.04);
-	--shadow-md: 0 2px 8px rgba(28, 28, 46, 0.06);
-	--shadow-lg: 0 4px 24px rgba(28, 28, 46, 0.08);
-	--shadow-xl: 0 8px 40px rgba(28, 28, 46, 0.12);
+  /* Shadows — dark-ink based */
+  --shadow-sm: 0 1px 2px rgba(28, 28, 46, 0.04);
+  --shadow-md: 0 2px 8px rgba(28, 28, 46, 0.06);
+  --shadow-lg: 0 4px 24px rgba(28, 28, 46, 0.08);
+  --shadow-xl: 0 8px 40px rgba(28, 28, 46, 0.12);
 
-	/* Borders — dark-ink based */
-	--border-color-light: rgba(28, 28, 46, 0.06);
-	--border-color-medium: rgba(28, 28, 46, 0.1);
-	--border-light: 1px solid var(--border-color-light);
-	--border-medium: 1px solid var(--border-color-medium);
+  /* Borders — dark-ink based */
+  --border-color-light: rgba(28, 28, 46, 0.06);
+  --border-color-medium: rgba(28, 28, 46, 0.1);
+  --border-light: 1px solid var(--border-color-light);
+  --border-medium: 1px solid var(--border-color-medium);
 
-	/* Overlay / modal backdrop */
-	--overlay: rgba(28, 28, 46, 0.3);
-	--overlay-heavy: rgba(28, 28, 46, 0.4);
+  /* Overlay / modal backdrop */
+  --overlay: rgba(28, 28, 46, 0.3);
+  --overlay-heavy: rgba(28, 28, 46, 0.4);
 
-	/* On-dark overlays (for ink-colored surfaces) */
-	--on-ink-subtle: rgba(255, 255, 255, 0.1);
-	--on-ink-muted: rgba(255, 255, 255, 0.6);
-	--on-ink-dim: rgba(255, 255, 255, 0.7);
-	--on-ink-bright: rgba(255, 255, 255, 0.9);
-	--on-ink-divider: 1px solid rgba(255, 255, 255, 0.15);
+  /* On-dark overlays (for ink-colored surfaces) */
+  --on-ink-subtle: rgba(255, 255, 255, 0.1);
+  --on-ink-muted: rgba(255, 255, 255, 0.6);
+  --on-ink-dim: rgba(255, 255, 255, 0.7);
+  --on-ink-bright: rgba(255, 255, 255, 0.9);
+  --on-ink-divider: 1px solid rgba(255, 255, 255, 0.15);
 
-	/* Scrollbar */
-	--scrollbar-thumb: rgba(28, 28, 46, 0.12);
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(28, 28, 46, 0.12);
 }
 
 /* ── Dark Theme ── */
 [data-theme="dark"] {
-	--color-ink: #e8e6e3;
-	--color-ink-light: #b8b6b2;
-	--color-ink-muted: #7a7875;
-	--color-cream: #12121f;
-	--color-cream-warm: #181828;
-	--color-paper: #1e1e32;
-	--color-copper: #d4945c;
-	--color-copper-light: #e0a870;
-	--color-sage: #a3b296;
-	--color-sage-light: #bcc9af;
-	--color-rose: #c97070;
-	--color-rose-light: #d48585;
+  --color-ink: #e8e6e3;
+  --color-ink-light: #b8b6b2;
+  --color-ink-muted: #7a7875;
+  --color-cream: #12121f;
+  --color-cream-warm: #181828;
+  --color-paper: #1e1e32;
+  --color-copper: #d4945c;
+  --color-copper-light: #e0a870;
+  --color-sage: #a3b296;
+  --color-sage-light: #bcc9af;
+  --color-rose: #c97070;
+  --color-rose-light: #d48585;
 
-	/* Surfaces */
-	--surface-card: var(--color-paper);
-	--surface-bg: var(--color-cream);
-	--surface-nav: rgba(18, 18, 31, 0.9);
+  /* Surfaces */
+  --surface-card: var(--color-paper);
+  --surface-bg: var(--color-cream);
+  --surface-nav: rgba(18, 18, 31, 0.9);
 
-	/* Text */
-	--text-primary: var(--color-ink);
-	--text-secondary: var(--color-ink-light);
-	--text-muted: var(--color-ink-muted);
+  /* Text */
+  --text-primary: var(--color-ink);
+  --text-secondary: var(--color-ink-light);
+  --text-muted: var(--color-ink-muted);
 
-	/* Accent */
-	--accent: var(--color-copper);
-	--accent-hover: var(--color-copper-light);
-	--accent-sage: var(--color-sage);
+  /* Accent */
+  --accent: var(--color-copper);
+  --accent-hover: var(--color-copper-light);
+  --accent-sage: var(--color-sage);
 
-	/* State */
-	--danger: var(--color-rose);
-	--danger-hover: var(--color-rose-light);
-	--danger-bg: rgba(201, 112, 112, 0.12);
-	--danger-border: rgba(201, 112, 112, 0.25);
-	--success-bg: rgba(163, 178, 150, 0.12);
-	--success-border: rgba(163, 178, 150, 0.25);
-	--info-bg: rgba(160, 160, 190, 0.12);
-	--info-border: rgba(160, 160, 190, 0.25);
+  /* State */
+  --danger: var(--color-rose);
+  --danger-hover: var(--color-rose-light);
+  --danger-bg: rgba(201, 112, 112, 0.12);
+  --danger-border: rgba(201, 112, 112, 0.25);
+  --success-bg: rgba(163, 178, 150, 0.12);
+  --success-border: rgba(163, 178, 150, 0.25);
+  --info-bg: rgba(160, 160, 190, 0.12);
+  --info-border: rgba(160, 160, 190, 0.25);
 
-	/* Toast */
-	--toast-error-bg: rgba(201, 112, 112, 0.2);
-	--toast-error-border: rgba(201, 112, 112, 0.4);
-	--toast-success-bg: rgba(163, 178, 150, 0.2);
-	--toast-success-border: rgba(163, 178, 150, 0.4);
-	--toast-info-bg: rgba(160, 160, 190, 0.2);
-	--toast-info-border: rgba(160, 160, 190, 0.4);
+  /* Toast */
+  --toast-error-bg: rgba(201, 112, 112, 0.2);
+  --toast-error-border: rgba(201, 112, 112, 0.4);
+  --toast-success-bg: rgba(163, 178, 150, 0.2);
+  --toast-success-border: rgba(163, 178, 150, 0.4);
+  --toast-info-bg: rgba(160, 160, 190, 0.2);
+  --toast-info-border: rgba(160, 160, 190, 0.4);
 
-	/* Shadows — brighter for dark bg visibility */
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-	--shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
-	--shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.4);
-	--shadow-xl: 0 8px 40px rgba(0, 0, 0, 0.5);
+  /* Shadows — brighter for dark bg visibility */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 8px 40px rgba(0, 0, 0, 0.5);
 
-	/* Borders — white-based on dark bg */
-	--border-color-light: rgba(255, 255, 255, 0.06);
-	--border-color-medium: rgba(255, 255, 255, 0.1);
-	--border-light: 1px solid var(--border-color-light);
-	--border-medium: 1px solid var(--border-color-medium);
+  /* Borders — white-based on dark bg */
+  --border-color-light: rgba(255, 255, 255, 0.06);
+  --border-color-medium: rgba(255, 255, 255, 0.1);
+  --border-light: 1px solid var(--border-color-light);
+  --border-medium: 1px solid var(--border-color-medium);
 
-	/* Overlay / modal backdrop */
-	--overlay: rgba(0, 0, 0, 0.5);
-	--overlay-heavy: rgba(0, 0, 0, 0.6);
+  /* Overlay / modal backdrop */
+  --overlay: rgba(0, 0, 0, 0.5);
+  --overlay-heavy: rgba(0, 0, 0, 0.6);
 
-	/* On-dark overlays (for ink-colored surfaces in dark mode, ink is light) */
-	--on-ink-subtle: rgba(0, 0, 0, 0.15);
-	--on-ink-muted: rgba(0, 0, 0, 0.5);
-	--on-ink-dim: rgba(0, 0, 0, 0.6);
-	--on-ink-bright: rgba(0, 0, 0, 0.85);
-	--on-ink-divider: 1px solid rgba(0, 0, 0, 0.15);
+  /* On-dark overlays (for ink-colored surfaces in dark mode, ink is light) */
+  --on-ink-subtle: rgba(0, 0, 0, 0.15);
+  --on-ink-muted: rgba(0, 0, 0, 0.5);
+  --on-ink-dim: rgba(0, 0, 0, 0.6);
+  --on-ink-bright: rgba(0, 0, 0, 0.85);
+  --on-ink-divider: 1px solid rgba(0, 0, 0, 0.15);
 
-	/* Scrollbar */
-	--scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
 }
 
 /* ── Base Styles ── */
 body {
-	margin: 0;
-	font-family: var(--font-body);
-	background-color: var(--surface-bg);
-	color: var(--text-primary);
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-	line-height: 1.6;
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--surface-bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
 }
 
 /* ── Paper Texture Overlay ── */
 body::before {
-	content: "";
-	position: fixed;
-	inset: 0;
-	z-index: 9999;
-	pointer-events: none;
-	opacity: 0.03;
-	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
 }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar {
-	width: 4px;
+  width: 4px;
 }
 ::-webkit-scrollbar-track {
-	background: transparent;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-	background: var(--scrollbar-thumb);
-	border-radius: 2px;
+  background: var(--scrollbar-thumb);
+  border-radius: 2px;
 }
 
 /* ── Typography Utilities ── */
 .display-text {
-	font-family: var(--font-display);
-	font-weight: 700;
-	letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .body-text {
-	font-family: var(--font-body);
-	font-weight: 400;
+  font-family: var(--font-body);
+  font-weight: 400;
 }
 
 /* ── Animation Keyframes ── */
 @keyframes fade-in-up {
-	from {
-		opacity: 0;
-		transform: translateY(12px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fade-in {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slide-in-right {
-	from {
-		opacity: 0;
-		transform: translateX(-12px);
-	}
-	to {
-		opacity: 1;
-		transform: translateX(0);
-	}
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes pulse-soft {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.4;
-	}
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 @keyframes shimmer {
-	0% {
-		background-position: -200% 0;
-	}
-	100% {
-		background-position: 200% 0;
-	}
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* ── Animation Utility Classes ── */
 .animate-fade-in-up {
-	animation: fade-in-up var(--duration-normal) var(--ease-out) both;
+  animation: fade-in-up var(--duration-normal) var(--ease-out) both;
 }
 
 .animate-fade-in {
-	animation: fade-in var(--duration-normal) var(--ease-out) both;
+  animation: fade-in var(--duration-normal) var(--ease-out) both;
 }
 
 .animate-slide-in-right {
-	animation: slide-in-right var(--duration-normal) var(--ease-out) both;
+  animation: slide-in-right var(--duration-normal) var(--ease-out) both;
 }
 
 /* ── Card Base Style ── */
 .card {
-	background: var(--surface-card);
-	border: var(--border-light);
-	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-sm);
+  background: var(--surface-card);
+  border: var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .card-hover {
-	transition:
-		box-shadow var(--duration-fast) var(--ease-out),
-		transform var(--duration-fast) var(--ease-out);
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 .card-hover:hover {
-	box-shadow: var(--shadow-md);
-	transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }

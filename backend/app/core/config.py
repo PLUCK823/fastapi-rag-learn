@@ -28,11 +28,11 @@ CHROMA_DIR = ROOT_DIR / "chroma_db"
 DOCUMENTS_DIR = ROOT_DIR / "documents"
 
 # 文本切分
-CHUNK_SIZE = 300
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 800
+CHUNK_OVERLAP = 120
 
 # 检索
-RETRIEVAL_K = 3
+RETRIEVAL_K = 8
 
 # CORS 配置（生产部署需要）
 # 允许的来源，多个用逗号分隔，例如: "http://localhost:5173,https://example.com"

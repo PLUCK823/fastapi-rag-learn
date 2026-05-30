@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import current_user
 from app.core.config import SECRET_KEY
 from app.core.database import get_sync_session, sync_engine
-from app.core.engine import ask, ask_stream_with_sources
+from app.core.engine import _execute_code_blocks, ask, ask_stream_with_sources
 from app.models.chat import ChatMessage
 from app.models.schemas import AskRequest, AskResponse, SourceInfo
 from app.models.user import User
@@ -205,6 +205,14 @@ async def ws_ask(
             full_answer_parts.append(chunk)
             await websocket.send_text(chunk)
 
+        # 流式完成后，执行 Python 代码块
+        full_answer = "".join(full_answer_parts)
+        code_result = _execute_code_blocks(full_answer)
+        if code_result != full_answer:
+            # 提取新增的运算结果部分并发送
+            result_suffix = code_result[len(full_answer):]
+            await websocket.send_text(result_suffix)
+
         # 发送结束标记 + 来源信息
         await websocket.send_text(
             json.dumps(
@@ -215,12 +223,11 @@ async def ws_ask(
             )
         )
 
-        # 保存对话记录
-        full_answer = "".join(full_answer_parts)
+        # 保存对话记录（包含代码执行结果）
         if user_id:
             with sync_session_factory() as session:
                 _save_message(session, kb_id, user_id, "user", data, None, sid)
-                _save_message(session, kb_id, user_id, "assistant", full_answer, sources, sid)
+                _save_message(session, kb_id, user_id, "assistant", code_result, sources, sid)
     except Exception as e:
         error_msg = str(e)
         # Provide user-friendly error messages

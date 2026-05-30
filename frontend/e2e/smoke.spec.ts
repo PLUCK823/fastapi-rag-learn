@@ -10,7 +10,7 @@ test("full user flow", async ({ page }) => {
   await page.goto("http://localhost:5173/register");
   await page.getByPlaceholder("name@example.com").fill(EMAIL);
   await page.getByPlaceholder("至少 6 个字符").fill(PASSWORD);
-  await page.getByRole("button", { name: "注册并登录" }).click();
+  await page.getByRole("button", { name: "注册" }).click();
   await expect(page).toHaveURL("/", { timeout: 10000 });
 
   // 2. Create KB
