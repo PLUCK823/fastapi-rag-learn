@@ -11,6 +11,8 @@ function nextId(): string {
   return `msg_${_msgId}_${Date.now()}`;
 }
 
+const FLUSH_INTERVAL = 33; // ~30fps — smooth but not blocking
+
 export function useChatWS(kbId: number, sessionId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -19,10 +21,14 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   const sessionIdRef = useRef(sessionId);
   const shouldLoadMessages = useRef(true);
 
+  const bufferRef = useRef("");
+  const lastFlushRef = useRef("");
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const aiIdRef = useRef("");
+
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
-
   useEffect(() => {
     if (sessionId && shouldLoadMessages.current) {
       listSessionMessages(kbId, sessionId)
@@ -42,6 +48,24 @@ export function useChatWS(kbId: number, sessionId: string | null) {
     (aiId: string, question: string, token: string, sid: string) => {
       setIsStreaming(true);
       doneRef.current = false;
+      bufferRef.current = "";
+      lastFlushRef.current = "";
+      aiIdRef.current = aiId;
+
+      if (intervalRef.current) clearInterval(intervalRef.current);
+
+      // 30fps flush loop — batches tokens, sync-DOM-commits, leaves breathing room
+      intervalRef.current = setInterval(() => {
+        if (doneRef.current) return;
+        const cur = bufferRef.current;
+        if (cur === lastFlushRef.current) return; // no new tokens
+        lastFlushRef.current = cur;
+        flushSync(() => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === aiId ? { ...m, content: cur, isStreaming: true } : m)),
+          );
+        });
+      }, FLUSH_INTERVAL);
 
       const proto = window.location.protocol === "https:" ? "wss" : "ws";
       const host = window.location.host;
@@ -59,64 +83,62 @@ export function useChatWS(kbId: number, sessionId: string | null) {
             const data = JSON.parse(e.data);
             if (data.error) {
               doneRef.current = true;
-              flushSync(() => {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === aiId
-                      ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false }
-                      : m,
-                  ),
-                );
-                setIsStreaming(false);
-              });
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId
+                    ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false }
+                    : m,
+                ),
+              );
+              setIsStreaming(false);
             } else if (data.done) {
               doneRef.current = true;
-              flushSync(() => {
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === aiId ? { ...m, isStreaming: false, sources: data.sources } : m,
-                  ),
-                );
-                setIsStreaming(false);
-              });
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        content: bufferRef.current,
+                        isStreaming: false,
+                        sources: data.sources,
+                      }
+                    : m,
+                ),
+              );
+              setIsStreaming(false);
             }
           } catch {
-            /* ignore - not JSON */
+            /* not JSON */
           }
         } else {
-          // Token: append immediately with flushSync for frame-level visibility
-          flushSync(() => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === aiId ? { ...m, content: m.content + e.data, isStreaming: true } : m,
-              ),
-            );
-          });
+          bufferRef.current += e.data;
         }
       };
 
       ws.onclose = () => {
         doneRef.current = true;
-        flushSync(() => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, isStreaming: false } : m)),
-          );
-          setIsStreaming(false);
-        });
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiId ? { ...m, content: bufferRef.current, isStreaming: false } : m,
+          ),
+        );
+        setIsStreaming(false);
       };
 
       ws.onerror = () => {
         doneRef.current = true;
-        flushSync(() => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === aiId
-                ? { ...m, content: m.content || "[错误: 连接失败]", isStreaming: false }
-                : m,
-            ),
-          );
-          setIsStreaming(false);
-        });
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiId
+              ? { ...m, content: bufferRef.current || "[错误: 连接失败]", isStreaming: false }
+              : m,
+          ),
+        );
+        setIsStreaming(false);
       };
     },
     [kbId],
@@ -128,9 +150,11 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       const sid = overrideSessionId ?? sessionIdRef.current;
       if (!token || !sid) return;
       const aiId = nextId();
-      const userMsg: Message = { id: nextId(), role: "user", content: question };
-      const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true };
-      setMessages((prev) => [...prev, userMsg, aiMsg]);
+      setMessages((prev) => [
+        ...prev,
+        { id: nextId(), role: "user", content: question },
+        { id: aiId, role: "assistant", content: "", isStreaming: true },
+      ]);
       _startStream(aiId, question, token, sid);
     },
     [_startStream],
@@ -142,8 +166,10 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       const sid = sessionIdRef.current;
       if (!token || !sid) return;
       const aiId = nextId();
-      const aiMsg: Message = { id: aiId, role: "assistant", content: "", isStreaming: true };
-      setMessages((prev) => [...prev, aiMsg]);
+      setMessages((prev) => [
+        ...prev,
+        { id: aiId, role: "assistant", content: "", isStreaming: true },
+      ]);
       _startStream(aiId, question, token, sid);
     },
     [_startStream],
