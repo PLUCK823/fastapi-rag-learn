@@ -19,11 +19,17 @@ os.environ.setdefault(
 os.environ.setdefault(
     "SECRET_KEY", "test-secret-key-for-jwt-signing-must-be-at-least-32-bytes"
 )
+# 告知 app lifespan 不要销毁 engine（conftest 自己管理）
+os.environ["PYTEST_RUNNING"] = "1"
 
 
 @pytest.fixture
 async def client() -> AsyncClient:
-    """每个测试函数独立建表/删表，保证隔离"""
+    """每个测试函数独立建表/删表，保证隔离
+
+    引擎在测试 session 期间保持存活（由 session-scoped fixture 统一 dispose），
+    每个 test 只做表级 drop/create。
+    """
     from app.core.database import Base, async_engine, sync_engine
     from app.models.chat import ChatMessage  # noqa: F401
     from app.models.knowledge_base import Document, KnowledgeBase  # noqa: F401
@@ -41,10 +47,9 @@ async def client() -> AsyncClient:
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
-
-    # 清理
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        # 清理：在 AsyncClient 关闭前执行
+        async with async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest.fixture
@@ -81,3 +86,37 @@ def mock_engine():
 
     with mock_engine_init():
         yield
+
+
+@pytest.fixture
+def sync_db():
+    """纯同步表管理 — 给 TestClient 同步测试用。
+
+    使用 sync engine 而非 async engine，避免 asyncpg 与
+    pytest-asyncio 的 event loop 生命周期冲突。
+    """
+    from app.core.database import Base, sync_engine
+    from app.models.chat import ChatMessage  # noqa: F401
+    from app.models.knowledge_base import Document, KnowledgeBase  # noqa: F401
+    from app.models.user import User  # noqa: F401
+
+    Base.metadata.drop_all(sync_engine)
+    Base.metadata.create_all(sync_engine)
+    yield
+    Base.metadata.drop_all(sync_engine)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _dispose_engines_after_all_tests():
+    """在全部测试完成后释放同步引擎连接池。
+
+    异步引擎的连接会在进程退出时由 OS 回收，
+    per-test 级别 dispose 会导致 asyncpg 与 event loop 生命周期冲突。
+    """
+    yield
+    from app.core.database import sync_engine
+
+    try:
+        sync_engine.dispose()
+    except Exception:
+        pass
