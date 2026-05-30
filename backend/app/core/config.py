@@ -10,13 +10,13 @@ load_dotenv()
 # 项目根目录（app/ 的上一级）
 ROOT_DIR = Path(__file__).parent.parent.parent
 
-# 数据库 URL（支持 SQLite / PostgreSQL 自动切换）
-# 本地开发: sqlite+aiosqlite:///...（默认）
-# Docker 部署: postgresql+asyncpg://user:pass@db:5432/dbname
-_DEFAULT_SQLITE_URL = f"sqlite+aiosqlite:///{ROOT_DIR}/app.db"
-DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_SQLITE_URL)
+# 数据库 URL — 默认 PostgreSQL
+# 本地开发: postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn
+# Docker:   postgresql+asyncpg://raguser:${DB_PASSWORD}@db:5432/raglearn
+# SQLite:   sqlite+aiosqlite:///./app.db（需要时手动设置）
+_DEFAULT_DB_URL = "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn"
+DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DB_URL)
 
-# 是否使用 PostgreSQL
 IS_POSTGRES = DATABASE_URL.startswith("postgresql")
 
 # 用户认证

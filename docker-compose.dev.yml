@@ -1,0 +1,76 @@
+# ============================================================
+# RAG Learn — 本地开发环境
+#
+# 包含: PostgreSQL + FastAPI（热重载）+ React（热重载）
+#
+# 启动:  docker compose -f docker-compose.dev.yml up --build -d
+# 停止:  docker compose -f docker-compose.dev.yml down
+# ============================================================
+
+services:
+  # ── PostgreSQL ──
+  db:
+    image: postgres:16.8-alpine3.21
+    environment:
+      POSTGRES_USER: raguser
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: raglearn
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raguser -d raglearn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── FastAPI（热重载: 挂载代码目录）──
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://raguser:devpassword@db:5432/raglearn
+      - SECRET_KEY=dev-secret-key-not-for-production
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+      - ./backend/pyproject.toml:/app/pyproject.toml
+      - ./backend/uv.lock:/app/uv.lock
+      - chroma_data_dev:/app/chroma_db
+    depends_on:
+      db:
+        condition: service_healthy
+    working_dir: /app
+
+  # ── React（Vite dev server 热重载）──
+  frontend:
+    build:
+      context: ./frontend
+      target: builder
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+    depends_on:
+      - backend
+    working_dir: /app
+
+volumes:
+  pgdata_dev:
+  chroma_data_dev:

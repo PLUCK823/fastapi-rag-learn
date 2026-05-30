@@ -17,6 +17,20 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16.8-alpine3.21
+        env:
+          POSTGRES_USER: raguser
+          POSTGRES_PASSWORD: citest
+          POSTGRES_DB: raglearn
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U raguser -d raglearn"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +61,7 @@ jobs:
       - name: Unit tests (pytest)
         run: uv run pytest tests/ -v
         env:
+          DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
 
@@ -83,6 +98,20 @@ jobs:
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.8-alpine3.21
+        env:
+          POSTGRES_USER: raguser
+          POSTGRES_PASSWORD: citest
+          POSTGRES_DB: raglearn
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U raguser -d raglearn"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -124,6 +153,7 @@ jobs:
         run: uv run uvicorn app.main:app --port 8000 --host 127.0.0.1 &
         env:
           SECRET_KEY: ci-test-secret-key-at-least-32-bytes
+          DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
 

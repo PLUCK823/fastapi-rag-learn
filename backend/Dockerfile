@@ -17,6 +17,14 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
+# ============================================================
+# 阶段 1b: dev 构建（包含 dev 依赖，用于本地开发热重载）
+# ============================================================
+FROM builder AS dev
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project
+
 # 预下载 BGE 中文向量模型（避免首次请求等很久）
 # 国内部署可取消注释下面这行用镜像加速:
 # ENV HF_ENDPOINT=https://hf-mirror.com
