@@ -92,6 +92,87 @@ npx playwright test --reporter=list
 - Styling: Tailwind CSS (utility-first, no component lib)
 - API: axios instance with JWT interceptor + 401 redirect
 
+## CI/CD (持续集成/持续交付)
+
+### 概述
+
+`.github/workflows/ci.yml` 定义了自动化流水线。每次 `git push` 到 `master` 或发起 Pull Request 时，GitHub Actions 自动执行以下三个阶段：
+
+```
+git push ──→ GitHub Actions
+               │
+               ├── backend job
+               │   ├── ruff check .        ← 代码规范
+               │   ├── mypy app/           ← 类型检查
+               │   └── pytest tests/ -v    ← 单元测试（93 个）
+               │
+               ├── frontend job（与 backend 并行）
+               │   ├── biome check src/    ← 代码规范
+               │   ├── tsc --noEmit        ← 类型检查
+               │   └── vitest run          ← 单元测试（56 个）
+               │
+               └── e2e job（等 backend + frontend 都通过）
+                   ├── 启动 backend + frontend
+                   └── playwright test     ← smoke.spec.ts + session.spec.ts
+```
+
+### 触发方式
+
+| 事件 | 说明 |
+|------|------|
+| `push` 到 `master` | 提交代码后自动跑 |
+| Pull Request → `master` | 发起 PR 时自动跑，合并前强制通过 |
+
+### 必需配置
+
+项目依赖 GitHub Secrets（`OPENAI_API_KEY` + `OPENAI_BASE_URL`），否则 backend 测试无法通过。
+
+**管理地址：** `https://github.com/<owner>/<repo>/settings/secrets/actions`
+
+| Secret | 用途 |
+|--------|------|
+| `OPENAI_API_KEY` | DeepSeek API 密钥 |
+| `OPENAI_BASE_URL` | DeepSeek API 端点地址 |
+
+Secrets 的安全性：
+- GitHub 服务端加密存储，仅 Actions runtime 解密
+- 日志中自动脱敏为 `***`
+- Fork 的仓库**无法访问**原仓库 Secrets
+- 仅通过 `env:` 注入到指定 workflow step，作用域隔离
+
+### CI 失败处理流程
+
+1. 到 [GitHub Actions](https://github.com/PLUCK823/fastapi-rag-learn/actions) 查看失败 job
+2. 点开日志定位具体错误（lint / type-check / test）
+3. 本地复现并修复
+4. 推送修复 commit → 自动重跑 CI
+5. 全部 ✅ 才算通过
+
+### Pull Request（PR）协作流程
+
+多人协作时的标准工作流：
+
+```
+1. 创建分支        git checkout -b feature/xxx
+2. 开发 + 提交     git commit -m "..."
+3. 推送分支        git push origin feature/xxx
+4. 发起 PR         GitHub 上点击 "New Pull Request"
+5. CI 自动跑       backend + frontend + e2e 全部通过
+6. Code Review     reviewer 逐行审查代码，提出修改意见
+7. 修改后重跑      git push → CI 重新跑
+8. 合并到 master   reviewer 点 "Merge"
+```
+
+PR 的优势：
+- **强制 review** — 代码必须有人看过才能合入
+- **CI 自动门禁** — 不通过不准合并
+- **完整记录** — 谁改了、为什么改、讨论过程全留存
+- **防止直接 push** — 保护 master 分支不被意外破坏
+
+单人开发建议：
+- 功能开发仍可先在分支上做，完成后发起 PR（自己 review、CI 把关）
+- 养成习惯后，多人协作时无缝衔接
+
 ## Testing conventions
 
 ### Backend (pytest)
