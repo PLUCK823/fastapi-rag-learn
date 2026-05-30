@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 const STORAGE_KEY = "onboarding_done";
 
@@ -11,7 +11,7 @@ export function markOnboardingDone(): void {
 }
 
 interface Step {
-  icon: JSX.Element;
+  icon: ReactNode;
   title: string;
   desc: string;
 }
