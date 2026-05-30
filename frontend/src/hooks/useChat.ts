@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { listSessionMessages } from "../api/kb";
 import { toast } from "../stores/toastStore";
 import type { Message } from "../types";
@@ -40,7 +41,7 @@ export function useChatWS(kbId: number, sessionId: string | null) {
     shouldLoadMessages.current = true;
   }, []);
 
-  /** Shared WebSocket streaming logic */
+  /** Shared WebSocket streaming logic — uses flushSync for true token-by-token rendering */
   const _startStream = useCallback(
     (aiId: string, question: string, token: string, sid: string) => {
       setIsStreaming(true);
@@ -61,33 +62,42 @@ export function useChatWS(kbId: number, sessionId: string | null) {
           try {
             const data = JSON.parse(e.data);
             if (data.error) {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === aiId
-                    ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false }
-                    : m,
-                ),
-              );
-              setIsStreaming(false);
+              flushSync(() => {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === aiId
+                      ? { ...m, content: `[错误: ${data.error}]`, isStreaming: false }
+                      : m,
+                  ),
+                );
+                setIsStreaming(false);
+              });
               doneRef.current = true;
             } else if (data.done) {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === aiId ? { ...m, isStreaming: false, sources: data.sources } : m,
-                ),
-              );
-              setIsStreaming(false);
+              flushSync(() => {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === aiId ? { ...m, isStreaming: false, sources: data.sources } : m,
+                  ),
+                );
+                setIsStreaming(false);
+              });
               doneRef.current = true;
             }
           } catch {
+            flushSync(() => {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
+              );
+            });
+          }
+        } else {
+          // 纯文本 token — flushSync 强制同步渲染，实现逐字打字效果
+          flushSync(() => {
             setMessages((prev) =>
               prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
             );
-          }
-        } else {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, content: m.content + e.data } : m)),
-          );
+          });
         }
       };
 
@@ -148,7 +158,6 @@ export function useChatWS(kbId: number, sessionId: string | null) {
 
   const clear = useCallback(() => setMessages([]), []);
 
-  /** Replace messages from a given index (for edit — keeps messages before idx, removes rest) */
   const truncateAt = useCallback((index: number) => {
     setMessages((prev) => prev.slice(0, index));
   }, []);

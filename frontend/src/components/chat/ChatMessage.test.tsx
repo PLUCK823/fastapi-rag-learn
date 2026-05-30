@@ -28,12 +28,10 @@ describe("ChatMessage", () => {
     };
     render(<ChatMessage msg={msg} />);
     expect(screen.getByText("RAG 是检索增强生成。")).toBeInTheDocument();
-    // Assistant message is left-aligned: text → div.bubble → div.flex-col(items-start) → div.flex(justify-start)
+    // Assistant message is left-aligned — check the chat-message container has justify-start
     const textEl = screen.getByText("RAG 是检索增强生成。");
-    const bubble = textEl.parentElement; // .rounded-2xl
-    const column = bubble?.parentElement; // .flex-col items-start
-    const flexContainer = column?.parentElement; // .chat-message.flex justify-start
-    expect(flexContainer?.className).toContain("justify-start");
+    const chatMsg = textEl.closest(".chat-message");
+    expect(chatMsg?.className).toContain("justify-start");
   });
 
   it("shows blinking cursor when streaming and empty", () => {

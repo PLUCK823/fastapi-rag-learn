@@ -131,8 +131,8 @@ test.describe("Full E2E Test Suite", () => {
     await page.waitForTimeout(2000);
     await expect(page.locator("aside").locator("text=test-doc.md")).toBeVisible({ timeout: 10000 });
 
-    // Edit document - click on the document name in sidebar
-    await page.getByRole("button", { name: "test-doc.md" }).click();
+    // Edit document - click on the document name in sidebar (use aside scope to avoid dashboard suggested question)
+    await page.locator("aside").getByRole("button", { name: "test-doc.md" }).click();
     // Wait for modal to appear
     await page.waitForTimeout(500);
     // Modal should be visible (check for the modal container)
@@ -151,8 +151,8 @@ test.describe("Full E2E Test Suite", () => {
     // Verify document still exists after edit
     await expect(page.locator("aside").locator("text=test-doc.md")).toBeVisible({ timeout: 5000 });
 
-    // Delete document
-    const deleteDocItem = page.locator("button").filter({ hasText: "test-doc.md" });
+    // Delete document — scope to sidebar to avoid dashboard suggested question
+    const deleteDocItem = page.locator("aside").locator("button").filter({ hasText: "test-doc.md" });
     await deleteDocItem.hover();
     await page.waitForTimeout(500);
     // Find the delete button in the doc list (not in session section)
@@ -332,6 +332,9 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByText(user.email).click();
     await page.waitForTimeout(300);
     await page.getByRole("button", { name: "退出登录" }).click();
+    // Confirm the logout dialog
+    await expect(page.getByText("确定要退出登录")).toBeVisible({ timeout: 3000 });
+    await page.getByRole("button", { name: "退出" }).click();
     await expect(page).toHaveURL("/login", { timeout: 5000 });
 
     // Token should be cleared
