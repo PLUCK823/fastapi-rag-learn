@@ -1,10 +1,14 @@
 # ============================================================
-# RAG Learn — 本地开发环境
+# RAG Learn — 本地开发环境（docker compose watch）
 #
-# 包含: PostgreSQL + FastAPI（热重载）+ React（热重载）
-#
-# 启动:  docker compose -f docker-compose.dev.yml up --build -d
+# 启动:  docker compose -f docker-compose.dev.yml up --watch
+#        （或 docker compose -f docker-compose.dev.yml watch）
 # 停止:  docker compose -f docker-compose.dev.yml down
+#
+# 改动即生效，无需手动 rebuild：
+#   src/        → sync 到容器，Vite HMR / uvicorn --reload 自动刷新
+#   package.json → 自动 rebuild 前端镜像
+#   pyproject.toml / uv.lock → 自动 rebuild 后端镜像
 # ============================================================
 
 services:
@@ -26,7 +30,7 @@ services:
       retries: 5
       start_period: 10s
 
-  # ── FastAPI（热重载: 挂载代码目录）──
+  # ── FastAPI（uvicorn --reload 热重载）──
   backend:
     build:
       context: ./backend
@@ -40,36 +44,81 @@ services:
       - DATABASE_URL=postgresql+asyncpg://raguser:devpassword@db:5432/raglearn
       - SECRET_KEY=dev-secret-key-not-for-production
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/alembic:/app/alembic
-      - ./backend/alembic.ini:/app/alembic.ini
-      - ./backend/pyproject.toml:/app/pyproject.toml
-      - ./backend/uv.lock:/app/uv.lock
       - chroma_data_dev:/app/chroma_db
     depends_on:
       db:
         condition: service_healthy
     working_dir: /app
+    develop:
+      watch:
+        # 代码改动 → sync + uvicorn 自动重启
+        - action: sync+restart
+          path: ./backend/app
+          target: /app/app
+          ignore:
+            - "**/__pycache__/"
+            - "**/*.pyc"
+        # Alembic 迁移文件
+        - action: sync+restart
+          path: ./backend/alembic
+          target: /app/alembic
+        - action: sync
+          path: ./backend/alembic.ini
+          target: /app/alembic.ini
+        # 依赖变更 → 完整 rebuild
+        - action: rebuild
+          path: ./backend/pyproject.toml
+        - action: rebuild
+          path: ./backend/uv.lock
+        - action: rebuild
+          path: ./backend/Dockerfile
 
-  # ── React（Vite dev server 热重载）──
+  # ── React Vite（HMR 热更新）──
   frontend:
     build:
       context: ./frontend
       target: builder
     command: npm run dev -- --host 0.0.0.0 --port 5173
+    environment:
+      - VITE_BACKEND_URL=http://backend:8000
     ports:
       - "5173:5173"
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - ./frontend/index.html:/app/index.html
-      - ./frontend/vite.config.ts:/app/vite.config.ts
-      - ./frontend/tsconfig.json:/app/tsconfig.json
-      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
-      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
     depends_on:
       - backend
     working_dir: /app
+    develop:
+      watch:
+        # 源码改动 → sync + Vite HMR 自动热更新
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+          ignore:
+            - "**/*.test.ts"
+            - "**/*.test.tsx"
+        # 静态资源
+        - action: sync
+          path: ./frontend/public
+          target: /app/public
+        - action: sync
+          path: ./frontend/index.html
+          target: /app/index.html
+        # Vite 配置 → 重启
+        - action: sync+restart
+          path: ./frontend/vite.config.ts
+          target: /app/vite.config.ts
+        - action: sync+restart
+          path: ./frontend/tsconfig.json
+          target: /app/tsconfig.json
+        - action: sync+restart
+          path: ./frontend/tsconfig.app.json
+          target: /app/tsconfig.app.json
+        # 依赖变更 → 完整 rebuild
+        - action: rebuild
+          path: ./frontend/package.json
+        - action: rebuild
+          path: ./frontend/package-lock.json
+        - action: rebuild
+          path: ./frontend/Dockerfile
 
 volumes:
   pgdata_dev:

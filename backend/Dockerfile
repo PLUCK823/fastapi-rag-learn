@@ -22,8 +22,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ============================================================
 FROM builder AS dev
 
+# 安装所有依赖（含 dev）
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project
+
+# 复制代码+迁移配置（初始状态，后续 watch sync 更新）
+COPY app/ ./app/
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 
 # 预下载 BGE 中文向量模型（避免首次请求等很久）
 # 国内部署可取消注释下面这行用镜像加速:
