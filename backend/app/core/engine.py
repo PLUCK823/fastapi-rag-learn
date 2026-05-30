@@ -268,9 +268,9 @@ def _keyword_search(
     except Exception:
         return []
 
-    ids = raw.get("ids", [])
-    docs_raw = raw.get("documents", [])
-    metadatas = raw.get("metadatas", [])
+    ids = raw.get("ids", []) or []
+    docs_raw = raw.get("documents", []) or []
+    metadatas = raw.get("metadatas", []) or []
 
     # 构建 BM25 语料库
     corpus: list[list[str]] = []

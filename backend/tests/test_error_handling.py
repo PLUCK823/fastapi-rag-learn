@@ -193,7 +193,7 @@ class TestWebSocketErrorHandling:
         # 注册并登录
         await client.post("/auth/register", json={"email": "ws_err@test.com", "password": "test123456"})
         resp = await client.post("/auth/login", data={"username": "ws_err@test.com", "password": "test123456"})
-        token = resp.json()["access_token"]
+        _token = resp.json()["access_token"]
 
         # 尝试连接不存在的 KB
         # WebSocket 测试需要特殊处理，这里只验证 API 层面

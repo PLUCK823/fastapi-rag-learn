@@ -19,10 +19,10 @@ os.environ["SECRET_KEY"] = "test-secret-key-for-jwt-signing-must-be-at-least-32-
 async def client() -> AsyncClient:
     """每个测试使用独立数据库（create_all 快速建表，生产用 Alembic migration）"""
     # 必须先导入所有模型，让它们注册到 Base.metadata
-    from app.models.user import User  # noqa: F401
-    from app.models.knowledge_base import KnowledgeBase, Document  # noqa: F401
-    from app.models.chat import ChatMessage  # noqa: F401
     from app.core.database import Base, async_engine, sync_engine
+    from app.models.chat import ChatMessage  # noqa: F401
+    from app.models.knowledge_base import Document, KnowledgeBase  # noqa: F401
+    from app.models.user import User  # noqa: F401
 
     # 通过 async engine 建表（fastapi-users 走 async engine 查询）
     async with async_engine.begin() as conn:

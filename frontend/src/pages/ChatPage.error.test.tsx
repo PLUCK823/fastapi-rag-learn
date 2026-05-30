@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import ChatPage from "./ChatPage";
 
 // Track KB state
@@ -14,7 +14,7 @@ let kbState = {
   documents: [{ id: 1, filename: "test.md", chunk_count: 5 }],
 };
 
-let sessionState: any[] = [];
+let sessionState: unknown[] = [];
 
 const server = setupServer(
   http.get("/kb", () =>

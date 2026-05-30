@@ -89,7 +89,7 @@ class TestXSSProtection:
 
             if resp.status_code == 200:
                 # 验证名称存储，前端应该转义显示
-                kb_id = resp.json()["id"]
+                _kb_id = resp.json()["id"]
                 resp2 = await client.get("/kb", headers=auth_headers)
                 # 名称应该存在，但不应该在 API 层执行脚本
                 assert resp2.status_code == 200

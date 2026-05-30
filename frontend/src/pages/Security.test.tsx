@@ -3,13 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import KBListPage from "./KBListPage";
 import LoginPage from "./LoginPage";
 import RegisterPage from "./RegisterPage";
 
 // XSS attack patterns
-const XSS_PATTERNS = [
+const _XSS_PATTERNS = [
   "<script>alert('xss')</script>",
   "<img src=x onerror=alert('xss')>",
   "javascript:alert('xss')",
@@ -18,7 +18,7 @@ const XSS_PATTERNS = [
 ];
 
 // SQL injection patterns
-const SQL_INJECTION_PATTERNS = [
+const _SQL_INJECTION_PATTERNS = [
   "'; DROP TABLE users; --",
   "' OR '1'='1",
   "admin'--",
