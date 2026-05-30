@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { listSessionMessages } from "../api/kb";
 import { toast } from "../stores/toastStore";
 import type { Message } from "../types";
@@ -11,7 +10,15 @@ function nextId(): string {
   return `msg_${_msgId}_${Date.now()}`;
 }
 
-const FLUSH_INTERVAL = 33; // ~30fps — smooth but not blocking
+/**
+ * Buffer Queue typewriter pattern:
+ * - Tokens arrive at WebSocket speed → accumulated in buffer (no re-render)
+ * - setInterval at ~30fps flushes buffer to React state (normal setState, no flushSync)
+ * - Browser has ~30ms between ticks for scroll/click/paint — never blocks main thread
+ * - Streaming renders as plain text; completion switches to ReactMarkdown once
+ */
+
+const TICK_MS = 35; // ~30fps — smooth enough, non-blocking
 
 export function useChatWS(kbId: number, sessionId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -22,7 +29,7 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   const shouldLoadMessages = useRef(true);
 
   const bufferRef = useRef("");
-  const lastFlushRef = useRef("");
+  const lastLenRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aiIdRef = useRef("");
 
@@ -34,7 +41,9 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       listSessionMessages(kbId, sessionId)
         .then(setMessages)
         .catch((err) => toast(getErrorMessage(err)));
-    } else if (!sessionId) setMessages([]);
+    } else if (!sessionId) {
+      setMessages([]);
+    }
   }, [kbId, sessionId]);
 
   const prepareSend = useCallback(() => {
@@ -49,23 +58,21 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       setIsStreaming(true);
       doneRef.current = false;
       bufferRef.current = "";
-      lastFlushRef.current = "";
+      lastLenRef.current = 0;
       aiIdRef.current = aiId;
 
       if (intervalRef.current) clearInterval(intervalRef.current);
 
-      // 30fps flush loop — batches tokens, sync-DOM-commits, leaves breathing room
+      // 30fps flush: read buffer, update state only if content grew
       intervalRef.current = setInterval(() => {
         if (doneRef.current) return;
         const cur = bufferRef.current;
-        if (cur === lastFlushRef.current) return; // no new tokens
-        lastFlushRef.current = cur;
-        flushSync(() => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, content: cur, isStreaming: true } : m)),
-          );
-        });
-      }, FLUSH_INTERVAL);
+        if (cur.length === lastLenRef.current) return;
+        lastLenRef.current = cur.length;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === aiId ? { ...m, content: cur, isStreaming: true } : m)),
+        );
+      }, TICK_MS);
 
       const proto = window.location.protocol === "https:" ? "wss" : "ws";
       const host = window.location.host;
@@ -95,22 +102,16 @@ export function useChatWS(kbId: number, sessionId: string | null) {
             } else if (data.done) {
               doneRef.current = true;
               if (intervalRef.current) clearInterval(intervalRef.current);
+              const content = bufferRef.current;
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === aiId
-                    ? {
-                        ...m,
-                        content: bufferRef.current,
-                        isStreaming: false,
-                        sources: data.sources,
-                      }
-                    : m,
+                  m.id === aiId ? { ...m, content, isStreaming: false, sources: data.sources } : m,
                 ),
               );
               setIsStreaming(false);
             }
           } catch {
-            /* not JSON */
+            /* not JSON — append as text below */
           }
         } else {
           bufferRef.current += e.data;
@@ -131,10 +132,11 @@ export function useChatWS(kbId: number, sessionId: string | null) {
       ws.onerror = () => {
         doneRef.current = true;
         if (intervalRef.current) clearInterval(intervalRef.current);
+        const content = bufferRef.current;
         setMessages((prev) =>
           prev.map((m) =>
             m.id === aiId
-              ? { ...m, content: bufferRef.current || "[错误: 连接失败]", isStreaming: false }
+              ? { ...m, content: content || "[错误: 连接失败]", isStreaming: false }
               : m,
           ),
         );

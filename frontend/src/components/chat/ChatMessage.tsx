@@ -152,7 +152,7 @@ export default function ChatMessage({
     >
       <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-[78%]`}>
         <div
-          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed transition-all duration-100 ease-out ${
+          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed transition-[padding,height] duration-150 ease-out ${
             isUser ? "rounded-br-md" : "rounded-bl-md"
           }`}
           style={
