@@ -1,4 +1,4 @@
-"""测试基础设施"""
+"""测试基础设施 — PostgreSQL 测试数据库 + 表级隔离"""
 
 import os
 import sys
@@ -10,25 +10,25 @@ from httpx import ASGITransport, AsyncClient
 _project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(_project_root))
 
-_test_db_path = _project_root / "test.db"
-os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_test_db_path}"
+# 使用独立测试数据库，不污染开发/生产数据
+os.environ["DATABASE_URL"] = (
+    "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn_test"
+)
 os.environ["SECRET_KEY"] = "test-secret-key-for-jwt-signing-must-be-at-least-32-bytes"
 
 
 @pytest.fixture
 async def client() -> AsyncClient:
-    """每个测试使用独立数据库（create_all 快速建表，生产用 Alembic migration）"""
-    # 必须先导入所有模型，让它们注册到 Base.metadata
+    """每个测试函数独立建表/删表，保证隔离"""
     from app.core.database import Base, async_engine, sync_engine
     from app.models.chat import ChatMessage  # noqa: F401
     from app.models.knowledge_base import Document, KnowledgeBase  # noqa: F401
     from app.models.user import User  # noqa: F401
 
-    # 通过 async engine 建表（fastapi-users 走 async engine 查询）
+    # 删除旧表 → 重建（确保每个测试从干净状态开始）
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    # sync engine 也确保能看到表（应用 CRUD 走 sync）
     Base.metadata.create_all(sync_engine)
 
     from app.main import app
@@ -37,6 +37,10 @@ async def client() -> AsyncClient:
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
+
+    # 清理
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest.fixture
