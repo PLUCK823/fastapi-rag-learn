@@ -1,6 +1,37 @@
+# 依赖
 node_modules
+.npm
+
+# 构建产物
 dist
+build
+
+# 版本控制
 .git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+
+# 文档
 *.md
+docs/
+
+# 环境变量
 .env
 .env.local
+.env.*.local
+
+# 测试
+coverage/
+playwright-report/
+test-results/
+e2e/
