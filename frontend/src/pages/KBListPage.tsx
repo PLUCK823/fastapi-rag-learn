@@ -90,9 +90,15 @@ export default function KBListPage() {
 
   const executeDelete = useCallback(async () => {
     if (!confirmDelete) return;
-    await deleteKB(confirmDelete.id);
-    setConfirmDelete(null);
-    refresh();
+    try {
+      await deleteKB(confirmDelete.id);
+      setConfirmDelete(null);
+      refresh();
+    } catch (err) {
+      console.error("Delete KB failed:", err);
+      // Still dismiss dialog on error so user isn't stuck
+      setConfirmDelete(null);
+    }
   }, [confirmDelete, refresh]);
 
   return (

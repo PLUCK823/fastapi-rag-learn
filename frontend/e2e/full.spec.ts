@@ -32,6 +32,8 @@ test.describe("Full E2E Test Suite", () => {
 
   test("2. Knowledge Base CRUD", async ({ page }) => {
     const user = getTestUser("kb");
+    const errors: string[] = [];
+    page.on("pageerror", (err) => errors.push(err.message));
 
     // Register and login
     await page.goto("http://localhost:5173/register");
@@ -68,11 +70,29 @@ test.describe("Full E2E Test Suite", () => {
 
     // Confirm dialog
     await expect(page.getByRole("heading", { name: "确认删除" })).toBeVisible({ timeout: 3000 });
+
+    // Wait for the DELETE API response after clicking confirm
+    const deleteResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes("/kb/") &&
+        response.request().method() === "DELETE" &&
+        response.status() === 200,
+      { timeout: 10000 }
+    );
     await page.getByRole("button", { name: "确认删除" }).click();
+    const deleteResponse = await deleteResponsePromise;
+    console.log(`Delete API responded with: ${deleteResponse.status()}`);
+
+    // Wait for the KB list to refresh
     await page.waitForTimeout(500);
 
     // KB should be deleted - use role to be specific
     await expect(page.getByRole("link", { name: "待删除 KB" })).not.toBeVisible({ timeout: 5000 });
+
+    // Report any page errors
+    if (errors.length > 0) {
+      console.log("PAGE ERRORS during KB CRUD test:", errors);
+    }
 
     console.log("✅ KB CRUD test passed");
   });
