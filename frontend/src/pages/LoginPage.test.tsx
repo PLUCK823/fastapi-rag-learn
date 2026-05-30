@@ -32,7 +32,11 @@ describe("LoginPage", () => {
   });
 
   it("shows error on failed login", async () => {
-    server.use(http.post("/auth/login", () => new HttpResponse(null, { status: 400 })));
+    server.use(
+      http.post("/auth/login", () =>
+        HttpResponse.json({ detail: "邮箱或密码不正确" }, { status: 400 }),
+      ),
+    );
     render(
       <MemoryRouter>
         <LoginPage />

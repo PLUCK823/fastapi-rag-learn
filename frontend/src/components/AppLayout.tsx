@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { changePassword, getProfile, updateNickname } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
-import { toast } from "../stores/toastStore";
 import { getErrorMessage } from "../utils/error";
 import Toast from "./shared/Toast";
 

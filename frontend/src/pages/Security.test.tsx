@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import KBListPage from "./KBListPage";
 import LoginPage from "./LoginPage";
 import RegisterPage from "./RegisterPage";
@@ -134,12 +134,15 @@ describe("XSS Protection Tests", () => {
       await userEvent.click(screen.getByRole("button", { name: "登录" }));
 
       // Should not execute script, should show error or attempt login
-      await waitFor(() => {
-        // No alert should be triggered
-        const error = screen.queryByText(/错误|Invalid|失败/);
-        // Either error shown or still on page
-        expect(error || emailInput).toBeTruthy();
-      }, { timeout: 1000 });
+      await waitFor(
+        () => {
+          // No alert should be triggered
+          const error = screen.queryByText(/错误|Invalid|失败/);
+          // Either error shown or still on page
+          expect(error || emailInput).toBeTruthy();
+        },
+        { timeout: 1000 },
+      );
     });
   });
 
@@ -159,10 +162,13 @@ describe("XSS Protection Tests", () => {
       await userEvent.click(screen.getByRole("button", { name: "注册并登录" }));
 
       // Should handle safely
-      await waitFor(() => {
-        // No script execution
-        expect(true).toBe(true);
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          // No script execution
+          expect(true).toBe(true);
+        },
+        { timeout: 500 },
+      );
     });
   });
 });
@@ -186,11 +192,14 @@ describe("Input Validation Tests", () => {
       await userEvent.click(screen.getByRole("button", { name: "创建" }));
 
       // Should show validation error or not create
-      await waitFor(() => {
-        // KB list should not change
-        const kbCards = screen.queryAllByText("测试知识库");
-        expect(kbCards.length).toBe(1);
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          // KB list should not change
+          const kbCards = screen.queryAllByText("测试知识库");
+          expect(kbCards.length).toBe(1);
+        },
+        { timeout: 500 },
+      );
     });
 
     it("handles very long KB name", async () => {
@@ -227,10 +236,13 @@ describe("Input Validation Tests", () => {
       await userEvent.click(screen.getByRole("button", { name: "登录" }));
 
       // Should stay on page (no redirect)
-      await waitFor(() => {
-        const loginButton = screen.queryByRole("button", { name: "登录" });
-        expect(loginButton).toBeTruthy();
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          const loginButton = screen.queryByRole("button", { name: "登录" });
+          expect(loginButton).toBeTruthy();
+        },
+        { timeout: 500 },
+      );
     });
 
     it("rejects empty password", async () => {
@@ -245,10 +257,13 @@ describe("Input Validation Tests", () => {
       await userEvent.click(screen.getByRole("button", { name: "登录" }));
 
       // Should stay on page (no redirect)
-      await waitFor(() => {
-        const loginButton = screen.queryByRole("button", { name: "登录" });
-        expect(loginButton).toBeTruthy();
-      }, { timeout: 500 });
+      await waitFor(
+        () => {
+          const loginButton = screen.queryByRole("button", { name: "登录" });
+          expect(loginButton).toBeTruthy();
+        },
+        { timeout: 500 },
+      );
     });
   });
 
@@ -267,11 +282,8 @@ describe("Input Validation Tests", () => {
       await userEvent.type(passwordInput, "12345"); // 5 chars
       await userEvent.click(screen.getByRole("button", { name: "注册并登录" }));
 
-      // Should show validation error
-      await waitFor(() => {
-        const error = screen.queryByText(/至少|6|字符|密码/);
-        expect(error).toBeTruthy();
-      }, { timeout: 500 });
+      // Client-side validation should catch short password before API call
+      expect(await screen.findByText("密码至少需要 6 个字符")).toBeInTheDocument();
     });
   });
 });

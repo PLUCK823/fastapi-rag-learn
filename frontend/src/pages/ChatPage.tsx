@@ -87,7 +87,10 @@ export default function ChatPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const { messages, isStreaming, send, clear, prepareSend, resetLoadFlag } = useChatWS(kbIdNum, activeSessionId);
+  const { messages, isStreaming, send, clear, prepareSend, resetLoadFlag } = useChatWS(
+    kbIdNum,
+    activeSessionId,
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

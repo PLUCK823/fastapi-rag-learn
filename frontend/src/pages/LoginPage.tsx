@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
+import { getErrorMessage } from "../utils/error";
 
 const EMPTY_STATE_ILLUSTRATION = (
   <svg
@@ -38,15 +39,22 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
+    if (!email.trim()) {
+      setError("请输入邮箱地址");
+      return;
+    }
+    if (!password.trim()) {
+      setError("请输入密码");
+      return;
+    }
     setError("");
     setLoading(true);
     try {
       const data = await login(email, password);
       setToken(data.access_token);
       navigate("/");
-    } catch {
-      setError("邮箱或密码不正确");
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

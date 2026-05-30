@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import ChatPage from "./ChatPage";
 
 // Track KB state
@@ -191,10 +191,13 @@ describe("ChatPage Boundary Tests", () => {
     await userEvent.type(input, "   {enter}");
 
     // Should not create message
-    await waitFor(() => {
-      // Input should be cleared or still empty
-      const inputValue = input.value.trim();
-      expect(inputValue.length).toBe(0);
-    }, { timeout: 500 });
+    await waitFor(
+      () => {
+        // Input should be cleared or still empty
+        const inputValue = input.value.trim();
+        expect(inputValue.length).toBe(0);
+      },
+      { timeout: 500 },
+    );
   });
 });

@@ -25,10 +25,7 @@ export default function Toast() {
   if (toasts.length === 0) return null;
 
   return (
-    <div
-      className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 max-w-sm"
-      aria-live="polite"
-    >
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 max-w-sm" aria-live="polite">
       {toasts.map((t) => {
         const s = typeStyles[t.type] ?? typeStyles.error;
         return (

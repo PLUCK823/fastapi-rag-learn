@@ -57,9 +57,11 @@ export default function KBListPage() {
   }, [editingKb]);
 
   const refresh = useCallback(() => {
-    listKBs(true).then(setKBs).catch((err) => {
-      toast(getErrorMessage(err));
-    });
+    listKBs(true)
+      .then(setKBs)
+      .catch((err) => {
+        toast(getErrorMessage(err));
+      });
   }, []);
 
   useEffect(() => {

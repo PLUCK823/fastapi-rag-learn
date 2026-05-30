@@ -109,7 +109,11 @@ export function useChatWS(kbId: number, sessionId: string | null) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === aiId
-              ? { ...m, content: m.content || "[错误: WebSocket 连接失败，请刷新页面重试]", isStreaming: false }
+              ? {
+                  ...m,
+                  content: m.content || "[错误: WebSocket 连接失败，请刷新页面重试]",
+                  isStreaming: false,
+                }
               : m,
           ),
         );
