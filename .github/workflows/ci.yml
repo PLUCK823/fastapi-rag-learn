@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Backend: lint + type-check + test ──
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/.venv
+            ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock') }}
+          restore-keys: ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Type-check (mypy)
+        run: uv run mypy app/
+
+      - name: Unit tests (pytest)
+        run: uv run pytest tests/ -v
+
+  # ── Frontend: lint + type-check + test ──
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (biome)
+        run: npx biome check src/
+
+      - name: Type-check (tsc)
+        run: npx tsc --noEmit
+
+      - name: Unit tests (vitest)
+        run: npx vitest run
+
+  # ── E2E: Playwright smoke test ──
+  e2e:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Cache backend deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/.venv
+            ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock') }}
+
+      - name: Install backend deps
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install chromium --with-deps
+
+      - name: Start backend
+        working-directory: backend
+        run: uv run uvicorn app.main:app --port 8000 --host 127.0.0.1 &
+        env:
+          SECRET_KEY: ci-test-secret-key-at-least-32-bytes
+
+      - name: Start frontend
+        working-directory: frontend
+        run: npm run dev -- --port 5173 &
+
+      - name: Wait for servers
+        run: |
+          for i in $(seq 1 30); do
+            if curl -s http://127.0.0.1:8000/health > /dev/null 2>&1 && \
+               curl -s http://127.0.0.1:5173 > /dev/null 2>&1; then
+              echo "Servers ready"
+              break
+            fi
+            echo "Waiting... ($i)"
+            sleep 2
+          done
+
+      - name: Run E2E tests
+        working-directory: frontend
+        run: npx playwright test smoke.spec.ts session.spec.ts --reporter=list --workers=1

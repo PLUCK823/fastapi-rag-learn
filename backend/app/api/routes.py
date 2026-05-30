@@ -1,4 +1,4 @@
-"""API 路由 — RAG 问答 + WebSocket 流式"""
+"""API 路由 — RAG 问答 + WebSocket 流式 + 健康检查"""
 
 import json
 from typing import Any
@@ -6,17 +6,40 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from jwt import PyJWTError
 from jwt import decode as jwt_decode
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.auth import current_user
 from app.core.config import SECRET_KEY
-from app.core.database import get_sync_session
+from app.core.database import get_sync_session, sync_engine
 from app.core.engine import ask, ask_stream_with_sources
 from app.models.chat import ChatMessage
 from app.models.schemas import AskRequest, AskResponse, SourceInfo
 from app.models.user import User
 
 router = APIRouter()
+
+
+@router.get("/health")
+def health_check():
+    """健康检查端点 — 返回服务、数据库状态及版本信息"""
+    db_ok = False
+    db_error: str | None = None
+    try:
+        with sync_engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception as e:
+        db_error = str(e)
+
+    return {
+        "status": "ok",
+        "version": "0.3.0",
+        "database": {
+            "connected": db_ok,
+            "error": db_error,
+        },
+    }
 
 
 # 多轮对话保留最近消息轮数

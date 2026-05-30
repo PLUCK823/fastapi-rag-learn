@@ -62,3 +62,14 @@ async def test_login_wrong_password_fails(client: AsyncClient):
         data={"username": email, "password": "wrongpassword"},
     )
     assert resp.status_code == 400
+
+
+async def test_health_check(client: AsyncClient):
+    """健康检查端点返回 OK 状态和数据库连接信息"""
+    resp = await client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert "version" in data
+    assert data["database"]["connected"] is True
+    assert data["database"]["error"] is None
