@@ -209,8 +209,7 @@ function highlightParagraph(children: React.ReactNode, keywords: string[]): Reac
     return children.map((child, i) => <span key={i}>{highlightParagraph(child, keywords)}</span>);
   }
   if (isValidElement(children)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const el = children as React.ReactElement<any>;
+    const el = children as React.ReactElement<{ children?: React.ReactNode }>;
     if (el.props.children) {
       return cloneElement(el, {
         children: highlightParagraph(el.props.children, keywords),

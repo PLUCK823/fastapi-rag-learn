@@ -63,8 +63,15 @@ def _run_migrations() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # 启动：运行数据库迁移
     _run_migrations()
     yield
+    # 关闭：释放数据库连接池
+    from app.core.database import async_engine, sync_engine
+
+    await async_engine.dispose()
+    sync_engine.dispose()
+    logger.info("Database engines disposed")
 
 
 app = FastAPI(title="RAG 学习项目", version="0.2.0", lifespan=lifespan)
