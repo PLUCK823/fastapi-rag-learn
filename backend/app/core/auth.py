@@ -1,9 +1,10 @@
 """fastapi-users 装配：UserManager, JWT auth, current_user 依赖"""
 
+import logging
 from collections.abc import AsyncGenerator
 
-from fastapi import Depends
-from fastapi_users import BaseUserManager, FastAPIUsers, IntegerIDMixin
+from fastapi import Depends, Request
+from fastapi_users import BaseUserManager, FastAPIUsers, IntegerIDMixin, models
 from fastapi_users.authentication import AuthenticationBackend, BearerTransport, JWTStrategy
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,10 +13,13 @@ from app.core.config import SECRET_KEY
 from app.core.database import get_async_session
 from app.models.user import User
 
+logger = logging.getLogger(__name__)
+
 UserDB = SQLAlchemyUserDatabase[User, int]
 
 ACCESS_TOKEN_LIFETIME = 3600  # 1 小时
 REFRESH_TOKEN_LIFETIME = 604800  # 7 天
+RESET_TOKEN_LIFETIME = 3600  # 密码重置 token 1 小时有效
 
 
 async def get_user_db(
@@ -25,7 +29,21 @@ async def get_user_db(
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
-    pass
+    reset_password_token_secret = SECRET_KEY
+    verification_token_secret = SECRET_KEY
+
+    async def on_after_forgot_password(
+        self, user: models.UP, token: str, request: Request | None = None,
+    ) -> None:
+        """打印密码重置链接到日志（开发者通过日志查看 token）"""
+        logger.info(
+            "Password reset requested for %s — token: %s", user.email, token,
+        )
+
+    async def on_after_reset_password(
+        self, user: models.UP, request: Request | None = None,
+    ) -> None:
+        logger.info("Password reset successful for %s", user.email)
 
 
 async def get_user_manager(user_db: UserDB = Depends(get_user_db)):

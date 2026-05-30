@@ -142,6 +142,7 @@ class MessageInfo(BaseModel):
     content: str
     session_id: str | None = None
     sources: list[SourceInfo] | None = None
+    feedback: bool | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

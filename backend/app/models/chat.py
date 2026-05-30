@@ -23,6 +23,9 @@ class ChatMessage(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    feedback: Mapped[bool | None] = mapped_column(
+        nullable=True, default=None, comment="用户反馈：True=赞, False=踩, None=无反馈"
+    )
     created_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), default=datetime.now(UTC)
     )

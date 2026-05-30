@@ -124,19 +124,64 @@ def extract_sources(docs: list[Document]) -> list[SourceInfo]:
     return sources
 
 
+def _keyword_search(
+    question: str, kb_id: int, exclude_ids: set[str], k: int = 3
+) -> list[Document]:
+    """关键词检索：在知识库所有分块中匹配关键词，作为向量检索的补充"""
+    vs = _get_kb_vectorstore(kb_id)
+    # 提取有意义的词（长度 >= 2）
+    keywords = [w for w in question.replace("？", " ").replace("?", " ").split() if len(w) >= 2]
+    if not keywords:
+        return []
+
+    matched: list[Document] = []
+    try:
+        raw = vs._collection.get(include=["documents", "metadatas"])
+    except Exception:
+        return []
+
+    ids = raw.get("ids", [])
+    docs_raw = raw.get("documents", [])
+    metadatas = raw.get("metadatas", [])
+
+    for i, chunk_id in enumerate(ids):
+        if chunk_id in exclude_ids:
+            continue
+        text = docs_raw[i] if isinstance(docs_raw[i], str) else ""
+        # 任一关键词匹配
+        if any(kw.lower() in text.lower() for kw in keywords):
+            meta = metadatas[i] if i < len(metadatas) else {}
+            matched.append(Document(
+                id=chunk_id,
+                page_content=text,
+                metadata=meta or {},
+            ))
+        if len(matched) >= k:
+            break
+
+    return matched
+
+
 def _retrieve_context(
     question: str,
     kb_id: int,
     history: list[tuple[str, str]] | None = None,
 ) -> tuple[str, list[Document]]:
-    """检索并构建 prompt（可选注入多轮对话历史），返回检索到的文档用于来源追溯"""
+    """混合检索（向量 + 关键词）+ 构建 prompt，支持多轮对话历史"""
     vectorstore = _get_kb_vectorstore(kb_id)
     retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
-    docs: list[Document] = retriever.invoke(question)
+    vec_docs: list[Document] = retriever.invoke(question)
+
+    # 关键词检索补充（排除已命中的 chunk）
+    seen_ids = {d.id for d in vec_docs if d.id}
+    kw_docs = _keyword_search(question, kb_id, seen_ids, k=2)
+
+    # 合并：向量结果优先，关键词结果补充
+    docs = vec_docs + kw_docs
 
     parts: list[str] = []
     for i, d in enumerate(docs, start=1):
-        name = d.metadata.get("document_name", "unknown")
+        name = d.metadata.get("document_name", "unknown") if d.metadata else "unknown"
         parts.append(f"来源{i}({name}): {d.page_content}")
     docs_text = "\n".join(parts)
 

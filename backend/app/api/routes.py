@@ -126,6 +126,26 @@ def ask_endpoint(
     return AskResponse(question=req.text, answer=answer, sources=sources)
 
 
+@router.patch("/messages/{message_id}/feedback")
+def feedback_endpoint(
+    message_id: int,
+    feedback: bool,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    """更新消息反馈（赞/踩），仅允许 assistant 消息且仅自己的消息"""
+    msg = session.query(ChatMessage).filter(
+        ChatMessage.id == message_id,
+        ChatMessage.role == "assistant",
+        ChatMessage.user_id == user.id,
+    ).first()
+    if msg is None:
+        raise HTTPException(status_code=404, detail="消息不存在或无权操作")
+    msg.feedback = feedback
+    session.commit()
+    return {"message": "ok", "feedback": feedback}
+
+
 async def _get_token_user(token: str) -> dict[str, Any] | None:
     """解码 JWT token 并返回 payload，失败返回 None"""
     try:
