@@ -1,6 +1,7 @@
+import { cloneElement, isValidElement } from "react";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { cloneElement, isValidElement } from "react";
 
 interface DocViewerModalProps {
   filename: string;

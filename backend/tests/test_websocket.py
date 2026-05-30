@@ -99,7 +99,7 @@ class TestWebSocketIntegration:
                 responses.append(response)
                 try:
                     data = json.loads(response)
-                    if data.get("done"):
+                    if isinstance(data, dict) and data.get("done"):
                         break
                 except json.JSONDecodeError:
                     continue
