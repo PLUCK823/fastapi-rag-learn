@@ -11,10 +11,14 @@ _project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(_project_root))
 
 # 使用独立测试数据库，不污染开发/生产数据
-os.environ["DATABASE_URL"] = (
-    "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn_test"
+# 仅当环境变量未设置时才用本地默认值（CI 等环境会通过 env 传入）
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn_test",
 )
-os.environ["SECRET_KEY"] = "test-secret-key-for-jwt-signing-must-be-at-least-32-bytes"
+os.environ.setdefault(
+    "SECRET_KEY", "test-secret-key-for-jwt-signing-must-be-at-least-32-bytes"
+)
 
 
 @pytest.fixture
