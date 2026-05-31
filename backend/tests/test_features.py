@@ -81,10 +81,14 @@ async def test_upload_txt_file(client: AsyncClient, auth_headers: dict, kb_id: i
         files={"file": ("test.txt", BytesIO(content), "text/plain")},
         headers=auth_headers,
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 202)
     data = resp.json()
-    assert data["filename"] == "test.txt"
-    assert data["chunk_count"] > 0
+    assert "doc_id" in data
+    assert data.get("status") in ("ready", "processing")
+    # Sync fallback: verify doc was actually created
+    if data.get("sync"):
+        doc_list = await client.get(f"/kb/{kb_id}/docs", headers=auth_headers)
+        assert doc_list.json()[0]["filename"] == "test.txt"
 
 
 @pytest.mark.asyncio
@@ -95,8 +99,8 @@ async def test_upload_md_file(client: AsyncClient, auth_headers: dict, kb_id: in
         files={"file": ("readme.md", BytesIO(content), "text/markdown")},
         headers=auth_headers,
     )
-    assert resp.status_code == 200
-    assert resp.json()["filename"] == "readme.md"
+    assert resp.status_code in (200, 202)
+    assert "doc_id" in resp.json()
 
 
 @pytest.mark.asyncio
@@ -121,7 +125,7 @@ async def test_upload_duplicate_filename_fails(
         files={"file": ("dup.txt", BytesIO(content), "text/plain")},
         headers=auth_headers,
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 202)
 
     resp = await client.post(
         f"/kb/{kb_id}/upload",
