@@ -36,6 +36,7 @@ router = APIRouter(prefix="/kb", tags=["knowledge_base"])
 
 # 支持的文件类型
 _ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+_MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 # Docling converter 单例（懒加载，避免首次启动开销）
 _docling_converter = None
@@ -83,6 +84,8 @@ def _parse_with_docling(raw: bytes, suffix: str) -> str:
 def _parse_upload(file: UploadFile) -> str:
     """解析上传文件内容，支持 txt / md / pdf"""
     raw = file.file.read()
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="文件大小不能超过 50MB")
     filename = file.filename or "untitled"
 
     ext = filename.lower()

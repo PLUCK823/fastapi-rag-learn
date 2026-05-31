@@ -12,7 +12,7 @@ T = TypeVar("T")
 
 class AskRequest(BaseModel):
     kb_id: int
-    text: str
+    text: str = Field(..., max_length=4000)
     session_id: str | None = None  # 可选，传入则注入会话历史实现多轮对话
 
     @field_validator("text")

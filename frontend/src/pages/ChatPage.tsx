@@ -420,6 +420,15 @@ export default function ChatPage() {
       const filename = file.name;
       const ext = `.${filename.split(".").pop()?.toLowerCase() ?? ""}`;
       const ALLOWED = [".txt", ".md", ".pdf", ".docx"];
+      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+      if (file.size > MAX_FILE_SIZE) {
+        setUploadQueue((prev) => [
+          ...prev,
+          { filename, taskId: "", status: "error", progress: 0, error: "文件大小不能超过 50MB" },
+        ]);
+        return;
+      }
+
       if (!ALLOWED.includes(ext)) {
         setUploadQueue((prev) => [
           ...prev,
@@ -1193,6 +1202,7 @@ export default function ChatPage() {
                   handleSend();
                 }
               }}
+              maxLength={4000}
               placeholder="输入问题，Enter 发送…"
               className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none transition-colors"
               style={{
