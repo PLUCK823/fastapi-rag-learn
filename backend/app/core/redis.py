@@ -22,8 +22,11 @@ async def create_redis_pool() -> ArqRedis | None:
         host = url
         port = 6379
     try:
-        pool = await create_pool(RedisSettings(host=host, port=port))
-        await pool.ping()  # Verify real connectivity (ARQ pools are created lazily)
+        pool = await create_pool(
+            RedisSettings(host=host, port=port, conn_timeout=2, conn_retries=0)
+        )
+        # Verify real connectivity (ARQ pools are created lazily)
+        await pool.ping()
         return pool
     except Exception:
         return None  # Redis unavailable — graceful degradation
