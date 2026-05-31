@@ -1,22 +1,31 @@
 """RAG 引擎 — 检索 + LLM 生成，按知识库隔离向量库"""
 
+from __future__ import annotations
+
 import logging
 import re
 import subprocess
 import sys
 import traceback
 from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI
 
+if TYPE_CHECKING:
+    from sentence_transformers import CrossEncoder
+
 from app.core.config import (
     CHROMA_DIR,
     EMBEDDING_MODEL,
     LLM_MODEL,
     OPENAI_BASE_URL,
+    RERANKER_CANDIDATE_K,
+    RERANKER_MODEL,
+    RERANKER_TOP_K,
     RETRIEVAL_K,
 )
 from app.models.schemas import SourceInfo
@@ -43,6 +52,7 @@ def _init_jieba() -> None:
 _initialized = False
 _embeddings: HuggingFaceEmbeddings | None = None
 _llm: ChatOpenAI | None = None
+_reranker: CrossEncoder | None = None
 
 
 def _init_shared() -> None:
@@ -58,6 +68,30 @@ def _init_shared() -> None:
         streaming=True,
     )
     _initialized = True
+
+
+def _get_reranker() -> CrossEncoder:
+    """懒加载 reranker 单例，避免拖慢首次 /ask 响应"""
+    global _reranker
+    if _reranker is not None:
+        return _reranker
+    from sentence_transformers import CrossEncoder
+
+    logger.info("Loading reranker model: %s", RERANKER_MODEL)
+    _reranker = CrossEncoder(RERANKER_MODEL)
+    return _reranker
+
+
+def _rerank(query: str, docs: list[Document], top_k: int) -> list[Document]:
+    """Cross-encoder 精排：对候选 doc 列表按与 query 的相关性重新排序"""
+    if not docs or top_k >= len(docs):
+        return docs
+    reranker = _get_reranker()
+    pairs = [(query, d.page_content) for d in docs]
+    scores = reranker.predict(pairs)  # type: ignore[arg-type]
+    # 按分数降序排列
+    ranked = sorted(zip(docs, scores), key=lambda x: x[1], reverse=True)
+    return [d for d, _ in ranked[:top_k]]
 
 
 def _get_kb_vectorstore(kb_id: int) -> Chroma:
@@ -323,7 +357,7 @@ def _retrieve_context(
     kb_id: int,
     history: list[tuple[str, str]] | None = None,
 ) -> tuple[str, list[Document]]:
-    """混合检索（向量 + BM25）+ RRF 融合 + 构建 prompt，支持多轮对话历史"""
+    """混合检索（向量 + BM25）+ RRF 融合 + Cross-encoder 精排 → prompt"""
     vectorstore = _get_kb_vectorstore(kb_id)
     retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
     vec_docs: list[Document] = retriever.invoke(question)
@@ -347,9 +381,12 @@ def _retrieve_context(
         scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (rrf_k + rank + 1)
         id_to_doc[doc_id] = d
 
-    # 按 RRF 分数排序，取 top
+    # RRF 排序 → 取候选（比最终需要的多，留给 reranker 精排）
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    docs = [id_to_doc[doc_id] for doc_id, _ in ranked[:RETRIEVAL_K + 3]]
+    candidates = [id_to_doc[doc_id] for doc_id, _ in ranked[:RERANKER_CANDIDATE_K]]
+
+    # Cross-encoder 精排 → 取 top-k
+    docs = _rerank(question, candidates, RERANKER_TOP_K)
 
     parts: list[str] = []
     for i, d in enumerate(docs, start=1):

@@ -26,7 +26,14 @@ LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 
 # Embedding（本地模型，无需 API key）
-EMBEDDING_MODEL = "BAAI/bge-small-zh-v1.5"
+# Qwen3-Embedding-0.6B — C-MTEB ~71，1024d，Apache 2.0
+# 注：Youtu-Embedding (C-MTEB #1) 需要 transformers 4.x，与当前 5.x 不兼容
+EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-0.6B"
+
+# Reranker（精排）— Qwen3-Reranker-4B，当前最强免费 cross-encoder
+RERANKER_MODEL = "Qwen/Qwen3-Reranker-4B"
+RERANKER_TOP_K = 5  # 精排后保留的 chunk 数
+RERANKER_CANDIDATE_K = 20  # 进入精排的候选数（RRF 后取 top-N 送入 reranker）
 
 # 向量库
 CHROMA_DIR = ROOT_DIR / "chroma_db"

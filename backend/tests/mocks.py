@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# 固定维度（BGE-small-zh 输出 512 维）
-EMBEDDING_DIM = 512
+# 固定维度（Qwen3-Embedding-0.6B 输出 1024 维）
+EMBEDDING_DIM = 1024
 
 
 class FakeEmbeddings:

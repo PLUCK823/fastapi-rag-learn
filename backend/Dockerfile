@@ -33,10 +33,11 @@ COPY app/ ./app/
 COPY alembic.ini ./
 COPY alembic/ ./alembic/
 
-# 预下载 BGE 中文向量模型（避免首次请求等很久）
+# 预下载 embedding + reranker 模型（避免首次请求等很久）
 # 国内部署可取消注释下面这行用镜像加速:
 # ENV HF_ENDPOINT=https://hf-mirror.com
-RUN .venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-zh-v1.5')"
+RUN .venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')" && \
+    .venv/bin/python3 -c "from sentence_transformers import CrossEncoder; CrossEncoder('Qwen/Qwen3-Reranker-4B')"
 
 # ============================================================
 # 阶段 2: 运行
