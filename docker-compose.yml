@@ -65,7 +65,7 @@ services:
 
   # ── Qdrant 向量数据库 ──
   qdrant:
-    image: qdrant/qdrant:v1.14.0
+    image: qdrant/qdrant:v1.15.2
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
@@ -74,7 +74,7 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      test: ["CMD", "bash", "-c", ": > /dev/tcp/localhost/6333"]
       interval: 10s
       timeout: 5s
       retries: 3

@@ -56,7 +56,7 @@ services:
     environment:
       - QDRANT__TELEMETRY__DISABLED=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      test: ["CMD", "bash", "-c", ": > /dev/tcp/localhost/6333"]
       interval: 10s
       timeout: 5s
       retries: 3
