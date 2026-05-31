@@ -418,9 +418,9 @@ export default function ChatPage() {
   const uploadAndPoll = useCallback(
     async (file: File) => {
       const filename = file.name;
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+      const ext = `.${filename.split(".").pop()?.toLowerCase() ?? ""}`;
       const ALLOWED = [".txt", ".md", ".pdf"];
-      if (!ALLOWED.some((v) => ext.endsWith(v))) {
+      if (!ALLOWED.includes(ext)) {
         setUploadQueue((prev) => [
           ...prev,
           { filename, taskId: "", status: "error", progress: 0, error: "不支持的格式" },
