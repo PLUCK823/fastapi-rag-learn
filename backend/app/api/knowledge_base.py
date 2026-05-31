@@ -285,20 +285,24 @@ def batch_delete_docs(
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
-    """批量删除文档"""
+    """批量删除文档 — 逐条提交，SQL 先删 ChromaDB 后清理"""
     from app.core.engine import delete_document_chunks
 
     deleted_count = 0
     for doc_id in req.doc_ids:
         try:
             doc = kb_service.get_document(session, kb_id, doc_id, user.id)
-            delete_document_chunks(kb_id, doc_id)
             session.delete(doc)
+            session.commit()  # 逐条提交，避免一批失败全部回滚
+            try:
+                delete_document_chunks(kb_id, doc_id)
+            except Exception:
+                pass  # ChromaDB 清理失败不阻塞，孤儿由定期任务兜底
             deleted_count += 1
         except HTTPException:
-            pass  # skip not-found or forbidden docs
+            session.rollback()  # 当前这条回滚
+            pass
 
-    session.commit()
     return BatchDeleteResponse(deleted_count=deleted_count)
 
 

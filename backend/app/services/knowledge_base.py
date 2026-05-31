@@ -282,9 +282,10 @@ def rename_kb(session: Session, kb_id: int, user_id: int, name: str) -> Knowledg
 def delete_kb(session: Session, kb_id: int, user_id: int) -> int:
     kb = _get_kb(session, kb_id, user_id)
     doc_count = len(kb.documents)
+    # 先删 ChromaDB，失败了 SQL 可回滚
+    delete_collection(kb_id)
     session.delete(kb)
     session.commit()
-    delete_collection(kb_id)
     return doc_count
 
 
@@ -355,15 +356,7 @@ def update_document(
 ) -> Document:
     doc = get_document(session, kb_id, doc_id, user_id)
 
-    # Delete old chunks first — if this fails, don't proceed (avoid duplicate chunks)
-    try:
-        delete_document_chunks(kb_id, doc_id)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"删除旧向量分块失败: {e}",
-        )
-
+    # upsert 自动覆盖同 ID chunk，无需手动删旧
     chunk_count = _ingest_to_kb(content, doc.filename, kb_id, doc_id)
     doc.chunk_count = chunk_count
     doc.updated_at = datetime.now(UTC)
@@ -397,24 +390,27 @@ def rename_document(
 
 def delete_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> None:
     doc = get_document(session, kb_id, doc_id, user_id)
-    try:
-        delete_document_chunks(kb_id, doc_id)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"删除文档向量分块失败: {e}",
-        )
+    # SQL 先删，ChromaDB 后清理（清理失败不阻塞，孤儿由定期任务兜底）
     session.delete(doc)
     session.commit()
+    try:
+        delete_document_chunks(kb_id, doc_id)
+    except Exception:
+        pass  # 残留 chunk 不影响正确性，定期清理兜底
 
 
 # ── Internal ──
 
 def _ingest_to_kb(content: str, filename: str, kb_id: int, doc_id: int) -> int:
-    """文档向量化存入 ChromaDB
-    优先 Markdown 标题感知切分（保留章节语义），
-    纯文本 fallback 到中文优化的字符级切分。
+    """文档向量化存入 ChromaDB（幂等 upsert + 确定性 ID）
+
+    使用 upsert + 确定性 ID（{doc_id}_{chunk_index}）：
+    - 同 ID 自动覆盖，无需手动删除旧 chunk
+    - chunk 数减少时清理由 _cleanup_stale_chunks 完成
     """
+    import logging
+
+    _logger = logging.getLogger(__name__)
     all_chunks = _split_content(content, filename)
 
     for i, chunk in enumerate(all_chunks):
@@ -424,5 +420,34 @@ def _ingest_to_kb(content: str, filename: str, kb_id: int, doc_id: int) -> int:
         chunk.metadata["chunk_index"] = i
 
     vs = get_vectorstore(kb_id)
-    vs.add_documents(all_chunks)
+    chunk_ids = [f"{doc_id}_{i}" for i in range(len(all_chunks))]
+
+    # 生成嵌入 + upsert（原子操作，同 ID 自动覆盖）
+    texts = [c.page_content for c in all_chunks]
+    metadatas = [c.metadata for c in all_chunks]
+    embed_fn = vs._embedding_function
+    if embed_fn is None:
+        raise RuntimeError("ChromaDB embedding function is not initialized")
+    embeddings = embed_fn.embed_documents(texts)
+    vs._collection.upsert(
+        ids=chunk_ids,
+        embeddings=embeddings,  # type: ignore
+        documents=texts,
+        metadatas=metadatas,  # type: ignore
+    )
+
+    # 清理上一版本残留的旧 chunk（chunk 数从 7→5 时，索引 5、6 变孤儿）
+    try:
+        existing = vs._collection.get(
+            where={"document_id": doc_id},
+            include=[],
+        )
+        current_ids = set(chunk_ids)
+        stale_ids = [rid for rid in existing["ids"] if rid not in current_ids]
+        if stale_ids:
+            vs._collection.delete(ids=stale_ids)
+            _logger.info("Cleaned %d stale chunks for doc %d", len(stale_ids), doc_id)
+    except Exception:
+        _logger.warning("Failed to clean stale chunks for doc %d", doc_id, exc_info=True)
+
     return len(all_chunks)

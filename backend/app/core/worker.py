@@ -1,10 +1,11 @@
-"""ARQ Worker — 异步文档处理 + 批量操作"""
+"""ARQ Worker — 异步文档处理 + 批量操作 + 孤儿数据清理"""
 
 from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
 
+from arq import cron
 from arq.connections import ArqRedis, RedisSettings
 
 from app.core.config import REDIS_URL
@@ -59,15 +60,17 @@ async def ingest_document(
         return {"kb_id": kb_id, "filename": filename, "chunk_count": chunk_count}
 
     except Exception as e:
-        logger.exception("Document ingestion failed for %s in kb %d", filename, kb_id)
-        # 标记失败
+        logger.exception(
+            "Document ingestion failed for %s (doc %d) in kb %d",
+            filename, doc_id, kb_id,
+        )
+        # 标记失败（用 doc_id 精准定位，避免更名后匹配不到）
         with sync_session_factory() as session:
             from sqlalchemy import update
 
             session.execute(
                 update(Document).where(
-                    Document.kb_id == kb_id,
-                    Document.filename == filename,
+                    Document.id == doc_id,
                     Document.status == "processing",
                 ).values(
                     status="failed",
@@ -138,6 +141,61 @@ async def batch_delete_documents(
         raise
 
 
+# ── 定期清理孤儿数据 ──
+
+
+async def cleanup_orphan_data(ctx: dict) -> dict:
+    """清理 SQL 与 ChromaDB 不一致的孤儿数据
+
+    场景：
+    - 文档已从 SQL 删除，但 ChromaDB chunk 残留（kill -9 等极端情况）
+    - Worker 崩溃导致 status="processing" 超时未更新
+    """
+    from datetime import timedelta
+
+    from app.core.database import sync_session_factory
+    from app.models.knowledge_base import Document
+
+    logger.info("Starting orphan cleanup...")
+
+    result = {"stuck_docs_cleaned": 0, "orphan_chunks_cleaned": 0}  # type: ignore[dict-assignment]
+
+    with sync_session_factory() as session:
+        from sqlalchemy import select
+
+        # 清理超过 1 小时仍卡在 processing 的文档
+        stuck_docs = session.execute(
+            select(Document).where(
+                Document.status == "processing",
+                Document.created_at < datetime.now(UTC) - timedelta(hours=1),
+            )
+        ).scalars().all()
+
+        for doc in stuck_docs:
+            try:
+                from app.core.engine import delete_document_chunks
+
+                delete_document_chunks(doc.kb_id, doc.id)
+                session.delete(doc)
+                result["stuck_docs_cleaned"] += 1  # type: ignore[index]
+            except Exception as exc:
+                logger.warning("Failed to clean stuck doc %d: %s", doc.id, exc)
+
+        session.commit()
+
+    logger.info(
+        "Orphan cleanup done: %d stuck docs",
+        result["stuck_docs_cleaned"],  # type: ignore[index]
+    )
+    return result
+
+
+# 注册为每天凌晨 3 点的 cron 任务
+cleanup_orphan_data = cron(  # type: ignore[assignment]
+    cleanup_orphan_data, hour=3, minute=0, run_at_startup=False
+)
+
+
 # ── Worker 配置 ──
 
 
@@ -162,6 +220,9 @@ class WorkerSettings:
     functions = [
         ingest_document,
         batch_delete_documents,
+    ]
+    cron_jobs = [
+        cleanup_orphan_data,  # type: ignore[list-item]
     ]
     max_jobs = 10
     job_timeout = 600  # 单任务最长 10 分钟
