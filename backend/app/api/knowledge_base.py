@@ -173,25 +173,19 @@ async def upload_document(
     content = _parse_upload(file)
     filename = file.filename or "untitled"
 
-    # 检查重复文件名
+    # 检查重复文件名（跳过已失败的记录，允许重试）
     existing = session.execute(
         sa_select(kb_service.Document).where(
             kb_service.Document.kb_id == kb_id,
             kb_service.Document.filename == filename,
+            kb_service.Document.status != "failed",
         )
     ).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="知识库中已存在同名文档")
 
-    # 创建 document 记录（status=processing）
-    doc = kb_service.Document(kb_id=kb_id, filename=filename, status="processing")
-    session.add(doc)
-    session.commit()
-    session.refresh(doc)
-
-    # 入队 ARQ 后台任务
+    # 尝试入队 ARQ 后台任务
     task_id = str(uuid4())
-    # Access app state without using FastAPI's request parameter injection
     try:
         import app.main as _main_mod
         from app.core.redis import update_task_progress
@@ -199,6 +193,14 @@ async def upload_document(
         app_instance = _main_mod.app
         redis = getattr(app_instance.state, "redis", None)
         if redis:
+            # 创建 "processing" 临时记录
+            doc = kb_service.Document(
+                kb_id=kb_id, filename=filename, status="processing"
+            )
+            session.add(doc)
+            session.commit()
+            session.refresh(doc)
+
             await update_task_progress(redis, task_id, "pending", 0, "排队中…")
             await redis.enqueue_job(
                 "ingest_document",
@@ -210,9 +212,9 @@ async def upload_document(
             )
             return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
     except Exception:
-        pass  # Redis unavailable — fall through to sync
+        session.rollback()
 
-    # Redis 不可用时的降级：同步处理
+    # Redis 不可用 → 同步处理
     doc = kb_service.add_document(session, kb_id, user.id, content, filename)
     return {"doc_id": doc.id, "task_id": task_id, "status": "ready", "sync": True}
 
