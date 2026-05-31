@@ -196,10 +196,16 @@ async def upload_document(
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
-    """上传文件（txt / md / pdf）— 返回 task_id，后台异步处理"""
+    """上传文件（txt / md / pdf / docx）— 返回 task_id，后台异步处理"""
 
     content = _parse_upload(file)
     filename = file.filename or "untitled"
+
+    # PDF/DOCX 经 Docling 已转为 Markdown，统一后缀
+    import os as _os
+    name, ext = _os.path.splitext(filename)
+    if ext.lower() in {".pdf", ".docx"}:
+        filename = f"{name}.md"
 
     # 检查重复文件名（跳过已失败的记录，允许重试）
     existing = session.execute(
@@ -236,6 +242,7 @@ async def upload_document(
                 user_id=user.id,
                 content=content,
                 filename=filename,
+                doc_id=doc.id,
                 _job_id=task_id,
             )
             return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}

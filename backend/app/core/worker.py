@@ -21,6 +21,7 @@ async def ingest_document(
     user_id: int,
     content: str,
     filename: str,
+    doc_id: int,
 ) -> dict:
     """后台处理文档：切分 → 嵌入 → 存入 ChromaDB"""
     from app.core.database import sync_session_factory
@@ -33,7 +34,7 @@ async def ingest_document(
     try:
         await update_task_progress(redis, task_id, "chunking", 10, "正在切分文档…")
 
-        chunk_count = _ingest_to_kb(content, filename, kb_id, 0)  # doc_id=0 临时
+        chunk_count = _ingest_to_kb(content, filename, kb_id, doc_id)
         # 注：_ingest_to_kb 内部会调用 vs.add_documents() 生成 embedding
 
         await update_task_progress(redis, task_id, "storing", 80, "正在保存…")
@@ -44,8 +45,7 @@ async def ingest_document(
 
             session.execute(
                 update(Document).where(
-                    Document.kb_id == kb_id,
-                    Document.filename == filename,
+                    Document.id == doc_id,
                     Document.status == "processing",
                 ).values(
                     chunk_count=chunk_count,
