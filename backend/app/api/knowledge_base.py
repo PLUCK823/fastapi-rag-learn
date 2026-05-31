@@ -1,6 +1,9 @@
 """知识库 + 文档管理路由（同步，避免 greenlet）"""
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from typing import Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy import delete, desc, func
 from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
@@ -8,8 +11,11 @@ from sqlalchemy.orm import Session
 from app.core.auth import current_user
 from app.core.database import get_sync_session
 from app.core.engine import get_document_content
+from app.core.redis import get_task_status
 from app.models.chat import ChatMessage
 from app.models.schemas import (
+    BatchDeleteRequest,
+    BatchDeleteResponse,
     DocCreateRequest,
     DocInfo,
     DocRenameRequest,
@@ -22,6 +28,7 @@ from app.models.schemas import (
     MessageInfo,
     PaginatedResponse,
     SessionInfo,
+    TaskInfo,
 )
 from app.models.user import User
 from app.services import knowledge_base as kb_service
@@ -155,18 +162,95 @@ def add_document(
     return DocInfo.model_validate(doc)
 
 
-@router.post("/{kb_id}/upload", response_model=DocInfo)
-def upload_document(
+@router.post("/{kb_id}/upload", status_code=202)
+async def upload_document(
     kb_id: int,
     file: UploadFile = File(...),
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
+    request: Optional[Request] = None,
 ):
-    """上传文件（txt / md / pdf）到知识库"""
+    """上传文件（txt / md / pdf）— 返回 task_id，后台异步处理"""
     content = _parse_upload(file)
     filename = file.filename or "untitled"
-    doc = kb_service.add_document(session, kb_id, user.id, content, filename)
-    return DocInfo.model_validate(doc)
+
+    # 检查重复文件名
+    existing = session.execute(
+        sa_select(kb_service.Document).where(
+            kb_service.Document.kb_id == kb_id,
+            kb_service.Document.filename == filename,
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="知识库中已存在同名文档")
+
+    # 创建 document 记录（status=processing）
+    doc = kb_service.Document(kb_id=kb_id, filename=filename, status="processing")
+    session.add(doc)
+    session.commit()
+    session.refresh(doc)
+
+    # 入队 ARQ 后台任务
+    task_id = str(uuid4())
+    redis = getattr(request.app.state, "redis", None) if request else None
+    if redis:
+        from app.core.redis import update_task_progress
+
+        await update_task_progress(redis, task_id, "pending", 0, "排队中…")
+        await redis.enqueue_job(
+            "ingest_document",
+            kb_id=kb_id,
+            user_id=user.id,
+            content=content,
+            filename=filename,
+            _job_id=task_id,
+        )
+    else:
+        # Redis 不可用时的降级：同步处理
+        doc = kb_service.add_document(session, kb_id, user.id, content, filename)
+        return {"doc_id": doc.id, "task_id": task_id, "status": "ready", "sync": True}
+
+    return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
+
+
+@router.get("/tasks/{task_id}", response_model=TaskInfo)
+async def poll_task(task_id: str, request: Request):
+    """轮询异步任务进度"""
+    redis = getattr(request.app.state, "redis", None)
+    if not redis:
+        return TaskInfo(task_id=task_id, status="done", progress=100, message="ok")
+
+    data = await get_task_status(redis, task_id)
+    return TaskInfo(
+        task_id=task_id,
+        status=data.get("status", "unknown"),
+        progress=int(data.get("progress", "0")),
+        message=data.get("message", ""),
+    )
+
+
+@router.post("/{kb_id}/docs/batch-delete", response_model=BatchDeleteResponse)
+def batch_delete_docs(
+    kb_id: int,
+    req: BatchDeleteRequest,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    """批量删除文档"""
+    from app.core.engine import delete_document_chunks
+
+    deleted_count = 0
+    for doc_id in req.doc_ids:
+        try:
+            doc = kb_service.get_document(session, kb_id, doc_id, user.id)
+            delete_document_chunks(kb_id, doc_id)
+            session.delete(doc)
+            deleted_count += 1
+        except HTTPException:
+            pass  # skip not-found or forbidden docs
+
+    session.commit()
+    return BatchDeleteResponse(deleted_count=deleted_count)
 
 
 @router.get("/{kb_id}/docs", response_model=list[DocInfo])

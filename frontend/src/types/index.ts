@@ -15,8 +15,25 @@ export interface Document {
   id: number;
   filename: string;
   chunk_count: number;
+  status: string;
+  error_message: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TaskInfo {
+  task_id: string;
+  status: string;
+  progress: number;
+  message: string;
+  result?: Record<string, unknown> | null;
+}
+
+export interface UploadResult {
+  doc_id: number;
+  task_id: string;
+  status: string;
+  sync?: boolean;
 }
 
 export interface SourceInfo {

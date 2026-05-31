@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useParams } from "react-router-dom";
 import {
+  batchDeleteDocuments,
   clearMessages,
   deleteDocument,
   deleteSession,
   getDocContent,
   listKBs,
   listSessions,
+  pollTask,
   searchMessages,
-  uploadFile,
+  uploadFileAsync,
 } from "../api/kb";
 import ChatMessage from "../components/chat/ChatMessage";
 import DocEditorModal from "../components/chat/DocEditorModal";
@@ -104,11 +106,14 @@ export default function ChatPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editDoc, setEditDoc] = useState<Document | null>(null);
   const [editContent, setEditContent] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState<
+    { filename: string; taskId: string; status: string; progress: number; error?: string }[]
+  >([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
   const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
   const [confirmClearChat, setConfirmClearChat] = useState(false);
 
@@ -145,9 +150,43 @@ export default function ChatPage() {
   }, []);
 
   const [docFilter, setDocFilter] = useState("");
-  const filteredDocs = docFilter.trim()
-    ? docs.filter((d) => d.filename.toLowerCase().includes(docFilter.trim().toLowerCase()))
-    : docs;
+  type DocSort =
+    | "name-asc"
+    | "name-desc"
+    | "date-newest"
+    | "date-oldest"
+    | "chunks-most"
+    | "chunks-least";
+  const [docSort, setDocSort] = useState<DocSort>("date-newest");
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<number>>(new Set());
+
+  const filteredDocs = useMemo(() => {
+    const list = docFilter.trim()
+      ? docs.filter((d) => d.filename.toLowerCase().includes(docFilter.trim().toLowerCase()))
+      : [...docs];
+
+    switch (docSort) {
+      case "name-asc":
+        list.sort((a, b) => a.filename.localeCompare(b.filename));
+        break;
+      case "name-desc":
+        list.sort((a, b) => b.filename.localeCompare(a.filename));
+        break;
+      case "date-newest":
+        list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        break;
+      case "date-oldest":
+        list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        break;
+      case "chunks-most":
+        list.sort((a, b) => b.chunk_count - a.chunk_count);
+        break;
+      case "chunks-least":
+        list.sort((a, b) => a.chunk_count - b.chunk_count);
+        break;
+    }
+    return list;
+  }, [docs, docFilter, docSort]);
 
   const [showSidebar, setShowSidebar] = useState(false);
 
@@ -309,6 +348,11 @@ export default function ChatPage() {
     if (!confirmDelete) return;
     try {
       await deleteDocument(kbIdNum, confirmDelete.id);
+      setSelectedDocIds((prev) => {
+        const next = new Set(prev);
+        next.delete(confirmDelete.id);
+        return next;
+      });
       setConfirmDelete(null);
       refreshDocs();
       toast("文档已删除", "success");
@@ -317,6 +361,36 @@ export default function ChatPage() {
       setConfirmDelete(null);
     }
   }, [kbIdNum, confirmDelete, refreshDocs]);
+
+  const toggleDocSelection = useCallback((docId: number) => {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedDocIds((prev) => {
+      if (prev.size === filteredDocs.length && filteredDocs.length > 0) return new Set();
+      return new Set(filteredDocs.map((d) => d.id));
+    });
+  }, [filteredDocs]);
+
+  const executeBatchDelete = useCallback(async () => {
+    if (selectedDocIds.size === 0) return;
+    try {
+      const result = await batchDeleteDocuments(kbIdNum, Array.from(selectedDocIds));
+      setSelectedDocIds(new Set());
+      setConfirmBatchDelete(false);
+      refreshDocs();
+      toast(`已删除 ${result.deleted_count} 篇文档`, "success");
+    } catch (err) {
+      toast(getErrorMessage(err));
+      setConfirmBatchDelete(false);
+    }
+  }, [kbIdNum, selectedDocIds, refreshDocs]);
 
   const handleCitationClick = useCallback(
     async (
@@ -341,30 +415,82 @@ export default function ChatPage() {
     [kbIdNum, extractKeywords],
   );
 
-  const uploadAndRefresh = useCallback(
+  const uploadAndPoll = useCallback(
     async (file: File) => {
-      setUploading(true);
+      const filename = file.name;
+      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+      const ALLOWED = [".txt", ".md", ".pdf"];
+      if (!ALLOWED.some((v) => ext.endsWith(v))) {
+        setUploadQueue((prev) => [
+          ...prev,
+          { filename, taskId: "", status: "error", progress: 0, error: "不支持的格式" },
+        ]);
+        return;
+      }
+
       try {
-        await uploadFile(kbIdNum, file);
-        refreshDocs();
-        toast("文件上传成功", "success");
+        const result = await uploadFileAsync(kbIdNum, file);
+        const item: (typeof uploadQueue)[number] = {
+          filename,
+          taskId: result.task_id,
+          status: result.sync ? "done" : "uploading",
+          progress: 0,
+        };
+        setUploadQueue((prev) => [...prev, item]);
+
+        if (result.sync) return; // Redis down — sync upload, already done
+
+        // Poll until done
+        const poll = setInterval(async () => {
+          try {
+            const t = await pollTask(result.task_id);
+            setUploadQueue((prev) =>
+              prev.map((q) =>
+                q.taskId === result.task_id
+                  ? {
+                      ...q,
+                      status:
+                        t.status === "failed"
+                          ? "error"
+                          : t.status === "done"
+                            ? "done"
+                            : "uploading",
+                      progress: t.progress,
+                      error: t.status === "failed" ? t.message : undefined,
+                    }
+                  : q,
+              ),
+            );
+            if (t.status === "done" || t.status === "failed") {
+              clearInterval(poll);
+            }
+          } catch {
+            clearInterval(poll);
+          }
+        }, 500);
       } catch (err) {
-        toast(getErrorMessage(err));
-      } finally {
-        setUploading(false);
+        setUploadQueue((prev) => [
+          ...prev,
+          { filename, taskId: "", status: "error", progress: 0, error: getErrorMessage(err) },
+        ]);
       }
     },
-    [kbIdNum, refreshDocs],
+    [kbIdNum],
   );
 
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      await uploadAndRefresh(file);
+      const files = Array.from(e.target.files ?? []);
+      if (files.length === 0) return;
       if (fileInputRef.current) fileInputRef.current.value = "";
+
+      for (const file of files) {
+        await uploadAndPoll(file);
+      }
+      // Final refresh once all are done
+      setTimeout(() => refreshDocs(), 2000);
     },
-    [uploadAndRefresh],
+    [uploadAndPoll, refreshDocs],
   );
 
   /* ── Drag-and-drop upload ── */
@@ -399,18 +525,15 @@ export default function ChatPage() {
       dragCounterRef.current = 0;
       setIsDragOver(false);
 
-      const file = e.dataTransfer.files?.[0];
-      if (!file) return;
+      const files = Array.from(e.dataTransfer.files ?? []);
+      if (files.length === 0) return;
 
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      if (!ext || ![".txt", ".md", ".pdf"].some((valid) => `.${ext}` === valid)) {
-        toast("仅支持 .txt、.md、.pdf 文件", "error");
-        return;
+      for (const file of files) {
+        await uploadAndPoll(file);
       }
-
-      await uploadAndRefresh(file);
+      setTimeout(() => refreshDocs(), 2000);
     },
-    [uploadAndRefresh],
+    [uploadAndPoll, refreshDocs],
   );
 
   const handleSend = useCallback(() => {
@@ -639,25 +762,64 @@ export default function ChatPage() {
           </button>
           <button
             type="button"
-            className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors disabled:opacity-50"
+            className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
             style={{
               backgroundColor: "var(--surface-bg)",
               color: "var(--text-secondary)",
               border: "var(--border-medium)",
             }}
-            disabled={uploading}
             onClick={() => fileInputRef.current?.click()}
           >
-            {uploading ? "上传中..." : "上传"}
+            上传
           </button>
           <input
             ref={fileInputRef}
             type="file"
             accept=".txt,.md,.pdf"
+            multiple
             className="hidden"
             onChange={handleFileUpload}
           />
         </div>
+
+        {/* Upload progress */}
+        {uploadQueue.length > 0 && (
+          <div className="mb-3 p-2 rounded-md" style={{ backgroundColor: "var(--surface-bg)" }}>
+            <p className="text-[10px] font-medium mb-1" style={{ color: "var(--text-muted)" }}>
+              上传进度 ({uploadQueue.filter((q) => q.status === "done").length}/{uploadQueue.length}
+              )
+            </p>
+            <div className="max-h-24 overflow-y-auto">
+              {uploadQueue.map((item, i) => (
+                <div key={i} className="flex items-center gap-1 text-[10px] py-0.5">
+                  <span
+                    style={{
+                      color:
+                        item.status === "error"
+                          ? "var(--danger)"
+                          : item.status === "done"
+                            ? "var(--accent-sage)"
+                            : "var(--text-muted)",
+                    }}
+                  >
+                    {item.status === "done" ? "✓" : item.status === "error" ? "✗" : "↑"}
+                  </span>
+                  <span className="truncate flex-1" style={{ color: "var(--text-secondary)" }}>
+                    {item.filename}
+                  </span>
+                  {item.status === "uploading" && (
+                    <span style={{ color: "var(--text-muted)" }}>{item.progress}%</span>
+                  )}
+                  {item.error && (
+                    <span className="truncate text-[9px]" style={{ color: "var(--danger)" }}>
+                      {item.error}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Sessions section */}
         <div className="pb-2 mb-2" style={{ borderBottom: "var(--border-light)" }}>
@@ -783,9 +945,9 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Doc search */}
+        {/* Doc search + sort + batch */}
         {docs.length > 0 && (
-          <div className="mb-2">
+          <div className="mb-2 space-y-1.5">
             <input
               value={docFilter}
               onChange={(e) => setDocFilter(e.target.value)}
@@ -803,6 +965,48 @@ export default function ChatPage() {
                 e.target.style.borderColor = "var(--border-color-light)";
               }}
             />
+            <select
+              value={docSort}
+              onChange={(e) => setDocSort(e.target.value as DocSort)}
+              className="w-full px-1.5 py-1 rounded text-[10px] outline-none appearance-none"
+              style={{
+                backgroundColor: "var(--surface-bg)",
+                border: "var(--border-light)",
+                color: "var(--text-secondary)",
+              }}
+              aria-label="排序方式"
+            >
+              <option value="date-newest">时间 ↓</option>
+              <option value="date-oldest">时间 ↑</option>
+              <option value="name-asc">名称 A-Z</option>
+              <option value="name-desc">名称 Z-A</option>
+              <option value="chunks-most">分块 ↓</option>
+              <option value="chunks-least">分块 ↑</option>
+            </select>
+            <div className="flex items-center justify-between">
+              <label
+                className="flex items-center gap-1 text-[10px] cursor-pointer"
+                style={{ color: "var(--text-muted)" }}
+              >
+                <input
+                  type="checkbox"
+                  className="w-3 h-3"
+                  checked={selectedDocIds.size === filteredDocs.length && filteredDocs.length > 0}
+                  onChange={toggleSelectAll}
+                />
+                全选
+              </label>
+              {selectedDocIds.size > 0 && (
+                <button
+                  type="button"
+                  className="text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors"
+                  style={{ color: "var(--danger)" }}
+                  onClick={() => setConfirmBatchDelete(true)}
+                >
+                  删({selectedDocIds.size})
+                </button>
+              )}
+            </div>
           </div>
         )}
         <div className="flex-1 overflow-y-auto -mx-4 px-4">
@@ -823,13 +1027,36 @@ export default function ChatPage() {
                 className="flex items-center justify-between py-2 text-xs group"
                 style={{ borderBottom: "var(--border-light)" }}
               >
+                <input
+                  type="checkbox"
+                  className="w-3 h-3 shrink-0 mr-1.5"
+                  checked={selectedDocIds.has(d.id)}
+                  onChange={() => toggleDocSelection(d.id)}
+                />
                 <button
                   type="button"
                   className="text-left truncate flex-1 mr-2 py-0.5 transition-colors"
-                  style={{ color: "var(--text-secondary)" }}
+                  style={{
+                    color:
+                      d.status === "failed"
+                        ? "var(--danger)"
+                        : d.status === "processing"
+                          ? "var(--accent)"
+                          : "var(--text-secondary)",
+                  }}
                   onClick={() => openEdit(d)}
                 >
                   {d.filename}
+                  {d.status === "processing" && (
+                    <span className="ml-1 text-[9px]" style={{ color: "var(--text-muted)" }}>
+                      处理中…
+                    </span>
+                  )}
+                  {d.status === "failed" && (
+                    <span className="ml-1 text-[9px]" style={{ color: "var(--danger)" }}>
+                      失败
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -1019,6 +1246,16 @@ export default function ChatPage() {
           danger
           onConfirm={executeDeleteDoc}
           onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+      {confirmBatchDelete && (
+        <ConfirmDialog
+          title="批量删除文档"
+          message={`确定删除选中的 ${selectedDocIds.size} 篇文档？此操作不可撤销。`}
+          confirmLabel="确认删除"
+          danger
+          onConfirm={executeBatchDelete}
+          onCancel={() => setConfirmBatchDelete(false)}
         />
       )}
       {confirmDeleteSession && (

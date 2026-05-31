@@ -46,3 +46,6 @@ CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "*").split(",")
 # Rate Limiting
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
 RATE_LIMIT_PERIOD = int(os.getenv("RATE_LIMIT_PERIOD", "60"))
+
+# Redis
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")

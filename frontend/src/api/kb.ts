@@ -5,6 +5,8 @@ import type {
   PaginatedResponse,
   SearchResult,
   Session,
+  TaskInfo,
+  UploadResult,
 } from "../types";
 import api from "./client";
 
@@ -107,6 +109,27 @@ export async function submitFeedback(messageId: number, feedback: boolean) {
 export async function searchMessages(kbId: number, q: string) {
   const res = await api.get<SearchResult[]>(`/kb/${kbId}/search-messages`, {
     params: { q },
+  });
+  return res.data;
+}
+
+export async function uploadFileAsync(kbId: number, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await api.post<UploadResult>(`/kb/${kbId}/upload`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+}
+
+export async function pollTask(taskId: string) {
+  const res = await api.get<TaskInfo>(`/kb/tasks/${taskId}`);
+  return res.data;
+}
+
+export async function batchDeleteDocuments(kbId: number, docIds: number[]) {
+  const res = await api.post<{ deleted_count: number }>(`/kb/${kbId}/docs/batch-delete`, {
+    doc_ids: docIds,
   });
   return res.data;
 }

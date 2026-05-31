@@ -31,6 +31,52 @@ services:
       retries: 5
       start_period: 10s
 
+  # ── Redis（消息队列 + 进度追踪）──
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── ARQ Worker（异步文档处理）──
+  worker:
+    build:
+      context: ./backend
+      target: dev
+    command: uv run arq app.core.worker.WorkerSettings
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://raguser:devpassword@db:5432/raglearn
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - chroma_data_dev:/app/chroma_db
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    working_dir: /app
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend/app
+          target: /app/app
+          ignore:
+            - "**/__pycache__/"
+            - "**/*.pyc"
+        - action: rebuild
+          path: ./backend/pyproject.toml
+        - action: rebuild
+          path: ./backend/uv.lock
+
   # ── FastAPI（uvicorn --reload 热重载）──
   backend:
     build:
@@ -124,3 +170,4 @@ services:
 volumes:
   pgdata_dev:
   chroma_data_dev:
+  redis_data_dev:

@@ -39,6 +39,64 @@ services:
           cpus: "0.5"
           memory: 256M
 
+  # ── Redis（消息队列 + 进度追踪）──
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ── ARQ Worker（异步文档处理）──
+  worker:
+    build: ./backend
+    command: uv run arq app.core.worker.WorkerSettings
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://raguser:${DB_PASSWORD:-change-me-in-production}@db:5432/raglearn
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-docker-secret-change-in-production}
+    volumes:
+      - chroma_data:/app/chroma_db
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
   # ── 后端: FastAPI + LangGraph + ChromaDB ──
   backend:
     build: ./backend
@@ -49,11 +107,14 @@ services:
     environment:
       - DB_PASSWORD=${DB_PASSWORD:-change-me-in-production}
       - DATABASE_URL=postgresql+asyncpg://raguser:${DB_PASSWORD:-change-me-in-production}@db:5432/raglearn
+      - REDIS_URL=redis://redis:6379
       - SECRET_KEY=${SECRET_KEY:-docker-secret-change-in-production}
     volumes:
       - chroma_data:/app/chroma_db
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -119,3 +180,4 @@ networks:
 volumes:
   pgdata:
   chroma_data:
+  redis_data:

@@ -123,6 +123,8 @@ class DocInfo(BaseModel):
     id: int
     filename: str
     chunk_count: int
+    status: str = "pending"
+    error_message: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -207,4 +209,23 @@ class PasswordChangeRequest(BaseModel):
         if not v.strip():
             raise ValueError("原密码不能为空")
         return v
+
+
+# ── Task / Async ──
+
+
+class TaskInfo(BaseModel):
+    task_id: str
+    status: str  # pending | chunking | embedding | storing | done | failed
+    progress: int = 0  # 0-100
+    message: str = ""
+    result: dict | None = None
+
+
+class BatchDeleteRequest(BaseModel):
+    doc_ids: list[int] = Field(min_length=1, max_length=500)
+
+
+class BatchDeleteResponse(BaseModel):
+    deleted_count: int
 

@@ -10,6 +10,7 @@ from app.api.knowledge_base import router as kb_router
 from app.api.routes import router
 from app.core.config import CORS_ALLOW_HEADERS, CORS_ALLOW_METHODS, CORS_ALLOW_ORIGINS
 from app.core.rate_limit import RateLimitMiddleware
+from app.core.redis import create_redis_pool
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,18 @@ def _run_migrations() -> None:
 async def lifespan(_app: FastAPI):
     # 启动：运行数据库迁移
     _run_migrations()
+
+    # 启动：Redis 连接池（用于入队 ARQ 任务）
+    try:
+        redis_pool = await create_redis_pool()
+        _app.state.redis = redis_pool
+        logger.info("Redis pool created")
+    except Exception:
+        logger.warning("Redis unavailable — async tasks disabled")
+        _app.state.redis = None
+
     yield
+
     # 测试环境不销毁 engine（conftest 自己管理 engine 生命周期）
     if _os.environ.get("PYTEST_RUNNING"):
         return
@@ -78,6 +90,12 @@ async def lifespan(_app: FastAPI):
 
     await async_engine.dispose()
     sync_engine.dispose()
+
+    # 关闭 Redis
+    if _app.state.redis:
+        await _app.state.redis.close()
+        logger.info("Redis pool closed")
+
     logger.info("Database engines disposed")
 
 

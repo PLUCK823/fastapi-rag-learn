@@ -7,6 +7,7 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "asyncpg>=0.30.0",
     "psycopg2-binary>=2.9.10",
+    "arq>=0.26.0,<1",
     "chromadb>=1.5.9",
     "email-validator>=2.3.0",
     "fastapi>=0.136.3",
@@ -23,6 +24,7 @@ dependencies = [
     "python-multipart>=0.0.29",
     "alembic>=1.18.4",
     "rank-bm25>=0.2.2",
+    "redis>=5,<6",
     "sentence-transformers>=5.5.1",
     "uvicorn>=0.48.0",
 ]
