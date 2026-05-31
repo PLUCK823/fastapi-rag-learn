@@ -103,7 +103,8 @@ _qdrant_client: QdrantClient | None = None
 def _get_qdrant_client() -> QdrantClient:
     global _qdrant_client
     if _qdrant_client is None:
-        _qdrant_client = QdrantClient(url=QDRANT_URL)
+        # gRPC 连接（跨版本兼容性好于 REST）
+        _qdrant_client = QdrantClient(url=QDRANT_URL, prefer_grpc=True, timeout=30)
     return _qdrant_client
 
 
@@ -114,11 +115,29 @@ def _collection_name(kb_id: int) -> str:
 def _get_kb_vectorstore(kb_id: int) -> Qdrant:
     _init_shared()
     assert _embeddings is not None
+    client = _get_qdrant_client()
+    col = _collection_name(kb_id)
+    # 自动创建集合（首次使用时）
+    if not client.collection_exists(col):
+        from qdrant_client.models import Distance, VectorParams
+
+        client.create_collection(
+            col,
+            vectors_config=VectorParams(size=_get_embedding_dim(), distance=Distance.COSINE),
+        )
     return Qdrant(
-        client=_get_qdrant_client(),
-        collection_name=_collection_name(kb_id),
+        client=client,
+        collection_name=col,
         embeddings=_embeddings,
     )
+
+
+def _get_embedding_dim() -> int:
+    """返回当前 embedding 模型的输出维度（Qwen3-Embedding-0.6B = 1024）"""
+    _init_shared()
+    assert _embeddings is not None
+    test_vec = _embeddings.embed_query("dim_test")
+    return len(test_vec)
 
 
 def get_vectorstore(kb_id: int) -> Qdrant:

@@ -59,8 +59,12 @@ class FakeRetriever:
 
 class FakeVectorStore:
     """假向量库，返回预设文档"""
-    client = MagicMock()
-    retriever = FakeRetriever()
+
+    def __init__(self):
+        self.client = MagicMock()
+        self.client.scroll.return_value = ([], None)
+        self.client.count.return_value = MagicMock(count=0)
+        self.client.get_collections.return_value = MagicMock(collections=[])
 
     def as_retriever(self, **kwargs):
         return FakeRetriever()
@@ -82,10 +86,15 @@ def mock_engine_init():
         patch.object(engine_mod, "_embeddings", FakeEmbeddings()),
         patch.object(engine_mod, "_llm", FakeLLM()),
         patch.object(engine_mod, "_initialized", True),
-        patch.object(engine_mod, "_get_kb_vectorstore", return_value=fake_vs),
-        patch.object(engine_mod, "_get_qdrant_client", return_value=fake_vs.client),
+        patch.object(
+            engine_mod, "_get_kb_vectorstore", return_value=fake_vs,
+        ),
+        patch.object(
+            engine_mod, "_get_qdrant_client", return_value=fake_vs.client,
+        ),
         patch("app.core.engine.get_vectorstore", return_value=fake_vs),
         patch("app.core.engine._scroll_all_docs", return_value=([], [], [])),
+        patch("app.core.engine._get_embedding_dim", return_value=1024),
     ):
         yield
 

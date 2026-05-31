@@ -77,10 +77,11 @@ async def kb_id(client: AsyncClient, auth_headers: dict) -> int:
     return resp.json()["id"]
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_engine():
-    """替换 engine 模块的 LLM 和 Embedding 为假实现，不加载真实模型。
-    需要测试真实 LLM/Embedding 行为时，不引入此 fixture。
+    """自动 mock engine（假 LLM + 假 Embedding + 假 Qdrant），
+    避免单元测试加载真实模型和连接外部服务。
+    需要真实行为的测试可显式 skip 此 fixture。
     """
     from tests.mocks import mock_engine_init
 
