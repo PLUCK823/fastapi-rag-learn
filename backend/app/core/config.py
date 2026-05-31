@@ -35,8 +35,8 @@ RERANKER_MODEL = "Qwen/Qwen3-Reranker-4B"
 RERANKER_TOP_K = 5  # 精排后保留的 chunk 数
 RERANKER_CANDIDATE_K = 20  # 进入精排的候选数（RRF 后取 top-N 送入 reranker）
 
-# 向量库
-CHROMA_DIR = ROOT_DIR / "chroma_db"
+# 向量库 — Qdrant（独立容器部署，gRPC 连接）
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6334")
 
 # 文本切分
 CHUNK_SIZE = 800

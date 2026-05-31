@@ -10,19 +10,20 @@ import traceback
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
-from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import ChatOpenAI
+from langchain_qdrant import Qdrant
+from qdrant_client import QdrantClient, models
 
 if TYPE_CHECKING:
     from sentence_transformers import CrossEncoder
 
 from app.core.config import (
-    CHROMA_DIR,
     EMBEDDING_MODEL,
     LLM_MODEL,
     OPENAI_BASE_URL,
+    QDRANT_URL,
     RERANKER_CANDIDATE_K,
     RERANKER_MODEL,
     RERANKER_TOP_K,
@@ -94,72 +95,93 @@ def _rerank(query: str, docs: list[Document], top_k: int) -> list[Document]:
     return [d for d, _ in ranked[:top_k]]
 
 
-def _get_kb_vectorstore(kb_id: int) -> Chroma:
+# ── Qdrant 客户端（模块级复用，避免每次创建新连接） ──
+
+_qdrant_client: QdrantClient | None = None
+
+
+def _get_qdrant_client() -> QdrantClient:
+    global _qdrant_client
+    if _qdrant_client is None:
+        _qdrant_client = QdrantClient(url=QDRANT_URL)
+    return _qdrant_client
+
+
+def _collection_name(kb_id: int) -> str:
+    return f"kb_{kb_id}"
+
+
+def _get_kb_vectorstore(kb_id: int) -> Qdrant:
     _init_shared()
     assert _embeddings is not None
-    collection_name = f"kb_{kb_id}"
-    return Chroma(
-        embedding_function=_embeddings,
-        persist_directory=str(CHROMA_DIR),
-        collection_name=collection_name,
+    return Qdrant(
+        client=_get_qdrant_client(),
+        collection_name=_collection_name(kb_id),
+        embeddings=_embeddings,
     )
 
 
-def get_vectorstore(kb_id: int) -> Chroma:
+def get_vectorstore(kb_id: int) -> Qdrant:
     return _get_kb_vectorstore(kb_id)
 
 
 def delete_collection(kb_id: int) -> None:
     """删除整个知识库的向量集合（不可逆）"""
-    vs = _get_kb_vectorstore(kb_id)
     try:
-        vs.delete_collection()
-        logger.info("Deleted ChromaDB collection for kb_id=%d", kb_id)
-    except AttributeError:
-        # Some versions of langchain_chroma don't have delete_collection
-        # Fall back to native ChromaDB client
-        try:
-            vs._collection.delete()
-            logger.info("Deleted ChromaDB collection (native) for kb_id=%d", kb_id)
-        except Exception as e:
-            logger.warning("Failed to delete collection for kb_id=%d: %s", kb_id, e)
+        _get_qdrant_client().delete_collection(_collection_name(kb_id))
+        logger.info("Deleted Qdrant collection for kb_id=%d", kb_id)
     except Exception as e:
         logger.warning("Failed to delete collection for kb_id=%d: %s", kb_id, e)
 
 
 def delete_document_chunks(kb_id: int, document_id: int) -> int:
-    """删除文档的所有向量分块，返回删除前分块数。失败时抛出异常。"""
-    vs = _get_kb_vectorstore(kb_id)
-    before = len(vs.get(where={"document_id": document_id})["ids"])
+    """删除文档的所有向量分块。失败时抛出异常。"""
+    client = _get_qdrant_client()
+    col = _collection_name(kb_id)
+
+    # 先统计数量
+    count_result = client.count(
+        col,
+        count_filter=models.Filter(
+            must=[models.FieldCondition(
+                key="metadata.document_id",
+                match=models.MatchValue(value=document_id),
+            )]
+        ),
+    )
+    before = count_result.count
     if before == 0:
-        logger.info("No chunks to delete for kb_id=%d doc_id=%d", kb_id, document_id)
         return 0
 
-    try:
-        vs.delete(where={"document_id": document_id})
-    except Exception as e:
-        # LangChain wrapper delete failed — try native ChromaDB client
-        logger.warning(
-            "LangChain delete failed for kb_id=%d doc_id=%d (%s), trying native client",
-            kb_id, document_id, e,
-        )
-        try:
-            vs._collection.delete(where={"document_id": document_id})
-        except Exception as e2:
-            raise RuntimeError(
-                f"Failed to delete chunks for doc_id={document_id} in kb_id={kb_id}: {e2}"
-            ) from e2
+    # 按 metadata filter 删除
+    client.delete(
+        col,
+        points_selector=models.FilterSelector(
+            filter=models.Filter(
+                must=[models.FieldCondition(
+                    key="metadata.document_id",
+                    match=models.MatchValue(value=document_id),
+                )]
+            )
+        ),
+    )
 
-    # Verify deletion
-    after = len(vs.get(where={"document_id": document_id})["ids"])
+    # 验证
+    after = client.count(
+        col,
+        count_filter=models.Filter(
+            must=[models.FieldCondition(
+                key="metadata.document_id",
+                match=models.MatchValue(value=document_id),
+            )]
+        ),
+    ).count
     if after > 0:
         raise RuntimeError(
             f"Deletion incomplete: {after} chunks remain for doc_id={document_id} in kb_id={kb_id}"
         )
 
-    logger.info(
-        "Deleted %d chunks for kb_id=%d doc_id=%d", before, kb_id, document_id,
-    )
+    logger.info("Deleted %d chunks for kb_id=%d doc_id=%d", before, kb_id, document_id)
     return before
 
 
@@ -286,36 +308,59 @@ def _execute_code_blocks(text: str) -> str:
 
 # ── 检索 ──
 
+def _scroll_all_docs(kb_id: int) -> tuple[list[str], list[str], list[dict]]:
+    """从 Qdrant scroll 获取集合中全部文档（用于 BM25 索引）"""
+    client = _get_qdrant_client()
+    col = _collection_name(kb_id)
+    ids: list[str] = []
+    docs: list[str] = []
+    metas: list[dict] = []
+
+    offset: str | int | None = None
+    while True:
+        points, next_offset = client.scroll(
+            col, limit=1000, offset=offset, with_payload=True, with_vectors=False,
+        )
+        if not points:
+            break
+        for p in points:
+            ids.append(str(p.id))
+            payload = p.payload or {}
+            docs.append(payload.get("page_content", "") or "")
+            metas.append(payload.get("metadata", {}) or {})
+        offset = next_offset  # type: ignore[assignment]
+        if not next_offset:
+            break
+    return ids, docs, metas
+
+
 def _keyword_search(
     question: str, kb_id: int, exclude_ids: set[str], k: int = 3
 ) -> list[Document]:
-    """BM25 关键词检索：TF-IDF 评分，远优于简单关键词计数"""
+    """BM25 关键词检索"""
     from rank_bm25 import BM25Okapi
 
-    vs = _get_kb_vectorstore(kb_id)
     keywords = _extract_keywords(question)
     if not keywords:
         return []
 
     try:
-        raw = vs._collection.get(include=["documents", "metadatas"])
+        ids, docs_raw, metadatas = _scroll_all_docs(kb_id)
     except Exception:
         return []
 
-    ids = raw.get("ids", []) or []
-    docs_raw = raw.get("documents", []) or []
-    metadatas = raw.get("metadatas", []) or []
+    if not docs_raw:
+        return []
 
     # 构建 BM25 语料库
     corpus: list[list[str]] = []
-    index_map: list[int] = []  # corpus_idx → original_idx
+    index_map: list[int] = []
     for i, chunk_id in enumerate(ids):
         if chunk_id in exclude_ids:
             continue
         text = docs_raw[i] if isinstance(docs_raw[i], str) else ""
         if not text.strip():
             continue
-        # jieba 分词
         tokens = _extract_keywords(text)
         if not tokens:
             continue
@@ -325,11 +370,9 @@ def _keyword_search(
     if not corpus:
         return []
 
-    # BM25 检索
     bm25 = BM25Okapi(corpus)
     scores = bm25.get_scores(keywords)
 
-    # 取 top-k
     ranked = sorted(
         [(scores[j], index_map[j]) for j in range(len(scores))],
         key=lambda x: x[0],
@@ -436,15 +479,28 @@ def ask(
 # ── 文档内容 ──
 
 def get_document_content(kb_id: int, document_id: int) -> str:
-    vs = _get_kb_vectorstore(kb_id)
-    raw = vs._collection.get(where={"document_id": document_id})
-    if not raw["documents"]:
-        return ""
-    metadatas: list = raw["metadatas"] or []
-    pairs = sorted(
-        zip(metadatas, raw["documents"]),
-        key=lambda x: int(x[0].get("chunk_index", 0)) if x[0] else 0,
+    """从 Qdrant 重建文档内容（按 chunk_index 排序合并）"""
+    client = _get_qdrant_client()
+    col = _collection_name(kb_id)
+    points, _ = client.scroll(
+        col,
+        scroll_filter=models.Filter(
+            must=[models.FieldCondition(
+                key="metadata.document_id",
+                match=models.MatchValue(value=document_id),
+            )]
+        ),
+        with_payload=True,
     )
+    if not points:
+        return ""
+    pairs = []
+    for p in points:
+        meta = (p.payload or {}).get("metadata", {})
+        text = (p.payload or {}).get("page_content", "")
+        chunk_idx = meta.get("chunk_index", 0) if isinstance(meta, dict) else 0
+        pairs.append((chunk_idx, text))
+    pairs.sort(key=lambda x: x[0])
     return "\n\n".join(p[1] for p in pairs)
 
 

@@ -45,6 +45,23 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── Qdrant 向量数据库 ──
+  qdrant:
+    image: qdrant/qdrant:v1.14.0
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data_dev:/qdrant/storage
+    environment:
+      - QDRANT__TELEMETRY__DISABLED=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
   # ── ARQ Worker（异步文档处理）──
   worker:
     build:
@@ -56,12 +73,13 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://raguser:devpassword@db:5432/raglearn
       - REDIS_URL=redis://redis:6379
-    volumes:
-      - chroma_data_dev:/app/chroma_db
+      - QDRANT_URL=http://qdrant:6334
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
     working_dir: /app
     develop:
@@ -90,10 +108,11 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://raguser:devpassword@db:5432/raglearn
       - SECRET_KEY=dev-secret-key-not-for-production
-    volumes:
-      - chroma_data_dev:/app/chroma_db
+      - QDRANT_URL=http://qdrant:6334
     depends_on:
       db:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
     working_dir: /app
     develop:
@@ -169,5 +188,5 @@ services:
 
 volumes:
   pgdata_dev:
-  chroma_data_dev:
+  qdrant_data_dev:
   redis_data_dev:

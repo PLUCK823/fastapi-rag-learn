@@ -63,6 +63,35 @@ services:
           cpus: "0.5"
           memory: 256M
 
+  # ── Qdrant 向量数据库 ──
+  qdrant:
+    image: qdrant/qdrant:v1.14.0
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__TELEMETRY__DISABLED=true
+    restart: unless-stopped
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
   # ── ARQ Worker（异步文档处理）──
   worker:
     build: ./backend
@@ -72,13 +101,14 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://raguser:${DB_PASSWORD:-change-me-in-production}@db:5432/raglearn
       - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6334
       - SECRET_KEY=${SECRET_KEY:-docker-secret-change-in-production}
-    volumes:
-      - chroma_data:/app/chroma_db
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -97,7 +127,7 @@ services:
           cpus: "0.5"
           memory: 512M
 
-  # ── 后端: FastAPI + LangGraph + ChromaDB ──
+  # ── 后端: FastAPI + LangGraph + RAG ──
   backend:
     build: ./backend
     ports:
@@ -108,13 +138,14 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-change-me-in-production}
       - DATABASE_URL=postgresql+asyncpg://raguser:${DB_PASSWORD:-change-me-in-production}@db:5432/raglearn
       - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6334
       - SECRET_KEY=${SECRET_KEY:-docker-secret-change-in-production}
-    volumes:
-      - chroma_data:/app/chroma_db
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -179,5 +210,5 @@ networks:
 
 volumes:
   pgdata:
-  chroma_data:
+  qdrant_data:
   redis_data:

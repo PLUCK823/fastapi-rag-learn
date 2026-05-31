@@ -420,32 +420,44 @@ def _ingest_to_kb(content: str, filename: str, kb_id: int, doc_id: int) -> int:
         chunk.metadata["chunk_index"] = i
 
     vs = get_vectorstore(kb_id)
-    chunk_ids = [f"{doc_id}_{i}" for i in range(len(all_chunks))]
+    # 确定性整数 ID：doc_id * 1e6 + chunk_index，确保唯一且支持 Qdrant uint64
+    id_mult = 1_000_000
+    chunk_ids = [doc_id * id_mult + i for i in range(len(all_chunks))]
 
-    # 生成嵌入 + upsert（原子操作，同 ID 自动覆盖）
-    texts = [c.page_content for c in all_chunks]
-    metadatas = [c.metadata for c in all_chunks]
-    embed_fn = vs._embedding_function
-    if embed_fn is None:
-        raise RuntimeError("ChromaDB embedding function is not initialized")
-    embeddings = embed_fn.embed_documents(texts)
-    vs._collection.upsert(
-        ids=chunk_ids,
-        embeddings=embeddings,  # type: ignore
-        documents=texts,
-        metadatas=metadatas,  # type: ignore
-    )
+    # Qdrant add_documents(ids=...) — 同 ID 自动覆盖（upsert 语义）
+    vs.add_documents(all_chunks, ids=chunk_ids)
 
-    # 清理上一版本残留的旧 chunk（chunk 数从 7→5 时，索引 5、6 变孤儿）
+    # 清理上一版本残留的旧 chunk（chunk 数减少时）
     try:
-        existing = vs._collection.get(
-            where={"document_id": doc_id},
-            include=[],
-        )
+        from qdrant_client import models as qdrant_models
+
+        client = vs.client
+        col = f"kb_{kb_id}"
         current_ids = set(chunk_ids)
-        stale_ids = [rid for rid in existing["ids"] if rid not in current_ids]
+        stale_ids = []
+
+        offset: int | str | None = None
+        while True:
+            pts, nxt = client.scroll(
+                col, limit=1000, offset=offset,
+                with_payload=False, with_vectors=False,
+            )
+            if not pts:
+                break
+            for p in pts:
+                pid = int(p.id) if not isinstance(p.id, str) else 0
+                if pid >= doc_id * id_mult and pid < (doc_id + 1) * id_mult:
+                    if pid not in current_ids:
+                        stale_ids.append(pid)
+            offset = nxt  # type: ignore[assignment]
+            if not nxt:
+                break
+
         if stale_ids:
-            vs._collection.delete(ids=stale_ids)
+            client.delete(
+                col,
+                points_selector=qdrant_models.PointIdsList(points=stale_ids),  # type: ignore[arg-type]
+            )
             _logger.info("Cleaned %d stale chunks for doc %d", len(stale_ids), doc_id)
     except Exception:
         _logger.warning("Failed to clean stale chunks for doc %d", doc_id, exc_info=True)
