@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, desc, func
 from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
@@ -167,9 +167,9 @@ async def upload_document(
     file: UploadFile = File(...),
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
-    request: Request | None = None,
 ):
     """上传文件（txt / md / pdf）— 返回 task_id，后台异步处理"""
+
     content = _parse_upload(file)
     filename = file.filename or "untitled"
 
@@ -191,41 +191,51 @@ async def upload_document(
 
     # 入队 ARQ 后台任务
     task_id = str(uuid4())
-    redis = getattr(request.app.state, "redis", None) if request else None
-    if redis:
+    # Access app state without using FastAPI's request parameter injection
+    try:
+        import app.main as _main_mod
         from app.core.redis import update_task_progress
 
-        await update_task_progress(redis, task_id, "pending", 0, "排队中…")
-        await redis.enqueue_job(
-            "ingest_document",
-            kb_id=kb_id,
-            user_id=user.id,
-            content=content,
-            filename=filename,
-            _job_id=task_id,
-        )
-    else:
-        # Redis 不可用时的降级：同步处理
-        doc = kb_service.add_document(session, kb_id, user.id, content, filename)
-        return {"doc_id": doc.id, "task_id": task_id, "status": "ready", "sync": True}
+        app_instance = _main_mod.app
+        redis = getattr(app_instance.state, "redis", None)
+        if redis:
+            await update_task_progress(redis, task_id, "pending", 0, "排队中…")
+            await redis.enqueue_job(
+                "ingest_document",
+                kb_id=kb_id,
+                user_id=user.id,
+                content=content,
+                filename=filename,
+                _job_id=task_id,
+            )
+            return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
+    except Exception:
+        pass  # Redis unavailable — fall through to sync
 
-    return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
+    # Redis 不可用时的降级：同步处理
+    doc = kb_service.add_document(session, kb_id, user.id, content, filename)
+    return {"doc_id": doc.id, "task_id": task_id, "status": "ready", "sync": True}
 
 
-@router.get("/tasks/{task_id}", response_model=TaskInfo)
-async def poll_task(task_id: str, request: Request):
+@router.get("/tasks/{task_id}")
+async def poll_task(task_id: str):
     """轮询异步任务进度"""
-    redis = getattr(request.app.state, "redis", None)
-    if not redis:
-        return TaskInfo(task_id=task_id, status="done", progress=100, message="ok")
+    try:
+        import app.main as _main_mod
 
-    data = await get_task_status(redis, task_id)
-    return TaskInfo(
-        task_id=task_id,
-        status=data.get("status", "unknown"),
-        progress=int(data.get("progress", "0")),
-        message=data.get("message", ""),
-    )
+        app_instance = _main_mod.app
+        redis = getattr(app_instance.state, "redis", None)
+        if redis:
+            data = await get_task_status(redis, task_id)
+            return TaskInfo(
+                task_id=task_id,
+                status=data.get("status", "unknown"),
+                progress=int(data.get("progress", "0")),
+                message=data.get("message", ""),
+            )
+    except Exception:
+        pass
+    return TaskInfo(task_id=task_id, status="done", progress=100, message="ok")
 
 
 @router.post("/{kb_id}/docs/batch-delete", response_model=BatchDeleteResponse)
