@@ -1,6 +1,5 @@
 """知识库 + 文档管理路由（同步，避免 greenlet）"""
 
-from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
@@ -168,7 +167,7 @@ async def upload_document(
     file: UploadFile = File(...),
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
-    request: Optional[Request] = None,
+    request: Request | None = None,
 ):
     """上传文件（txt / md / pdf）— 返回 task_id，后台异步处理"""
     content = _parse_upload(file)
