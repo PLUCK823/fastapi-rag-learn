@@ -35,7 +35,49 @@ from app.services import knowledge_base as kb_service
 router = APIRouter(prefix="/kb", tags=["knowledge_base"])
 
 # 支持的文件类型
-_ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf"}
+_ALLOWED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+
+# Docling converter 单例（懒加载，避免首次启动开销）
+_docling_converter = None
+
+
+def _get_docling_converter():
+    """获取 Docling converter（首次调用时加载模型）"""
+    global _docling_converter
+    if _docling_converter is None:
+        import os
+
+        # macOS MPS 不兼容 float64，强制 CPU
+        os.environ.setdefault("DOCLING_DEVICE", "cpu")
+        from docling.document_converter import DocumentConverter
+
+        _docling_converter = DocumentConverter()
+    return _docling_converter
+
+
+def _parse_with_docling(raw: bytes, suffix: str) -> str:
+    """用 Docling 解析 PDF/DOCX → Markdown（保留表格 + 阅读顺序 + 标题层级）"""
+    import os
+    import tempfile
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(raw)
+            tmp_path = tmp.name
+
+        try:
+            converter = _get_docling_converter()
+            result = converter.convert(tmp_path)
+            text = result.document.export_to_markdown()
+            if not text.strip():
+                raise HTTPException(status_code=400, detail="PDF 文件中没有可提取的文字")
+            return text.strip()
+        finally:
+            os.unlink(tmp_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"PDF 解析失败: {e}")
 
 
 def _parse_upload(file: UploadFile) -> str:
@@ -50,30 +92,16 @@ def _parse_upload(file: UploadFile) -> str:
             detail=f"不支持的文件类型，仅支持: {', '.join(sorted(_ALLOWED_EXTENSIONS))}",
         )
 
+    # PDF / DOCX 二进制文件 → Docling
+    if ext.endswith(".pdf") or ext.endswith(".docx"):
+        suffix = ext  # e.g. ".pdf", ".docx"
+        return _parse_with_docling(raw, suffix)
+
+    # txt / md → UTF-8 文本
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="文件编码不是 UTF-8，请转换后上传")
-
-    if ext.endswith(".pdf"):
-        try:
-            from io import BytesIO
-
-            from pypdf import PdfReader
-
-            reader = PdfReader(BytesIO(raw))
-            pages: list[str] = []
-            for page in reader.pages:
-                t = page.extract_text()
-                if t:
-                    pages.append(t)
-            text = "\n\n".join(pages)
-            if not text.strip():
-                raise HTTPException(status_code=400, detail="PDF 文件中没有可提取的文字")
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"PDF 解析失败: {e}")
 
     return text.strip()
 

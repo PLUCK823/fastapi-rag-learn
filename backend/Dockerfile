@@ -7,9 +7,11 @@ COPY --from=ghcr.io/astral-sh/uv:0.7.21 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# 安装系统依赖（sentence-transformers 需要）
+# 安装系统依赖（sentence-transformers + Docling/OpenCV 需要）
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc g++ && \
+    apt-get install -y --no-install-recommends \
+    gcc g++ \
+    libxcb1 libx11-6 libgl1-mesa-glx libglib2.0-0 libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 # 装 Python 依赖（利用 BuildKit cache mount 加速）
@@ -43,9 +45,11 @@ FROM python:3.12.10-slim-bookworm AS runtime
 
 WORKDIR /app
 
-# 安装 curl（HEALTHCHECK 需要）
+# 安装 curl（HEALTHCHECK 需要）+ Docling/OpenCV 系统依赖
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    libxcb1 libx11-6 libgl1-mesa-glx libglib2.0-0 libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 # 创建非 root 用户

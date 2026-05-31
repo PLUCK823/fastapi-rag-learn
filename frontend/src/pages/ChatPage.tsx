@@ -419,7 +419,7 @@ export default function ChatPage() {
     async (file: File) => {
       const filename = file.name;
       const ext = `.${filename.split(".").pop()?.toLowerCase() ?? ""}`;
-      const ALLOWED = [".txt", ".md", ".pdf"];
+      const ALLOWED = [".txt", ".md", ".pdf", ".docx"];
       if (!ALLOWED.includes(ext)) {
         setUploadQueue((prev) => [
           ...prev,
@@ -721,7 +721,7 @@ export default function ChatPage() {
               释放文件以上传
             </p>
             <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-              支持 .txt、.md、.pdf
+              支持 .txt、.md、.pdf、.docx
             </p>
           </div>
         </div>
@@ -775,7 +775,7 @@ export default function ChatPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".txt,.md,.pdf"
+            accept=".txt,.md,.pdf,.docx"
             multiple
             className="hidden"
             onChange={handleFileUpload}

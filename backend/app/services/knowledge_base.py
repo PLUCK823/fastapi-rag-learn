@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from langchain_core.documents import Document as LCDocument
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,13 +13,18 @@ from app.core.config import CHUNK_OVERLAP, CHUNK_SIZE
 from app.core.engine import delete_collection, delete_document_chunks, get_vectorstore
 from app.models.knowledge_base import Document, KnowledgeBase
 
-# 表格检测正则（markdown table: header line + separator line + at least one row）
+# Markdown 表格检测（保护表格不被切分）
 _TABLE_RE = re.compile(
     r"(\|.+\|\s*\n\|[-| :]+\|\s*\n(?:\|.+\|\s*\n?)+)", re.MULTILINE
 )
 
-# Markdown 标题检测（用于上下文富化）
-_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
+# MarkdownHeaderTextSplitter 切分层级
+_HEADERS_TO_SPLIT = [
+    ("#", "h1"),
+    ("##", "h2"),
+    ("###", "h3"),
+    ("####", "h4"),
+]
 
 
 def _splitter() -> RecursiveCharacterTextSplitter:
@@ -37,6 +42,125 @@ def _splitter() -> RecursiveCharacterTextSplitter:
             " ",
         ],
     )
+
+
+def _build_context(filename: str, metadata: dict) -> str:
+    """从 MarkdownHeaderTextSplitter 的 header metadata 构建上下文前缀"""
+    ctx = f"文档: {filename}"
+    headers = []
+    for level in ["h1", "h2", "h3", "h4"]:
+        h = metadata.get(level)
+        if h:
+            headers.append(h)
+    if headers:
+        ctx += "\n章节: " + " > ".join(headers)
+    return ctx
+
+
+def _extract_tables(content: str) -> tuple[str, list[str]]:
+    """提取 Markdown 表格，返回 (去表后的文本, 表格列表)"""
+    tables: list[str] = []
+
+    def _repl(m: re.Match) -> str:
+        tables.append(m.group(1))
+        return f"\n\n[表格 {len(tables)}]\n\n"
+
+    remaining = _TABLE_RE.sub(_repl, content)
+    return remaining, tables
+
+
+def _split_oversized(
+    content: str, filename: str, ctx: str, base_metadata: dict
+) -> list[LCDocument]:
+    """对超长 section 二次切分（先保护表格，再字符级切分）"""
+    remaining, tables = _extract_tables(content)
+
+    sub_chunks = _splitter().split_documents(
+        [LCDocument(page_content=remaining, metadata={"source": filename})]
+    )
+
+    result: list[LCDocument] = []
+    for sc in sub_chunks:
+        sc.page_content = f"{ctx}\n\n{sc.page_content}"
+        sc.metadata.update(base_metadata)
+        result.append(sc)
+
+    # 每个表格作为独立 chunk（保持完整不切分）
+    for t_idx, table_text in enumerate(tables):
+        result.append(
+            LCDocument(
+                page_content=f"{ctx}\n\n{table_text.strip()}",
+                metadata={
+                    **base_metadata,
+                    "source": filename,
+                    "is_table": True,
+                    "table_index": t_idx,
+                },
+            )
+        )
+
+    return result
+
+
+def _split_content(content: str, filename: str) -> list[LCDocument]:
+    """切分文档内容：优先 Markdown 标题感知切分，纯文本 fallback 到字符级"""
+
+    # 1. 尝试 Markdown 标题感知切分
+    md_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=_HEADERS_TO_SPLIT,
+        strip_headers=False,
+    )
+    md_chunks = md_splitter.split_text(content)
+
+    # 检测是否有实际标题层级（无标题时 splitter 返回一个整块且无 header metadata）
+    has_headers = any(
+        k in chunk.metadata
+        for chunk in md_chunks
+        for k in ["h1", "h2", "h3", "h4"]
+    )
+
+    # 2. 无标题 → 纯文本 fallback
+    if not has_headers:
+        remaining, tables = _extract_tables(content)
+        chunks = _splitter().split_documents(
+            [LCDocument(page_content=remaining, metadata={"source": filename})]
+        )
+        # 上下文富化
+        for chunk in chunks:
+            chunk.page_content = f"文档: {filename}\n\n{chunk.page_content}"
+        # 表格独立 chunks
+        for t_idx, table_text in enumerate(tables):
+            chunks.append(
+                LCDocument(
+                    page_content=f"文档: {filename}\n\n{table_text.strip()}",
+                    metadata={
+                        "source": filename,
+                        "is_table": True,
+                        "table_index": t_idx,
+                    },
+                )
+            )
+        return chunks
+
+    # 3. 标题感知 → 每个 section 作为独立切分单元
+    result: list[LCDocument] = []
+    for chunk in md_chunks:
+        ctx = _build_context(filename, chunk.metadata)
+
+        if len(chunk.page_content) <= CHUNK_SIZE:
+            # 大小合适，直接加入
+            chunk.page_content = f"{ctx}\n\n{chunk.page_content}"
+            chunk.metadata["source"] = filename
+            result.append(chunk)
+        else:
+            # 超长 section → 二次切分（保护表格）
+            result.extend(
+                _split_oversized(
+                    chunk.page_content, filename, ctx, chunk.metadata
+                )
+            )
+
+    return result
 
 
 # ── KB CRUD ──
@@ -287,70 +411,11 @@ def delete_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> 
 # ── Internal ──
 
 def _ingest_to_kb(content: str, filename: str, kb_id: int, doc_id: int) -> int:
-    """将文档内容向量化存入 ChromaDB，带上下文富化 + 表格保留"""
-    # 0. 提取所有 markdown 标题，构建位置→标题映射
-    heading_map: dict[int, str] = {}  # char_pos → heading text
-    for m in _HEADING_RE.finditer(content):
-        heading_map[m.start()] = m.group(2).strip()
-
-    def _get_context(char_pos: int) -> str:
-        """获取指定字符位置所属的最近标题"""
-        ctx = f"文档: {filename}"
-        prev = ""
-        for pos, heading in sorted(heading_map.items()):
-            if pos < char_pos:
-                prev = heading
-            else:
-                break
-        if prev:
-            ctx += f"\n章节: {prev}"
-        return ctx
-
-    # 1. 提取 markdown 表格（保持表格完整性，不切分）
-    tables: list[tuple[str, int]] = []  # (table_text, position)
-
-    def _extract(m: re.Match) -> str:
-        tables.append((m.group(1), m.start()))
-        return f"\n\n[表格 {len(tables)}]\n\n"
-
-    remaining = _TABLE_RE.sub(_extract, content)
-
-    # 2. 表格各自作为一个独立 chunk，并附上上下文
-    table_chunks: list[LCDocument] = []
-    for t_idx, (table_text, pos) in enumerate(tables):
-        ctx = _get_context(pos)
-        enriched = f"{ctx}\n\n{table_text.strip()}"
-        table_chunks.append(LCDocument(
-            page_content=enriched,
-            metadata={
-                "source": filename,
-                "is_table": True,
-                "table_index": t_idx,
-            },
-        ))
-
-    # 3. 剩余文本用 splitter 切分 + 上下文富化
-    raw_chunks = _splitter().split_documents(
-        [LCDocument(page_content=remaining, metadata={"source": filename})]
-    )
-
-    # 为每个 chunk 查找原始文档中的位置并添加上下文
-    text_chunks: list[LCDocument] = []
-    search_start = 0
-    for rc in raw_chunks:
-        # 在 remaining 文本中定位此 chunk（取前 80 字符做匹配）
-        snippet = rc.page_content[:80].strip()
-        pos = content.find(snippet, search_start)
-        if pos < 0:
-            pos = search_start  # fallback
-        else:
-            search_start = pos + len(snippet)
-        ctx = _get_context(pos)
-        rc.page_content = f"{ctx}\n\n{rc.page_content}"
-        text_chunks.append(rc)
-
-    # 4. 合并所有 chunk
-    all_chunks = text_chunks + table_chunks
+    """文档向量化存入 ChromaDB
+    优先 Markdown 标题感知切分（保留章节语义），
+    纯文本 fallback 到中文优化的字符级切分。
+    """
+    all_chunks = _split_content(content, filename)
 
     for i, chunk in enumerate(all_chunks):
         chunk.metadata["kb_id"] = kb_id

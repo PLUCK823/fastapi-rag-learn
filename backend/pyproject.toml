@@ -20,13 +20,13 @@ dependencies = [
     "langchain-openai>=1.2.2",
     "langchain-text-splitters>=1.1.2",
     "langgraph>=1.2.2",
-    "pypdf>=6.12.2",
     "python-multipart>=0.0.29",
     "alembic>=1.18.4",
     "rank-bm25>=0.2.2",
     "redis>=5,<6",
     "sentence-transformers>=5.5.1",
     "uvicorn>=0.48.0",
+    "docling>=2.96.0",
 ]
 
 [dependency-groups]
