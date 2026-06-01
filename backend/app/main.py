@@ -72,6 +72,7 @@ async def lifespan(_app: FastAPI):
     _run_migrations()
 
     # 启动：Redis 连接池（用于入队 ARQ 任务）
+    logger.info("Lifespan: attempting Redis connection...")
     try:
         redis_pool = await create_redis_pool()
         _app.state.redis = redis_pool
@@ -79,6 +80,7 @@ async def lifespan(_app: FastAPI):
     except Exception:
         logger.warning("Redis unavailable — async tasks disabled")
         _app.state.redis = None
+    logger.info("Lifespan: startup complete")
 
     yield
 
