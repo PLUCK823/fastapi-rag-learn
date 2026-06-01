@@ -43,7 +43,7 @@ function CodeBlockWithCopy({ raw, children }: { raw: string; children: React.Rea
     <div className="relative group my-2">
       <button
         type="button"
-        className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded text-[10px] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
         style={{ backgroundColor: "var(--on-ink-subtle)", color: "var(--on-ink-muted)" }}
         onClick={handleCopy}
         aria-label={copied ? "已复制" : "复制代码"}
@@ -92,7 +92,7 @@ interface ChatMessageProps {
   isStreaming?: boolean;
 }
 
-export default function ChatMessage({
+const ChatMessage = React.memo(function ChatMessage({
   msg,
   citationKeywords = [],
   onCitationClick,
@@ -375,7 +375,7 @@ export default function ChatMessage({
           {isUser && onEditMessage && !isStreaming && !editing && (
             <button
               type="button"
-              className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity px-1 py-0.5 rounded"
+              className="text-[10px] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity px-1 py-0.5 rounded"
               style={{ color: "var(--text-muted)" }}
               onClick={() => {
                 setEditText(msg.content);
@@ -389,7 +389,7 @@ export default function ChatMessage({
           {!isUser && onRegenerate && !isStreaming && !msg.isStreaming && (
             <button
               type="button"
-              className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity px-1 py-0.5 rounded"
+              className="text-[10px] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity px-1 py-0.5 rounded"
               style={{ color: "var(--text-muted)" }}
               onClick={() => onRegenerate(msgIndex)}
               title="重新生成回答"
@@ -398,7 +398,7 @@ export default function ChatMessage({
             </button>
           )}
           {!isUser && typeof msg.id === "number" && msg.id > 0 && (
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
               <button
                 type="button"
                 className="p-0.5 rounded transition-colors"
@@ -447,4 +447,6 @@ export default function ChatMessage({
       </div>
     </div>
   );
-}
+});
+
+export default ChatMessage;

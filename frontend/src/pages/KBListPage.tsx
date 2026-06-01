@@ -153,6 +153,7 @@ export default function KBListPage() {
             if (e.key === "Enter") handleCreate();
           }}
           placeholder="输入知识库名称…"
+          maxLength={255}
           className="flex-1 px-4 py-2.5 rounded-lg text-sm outline-none transition-colors"
           style={{
             backgroundColor: "var(--surface-card)",

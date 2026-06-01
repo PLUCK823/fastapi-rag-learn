@@ -80,7 +80,7 @@ export default function Skeleton({
 
   // text: multiple lines
   return (
-    <div className={className}>
+    <output className={className} aria-label="加载中" aria-busy="true">
       {Array.from({ length: lines }).map((_, i) => (
         <SkeletonLine
           key={`sk-${i}`}
@@ -88,7 +88,7 @@ export default function Skeleton({
           last={i === lines - 1}
         />
       ))}
-    </div>
+    </output>
   );
 }
 

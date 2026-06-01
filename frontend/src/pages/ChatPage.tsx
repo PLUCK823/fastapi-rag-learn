@@ -102,6 +102,7 @@ export default function ChatPage() {
   } = useChatWS(kbIdNum, activeSessionId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollIntervalsRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editDoc, setEditDoc] = useState<Document | null>(null);
@@ -193,6 +194,16 @@ export default function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 组件卸载时清理所有上传轮询 interval
+  useEffect(() => {
+    return () => {
+      for (const id of pollIntervalsRef.current) {
+        clearInterval(id);
+      }
+      pollIntervalsRef.current.clear();
+    };
+  }, []);
 
   // Compute KB stats from loaded data
   const kbStats = {
@@ -449,7 +460,7 @@ export default function ChatPage() {
 
         if (result.sync) return; // Redis down — sync upload, already done
 
-        // Poll until done
+        // Poll until done (tracked for cleanup on unmount)
         const poll = setInterval(async () => {
           try {
             const t = await pollTask(result.task_id);
@@ -472,11 +483,14 @@ export default function ChatPage() {
             );
             if (t.status === "done" || t.status === "failed") {
               clearInterval(poll);
+              pollIntervalsRef.current.delete(poll);
             }
           } catch {
             clearInterval(poll);
+            pollIntervalsRef.current.delete(poll);
           }
         }, 500);
+        pollIntervalsRef.current.add(poll);
       } catch (err) {
         setUploadQueue((prev) => [
           ...prev,
@@ -938,7 +952,7 @@ export default function ChatPage() {
                     </button>
                     <button
                       type="button"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-[10px]"
+                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-[10px]"
                       style={{ color: "var(--text-muted)" }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1069,7 +1083,7 @@ export default function ChatPage() {
                 </button>
                 <button
                   type="button"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-xs"
+                  className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-xs"
                   style={{ color: "var(--text-muted)" }}
                   onClick={() => handleDeleteDoc(d)}
                 >
