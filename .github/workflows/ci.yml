@@ -167,7 +167,7 @@ jobs:
         env:
           SECRET_KEY: ci-test-secret-key-at-least-32-bytes
           DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn_test
-          REDIS_URL: redis://localhost:6379
+          REDIS_URL: redis://localhost:6379?socket_connect_timeout=2
           RAG_TEST_MODE: "1"
           OPENAI_API_KEY: test
           OPENAI_BASE_URL: http://127.0.0.1

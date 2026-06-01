@@ -13,7 +13,12 @@ TASK_EXPIRE = 3600
 
 
 async def create_redis_pool() -> ArqRedis | None:
-    """创建 ARQ Redis 连接池（用于入队任务）"""
+    """创建 ARQ Redis 连接池（用于入队任务）
+
+    如果 Redis 不可用，返回 None（优雅降级，不阻塞应用启动）。
+    """
+    import asyncio
+
     url = REDIS_URL.replace("redis://", "")
     if ":" in url:
         host, port_str = url.split(":", 1)
@@ -22,11 +27,13 @@ async def create_redis_pool() -> ArqRedis | None:
         host = url
         port = 6379
     try:
-        pool = await create_pool(
-            RedisSettings(host=host, port=port, conn_timeout=2, conn_retries=0)
+        pool = await asyncio.wait_for(
+            create_pool(
+                RedisSettings(host=host, port=port, conn_timeout=2, conn_retries=0)
+            ),
+            timeout=3.0,
         )
-        # Verify real connectivity (ARQ pools are created lazily)
-        await pool.ping()
+        await asyncio.wait_for(pool.ping(), timeout=2.0)
         return pool
     except Exception:
         return None  # Redis unavailable — graceful degradation
