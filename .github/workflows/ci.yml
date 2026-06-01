@@ -163,6 +163,7 @@ jobs:
         working-directory: backend
         run: uv run alembic upgrade head
         env:
+          SECRET_KEY: ci-test-secret-key-at-least-32-bytes
           DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn_test
 
       - name: Start backend
