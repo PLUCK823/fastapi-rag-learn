@@ -66,6 +66,7 @@ jobs:
       - name: Unit tests (pytest)
         run: uv run pytest tests/ -v
         env:
+          SECRET_KEY: ci-test-secret-key-at-least-32-bytes
           DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn_test
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
@@ -165,8 +166,9 @@ jobs:
           SECRET_KEY: ci-test-secret-key-at-least-32-bytes
           DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn_test
           REDIS_URL: redis://localhost:6379
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          RAG_TEST_MODE: "1"
+          OPENAI_API_KEY: test
+          OPENAI_BASE_URL: http://127.0.0.1
 
       - name: Start frontend
         working-directory: frontend
@@ -178,11 +180,13 @@ jobs:
             if curl -s http://127.0.0.1:8000/health > /dev/null 2>&1 && \
                curl -s http://127.0.0.1:5173 > /dev/null 2>&1; then
               echo "Servers ready"
-              break
+              exit 0
             fi
             echo "Waiting... ($i)"
             sleep 2
           done
+          echo "Servers failed to become ready"
+          exit 1
 
       - name: Run E2E tests
         working-directory: frontend

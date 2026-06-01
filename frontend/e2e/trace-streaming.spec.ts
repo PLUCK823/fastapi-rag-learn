@@ -15,10 +15,16 @@ test("FRAME-BY-FRAME IN-BROWSER timing trace", async ({ page }) => {
   await page.getByPlaceholder("输入知识库名称…").fill("帧追踪");
   await page.getByRole("button", { name: "创建" }).click();
   await page.getByText("帧追踪").waitFor({ timeout: 5000 });
+  // Dismiss onboarding guide if shown (first KB triggers it)
+  const traceSkipBtn = page.getByText("跳过引导");
+  if (await traceSkipBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await traceSkipBtn.click();
+    await page.waitForTimeout(500);
+  }
   await page.getByText("帧追踪").click();
   await page.waitForURL(/\/chat\/\d+/, { timeout: 5000 });
   await page.locator('input[type="file"]').setInputFiles("/tmp/办公规范.md");
-  await page.locator("aside").getByText("办公规范.md").waitFor({ timeout: 15000 });
+  await page.locator("aside").getByText("办公规范.md").first().waitFor({ timeout: 15000 });
 
   // ── Inject frame-level tracer in browser ──
   await page.evaluate(() => {

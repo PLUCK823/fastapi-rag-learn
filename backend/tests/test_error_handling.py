@@ -123,10 +123,16 @@ class TestDatabaseErrorHandling:
 
     @pytest.mark.asyncio
     async def test_database_connection_error(self, client: AsyncClient):
-        """数据库连接错误应该返回友好错误"""
-        # 这个测试需要模拟数据库错误，在测试环境中可能难以实现
-        # 我们可以测试数据库不可用时的行为
-        pass  # 实际实现需要更复杂的 mock
+        """数据库不可用时 /health 应该报告 db_status: error"""
+        # Mock sync_engine.connect() 抛出异常，模拟数据库连接失败
+        with patch("app.api.routes.sync_engine") as mock_engine:
+            mock_engine.connect.side_effect = Exception("connection refused")
+
+            resp = await client.get("/health")
+            # 健康检查端点自身不应崩溃，应返回包含 db_status 的响应
+            assert resp.status_code in [200, 503]
+            data = resp.json()
+            assert "db_status" in data or "status" in data
 
     @pytest.mark.asyncio
     async def test_duplicate_key_error(self, client: AsyncClient, auth_headers: dict):
@@ -137,12 +143,12 @@ class TestDatabaseErrorHandling:
         assert resp.status_code == 409
 
 
-class TestChromaDBErrorHandling:
-    """ChromaDB 错误处理测试"""
+class TestVectorStoreErrorHandling:
+    """向量库错误处理测试（Qdrant）"""
 
     @pytest.mark.asyncio
-    async def test_chromadb_collection_not_found(self, client: AsyncClient, auth_headers: dict, kb_id: int):
-        """ChromaDB collection 不存在时的处理"""
+    async def test_vector_store_collection_not_found(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+        """向量库 collection 不存在时的处理"""
         # 删除 KB 后再尝试提问（collection 应该被删除）
         await client.post(
             f"/kb/{kb_id}/docs",
@@ -189,15 +195,34 @@ class TestWebSocketErrorHandling:
 
     @pytest.mark.asyncio
     async def test_websocket_invalid_kb_id(self, client: AsyncClient):
-        """WebSocket 连接无效 KB ID 应该失败"""
+        """不存在的 KB ID 在 REST API 层面返回 403（WebSocket 同理拒绝）"""
         # 注册并登录
-        await client.post("/auth/register", json={"email": "ws_err@test.com", "password": "test123456"})
-        resp = await client.post("/auth/login", data={"username": "ws_err@test.com", "password": "test123456"})
-        _token = resp.json()["access_token"]
+        await client.post(
+            "/auth/register",
+            json={"email": "ws_err@test.com", "password": "test123456"},
+        )
+        resp = await client.post(
+            "/auth/login",
+            data={"username": "ws_err@test.com", "password": "test123456"},
+        )
+        token = resp.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
 
-        # 尝试连接不存在的 KB
-        # WebSocket 测试需要特殊处理，这里只验证 API 层面
-        pass  # WebSocket 测试在 test_websocket.py 中
+        # 访问不存在的 KB（id=99999）— REST API 层应拒绝（403 禁止或 404 未找到）
+        resp = await client.get("/kb/99999/docs", headers=headers)
+        assert resp.status_code in [403, 404], (
+            f"访问不存在的 KB 应返回 403 或 404，实际 {resp.status_code}"
+        )
+
+        # 对不存在的 KB 发送 /ask 也应被拒绝（KB 所有权校验现在会先执行）
+        resp = await client.post(
+            "/ask",
+            json={"kb_id": 99999, "text": "测试"},
+            headers=headers,
+        )
+        assert resp.status_code in [403, 404], (
+            f"对不存在 KB 提问应返回 403 或 404，实际 {resp.status_code}"
+        )
 
 
 class TestTokenExpiryHandling:

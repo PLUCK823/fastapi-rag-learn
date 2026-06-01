@@ -2,7 +2,7 @@ import logging
 import os as _os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
@@ -100,6 +100,19 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="RAG 学习项目", version="0.2.0", lifespan=lifespan)
+
+
+# ── Token 脱敏中间件：防止 JWT 出现在 uvicorn 访问日志中 ──
+@app.middleware("http")
+async def sanitize_token_logging(request: Request, call_next):
+    """从 ASGI scope 中剥离 token 查询参数，避免出现在访问日志。"""
+    qs = request.scope.get("query_string", b"")
+    if b"token=" in qs:
+        import re as _re
+        sanitized = _re.sub(b"token=[^&]*", b"token=[REDACTED]", qs)
+        request.scope["query_string"] = sanitized
+    return await call_next(request)
+
 
 # Rate limiting middleware (applied first, before CORS)
 app.add_middleware(RateLimitMiddleware)

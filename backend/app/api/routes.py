@@ -1,6 +1,8 @@
 """API 路由 — RAG 问答 + WebSocket 流式 + 健康检查"""
 
+import asyncio
 import json
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
@@ -11,11 +13,17 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import current_user
 from app.core.config import SECRET_KEY
-from app.core.database import get_sync_session, sync_engine
+from app.core.database import get_sync_session, sync_engine, sync_session_factory
 from app.core.engine import _execute_code_blocks, ask, ask_stream_with_sources
 from app.models.chat import ChatMessage
 from app.models.schemas import AskRequest, AskResponse, SourceInfo
 from app.models.user import User
+from app.services import knowledge_base as kb_service
+
+
+async def _run_in_thread(fn: Callable[..., Any], *args: Any) -> Any:
+    """将同步阻塞调用卸载到线程池，避免阻塞 ASGI 事件循环。"""
+    return await asyncio.to_thread(fn, *args)
 
 router = APIRouter()
 
@@ -98,6 +106,9 @@ def ask_endpoint(
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
+    # 校验 KB 所有权
+    kb_service._get_kb(session, req.kb_id, user.id)
+
     # 获取会话历史（多轮对话上下文）
     history = _fetch_history(session, req.kb_id, user.id, req.session_id)
 
@@ -172,6 +183,21 @@ async def ws_ask(
         await websocket.close()
         return
 
+    # 校验 KB 所有权 — 防止跨用户数据访问（线程池卸载避免阻塞事件循环）
+    user_id_str = payload.get("sub", "0")
+    user_id = int(user_id_str) if user_id_str else 0
+
+    def _check_kb_owner() -> None:
+        with sync_session_factory() as s:
+            kb_service._get_kb(s, kb_id, user_id)
+
+    try:
+        await _run_in_thread(_check_kb_owner)
+    except HTTPException:
+        await websocket.send_text(json.dumps({"error": "kb not found or access denied"}))
+        await websocket.close()
+        return
+
     try:
         data = await websocket.receive_text()
     except WebSocketDisconnect:
@@ -184,18 +210,15 @@ async def ws_ask(
 
     full_answer_parts: list[str] = []
 
-    from app.core.database import sync_session_factory
-
-    # fastapi-users JWT uses 'sub' field for user_id
-    user_id_str = payload.get("sub", "0")
-    user_id = int(user_id_str) if user_id_str else 0
     sid = session_id if session_id else None
 
-    # 获取多轮对话历史
+    # 获取多轮对话历史（线程池卸载）
     history: list[tuple[str, str]] = []
     if sid and user_id:
-        with sync_session_factory() as history_session:
-            history = _fetch_history(history_session, kb_id, user_id, sid)
+        def _fetch() -> list[tuple[str, str]]:
+            with sync_session_factory() as s:
+                return _fetch_history(s, kb_id, user_id, sid)
+        history = await _run_in_thread(_fetch)
 
     try:
         stream, sources = ask_stream_with_sources(
@@ -223,11 +246,13 @@ async def ws_ask(
             )
         )
 
-        # 保存对话记录（包含代码执行结果）
+        # 保存对话记录（线程池卸载）
         if user_id:
-            with sync_session_factory() as session:
-                _save_message(session, kb_id, user_id, "user", data, None, sid)
-                _save_message(session, kb_id, user_id, "assistant", code_result, sources, sid)
+            def _save() -> None:
+                with sync_session_factory() as s:
+                    _save_message(s, kb_id, user_id, "user", data, None, sid)
+                    _save_message(s, kb_id, user_id, "assistant", code_result, sources, sid)
+            await _run_in_thread(_save)
     except Exception as e:
         error_msg = str(e)
         # Provide user-friendly error messages

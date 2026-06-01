@@ -551,7 +551,7 @@ export default function ChatPage() {
     prepareSend();
     let sid = activeSessionId;
     if (!sid) {
-      sid = `sess_${Date.now()}`;
+      sid = `sess_${crypto.randomUUID()}`;
       flushSync(() => setActiveSessionId(sid));
     }
     send(text, sid);
@@ -945,7 +945,7 @@ export default function ChatPage() {
                         handleDeleteSession(s);
                       }}
                     >
-                      删
+                      删除
                     </button>
                   </div>
                 );
@@ -1012,7 +1012,7 @@ export default function ChatPage() {
                   style={{ color: "var(--danger)" }}
                   onClick={() => setConfirmBatchDelete(true)}
                 >
-                  删({selectedDocIds.size})
+                  删除({selectedDocIds.size})
                 </button>
               )}
             </div>
@@ -1073,7 +1073,7 @@ export default function ChatPage() {
                   style={{ color: "var(--text-muted)" }}
                   onClick={() => handleDeleteDoc(d)}
                 >
-                  删
+                  删除
                 </button>
               </div>
             ))
@@ -1235,6 +1235,14 @@ export default function ChatPage() {
               )}
             </button>
           </div>
+          {input.length > 3000 && (
+            <div
+              className="flex justify-end mt-1 text-[10px]"
+              style={{ color: input.length >= 3900 ? "var(--danger)" : "var(--text-muted)" }}
+            >
+              {input.length}/4000
+            </div>
+          )}
         </div>
       </div>
 

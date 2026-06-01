@@ -13,13 +13,35 @@ ROOT_DIR = Path(__file__).parent.parent.parent
 # 数据库 — PostgreSQL
 # 本地: postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn
 # Docker: postgresql+asyncpg://raguser:${DB_PASSWORD}@db:5432/raglearn
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn",
-)
+_DEFAULT_DATABASE_URL = "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn"
+DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DATABASE_URL)
+if DATABASE_URL == _DEFAULT_DATABASE_URL:
+    import warnings
+    warnings.warn(
+        "DATABASE_URL is using the default value. "
+        "Set DATABASE_URL in production to a secure value.",
+        RuntimeWarning,
+    )
 
-# 用户认证
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
+# 用户认证 — 生产环境必须通过环境变量设置
+_SECRET_KEY = os.getenv("SECRET_KEY")
+if not _SECRET_KEY:
+    raise ValueError(
+        "SECRET_KEY environment variable is required. "
+        "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+    )
+SECRET_KEY = _SECRET_KEY
+
+# 密码重置/验证令牌使用独立密钥（若未单独设置，通过 HKDF 从 SECRET_KEY 派生，
+# 确保即使 JWT 密钥泄露也不会直接暴露密码重置令牌）
+_RESET_TOKEN_SECRET = os.getenv("RESET_TOKEN_SECRET")
+if _RESET_TOKEN_SECRET:
+    RESET_TOKEN_SECRET = _RESET_TOKEN_SECRET
+else:
+    import hashlib
+    RESET_TOKEN_SECRET = hashlib.sha256(
+        SECRET_KEY.encode() + b":reset-token-v1"
+    ).hexdigest()
 
 # LLM
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
@@ -46,9 +68,17 @@ CHUNK_OVERLAP = 120
 RETRIEVAL_K = 8
 
 # CORS 配置
-CORS_ALLOW_ORIGINS = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173").split(",")
-CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
-CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "*").split(",")
+CORS_ALLOW_ORIGINS = [
+    o.strip()
+    for o in os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173").split(",")
+    if o.strip()
+]
+CORS_ALLOW_METHODS = [
+    m.strip() for m in os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
+]
+CORS_ALLOW_HEADERS = [
+    h.strip() for h in os.getenv("CORS_ALLOW_HEADERS", "*").split(",")
+]
 
 # Rate Limiting
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))

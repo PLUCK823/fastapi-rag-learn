@@ -47,6 +47,13 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByRole("button", { name: "创建" }).click();
     await expect(page.getByText("KB CRUD 测试")).toBeVisible({ timeout: 5000 });
 
+    // Dismiss onboarding guide if shown (first KB triggers it)
+    const skipGuideBtn = page.getByText("跳过引导");
+    if (await skipGuideBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await skipGuideBtn.click();
+      await page.waitForTimeout(500);
+    }
+
     // Rename KB - click the "编辑" button
     await page.getByRole("button", { name: "编辑" }).click();
 
@@ -112,6 +119,13 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByRole("button", { name: "创建" }).click();
     await expect(page.getByText("文档 CRUD 测试")).toBeVisible({ timeout: 5000 });
 
+    // Dismiss onboarding guide if shown (first KB triggers it)
+    const docSkipGuideBtn = page.getByText("跳过引导");
+    if (await docSkipGuideBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await docSkipGuideBtn.click();
+      await page.waitForTimeout(500);
+    }
+
     // Navigate to chat
     await page.getByText("文档 CRUD 测试").click();
     await expect(page).toHaveURL(/\/chat\/\d+/);
@@ -120,7 +134,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByRole("button", { name: "+ 新建" }).first().click();
     await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
 
-    await page.getByPlaceholder("例如: readme（默认 .md）").fill("test-doc");
+    await page.getByPlaceholder("例如: readme").fill("test-doc");
 
     const editorTextarea = page.locator(".bytemd-editor textarea");
     await editorTextarea.waitFor({ state: "visible", timeout: 3000 });
@@ -184,6 +198,13 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByRole("button", { name: "创建" }).click();
     await expect(page.getByText("聊天测试库")).toBeVisible({ timeout: 5000 });
 
+    // Dismiss onboarding guide if shown (first KB triggers it)
+    const chatSkipGuideBtn = page.getByText("跳过引导");
+    if (await chatSkipGuideBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await chatSkipGuideBtn.click();
+      await page.waitForTimeout(500);
+    }
+
     // Navigate to chat
     await page.getByText("聊天测试库").click();
     await expect(page).toHaveURL(/\/chat\/\d+/);
@@ -195,7 +216,7 @@ test.describe("Full E2E Test Suite", () => {
 
     // Create document
     await page.getByRole("button", { name: "+ 新建" }).first().click();
-    await page.getByPlaceholder("例如: readme（默认 .md）").fill("chat-doc");
+    await page.getByPlaceholder("例如: readme").fill("chat-doc");
 
     const editorTextarea = page.locator(".bytemd-editor textarea");
     await editorTextarea.waitFor({ state: "visible", timeout: 3000 });
@@ -213,7 +234,7 @@ test.describe("Full E2E Test Suite", () => {
     await page.waitForTimeout(1000);
 
     // Message should appear and NOT disappear
-    await expect(page.locator(".chat-message").filter({ hasText: "Python" })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(".chat-message").filter({ hasText: "Python" }).first()).toBeVisible({ timeout: 10000 });
 
     // Wait for AI response to complete
     await expect(page.locator("text=回答中")).not.toBeVisible({ timeout: 30000 });
@@ -256,6 +277,13 @@ test.describe("Full E2E Test Suite", () => {
     await page.getByPlaceholder("输入知识库名称…").fill("空会话测试");
     await page.getByRole("button", { name: "创建" }).click();
     await expect(page.getByText("空会话测试")).toBeVisible({ timeout: 5000 });
+
+    // Dismiss onboarding guide if shown (first KB triggers it)
+    const emptySkipGuideBtn = page.getByText("跳过引导");
+    if (await emptySkipGuideBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await emptySkipGuideBtn.click();
+      await page.waitForTimeout(500);
+    }
 
     // Navigate to chat
     await page.getByText("空会话测试").click();

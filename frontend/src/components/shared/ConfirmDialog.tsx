@@ -21,6 +21,8 @@ export default function ConfirmDialog({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ backgroundColor: "var(--overlay)", backdropFilter: "blur(2px)" }}
+      role="dialog"
+      aria-modal="true"
       onClick={onCancel}
     >
       <div

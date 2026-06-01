@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, desc, func
+from sqlalchemy import exc as sa_exc
 from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
 
@@ -253,7 +254,11 @@ async def upload_document(
         session.rollback()
 
     # Redis 不可用 → 同步处理
-    doc = kb_service.add_document(session, kb_id, user.id, content, filename)
+    try:
+        doc = kb_service.add_document(session, kb_id, user.id, content, filename)
+    except sa_exc.IntegrityError:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="知识库中已存在同名文档")
     return {"doc_id": doc.id, "task_id": task_id, "status": "ready", "sync": True}
 
 
@@ -285,23 +290,38 @@ def batch_delete_docs(
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
-    """批量删除文档 — 逐条提交，SQL 先删 ChromaDB 后清理"""
+    """批量删除文档 — 先校验所有权（单条 SQL），再批量 DELETE，最后异步清理向量库"""
     from app.core.engine import delete_document_chunks
 
-    deleted_count = 0
-    for doc_id in req.doc_ids:
+    # ① 先校验 kb 所有权
+    kb_service._get_kb(session, kb_id, user.id)
+
+    # ② 查询该 KB 下属于请求的文档 ID（确保用户拥有这些文档）
+    existing = session.execute(
+        sa_select(kb_service.Document.id).where(
+            kb_service.Document.kb_id == kb_id,
+            kb_service.Document.id.in_(req.doc_ids),
+        )
+    ).scalars().all()
+    valid_ids = set(existing)
+
+    if not valid_ids:
+        return BatchDeleteResponse(deleted_count=0)
+
+    # ③ 批量删除（单条 SQL，避免 N+1）
+    stmt = delete(kb_service.Document).where(
+        kb_service.Document.id.in_(list(valid_ids))
+    )
+    session.execute(stmt)
+    session.commit()
+    deleted_count = len(valid_ids)
+
+    # ④ 异步清理 Qdrant 向量数据（失败不阻塞）
+    for doc_id in valid_ids:
         try:
-            doc = kb_service.get_document(session, kb_id, doc_id, user.id)
-            session.delete(doc)
-            session.commit()  # 逐条提交，避免一批失败全部回滚
-            try:
-                delete_document_chunks(kb_id, doc_id)
-            except Exception:
-                pass  # ChromaDB 清理失败不阻塞，孤儿由定期任务兜底
-            deleted_count += 1
-        except HTTPException:
-            session.rollback()  # 当前这条回滚
-            pass
+            delete_document_chunks(kb_id, doc_id)
+        except Exception:
+            pass  # Qdrant 清理失败不阻塞，孤儿由定期任务兜底
 
     return BatchDeleteResponse(deleted_count=deleted_count)
 

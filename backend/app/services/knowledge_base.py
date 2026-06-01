@@ -10,7 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import CHUNK_OVERLAP, CHUNK_SIZE
-from app.core.engine import delete_collection, delete_document_chunks, get_vectorstore
+from app.core.engine import (
+    _invalidate_bm25_cache,
+    delete_collection,
+    delete_document_chunks,
+    get_vectorstore,
+)
 from app.models.knowledge_base import Document, KnowledgeBase
 
 # Markdown 表格检测（保护表格不被切分）
@@ -282,7 +287,7 @@ def rename_kb(session: Session, kb_id: int, user_id: int, name: str) -> Knowledg
 def delete_kb(session: Session, kb_id: int, user_id: int) -> int:
     kb = _get_kb(session, kb_id, user_id)
     doc_count = len(kb.documents)
-    # 先删 ChromaDB，失败了 SQL 可回滚
+    # 先删 Qdrant，失败了 SQL 可回滚
     delete_collection(kb_id)
     session.delete(kb)
     session.commit()
@@ -309,7 +314,7 @@ def add_document(
     session.add(doc)
     session.flush()  # 获取 doc.id
 
-    # Ingest to ChromaDB — if this fails, rollback SQL
+    # Ingest to Qdrant — if this fails, rollback SQL
     try:
         chunk_count = _ingest_to_kb(content, filename, kb_id, doc.id)
     except Exception:
@@ -322,6 +327,7 @@ def add_document(
     doc.chunk_count = chunk_count
     session.commit()
     session.refresh(doc)
+    _invalidate_bm25_cache(kb_id)
     return doc
 
 
@@ -362,6 +368,7 @@ def update_document(
     doc.updated_at = datetime.now(UTC)
     session.commit()
     session.refresh(doc)
+    _invalidate_bm25_cache(kb_id)
     return doc
 
 
@@ -390,9 +397,10 @@ def rename_document(
 
 def delete_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> None:
     doc = get_document(session, kb_id, doc_id, user_id)
-    # SQL 先删，ChromaDB 后清理（清理失败不阻塞，孤儿由定期任务兜底）
+    # SQL 先删，Qdrant 后清理（清理失败不阻塞，孤儿由定期任务兜底）
     session.delete(doc)
     session.commit()
+    _invalidate_bm25_cache(kb_id)
     try:
         delete_document_chunks(kb_id, doc_id)
     except Exception:
@@ -402,7 +410,7 @@ def delete_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> 
 # ── Internal ──
 
 def _ingest_to_kb(content: str, filename: str, kb_id: int, doc_id: int) -> int:
-    """文档向量化存入 ChromaDB（幂等 upsert + 确定性 ID）
+    """文档向量化存入 Qdrant（幂等 upsert + 确定性 ID）
 
     使用 upsert + 确定性 ID（{doc_id}_{chunk_index}）：
     - 同 ID 自动覆盖，无需手动删除旧 chunk

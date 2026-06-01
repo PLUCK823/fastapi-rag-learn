@@ -307,6 +307,37 @@ body::before {
   transform: translateY(-1px);
 }
 
+/* ── ByteMD full-height in editor modals ── */
+/* The @bytemd/react Editor wrapper <div> needs explicit height to pass
+   down to .bytemd, which uses height:100%. Without this the chain
+   breaks and the editor collapses. */
+.bytemd-host > div {
+  height: 100%;
+}
+
+.bytemd {
+  height: 100% !important;
+  border: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.bytemd-body {
+  flex: 1 !important;
+  height: auto !important;
+  overflow: hidden !important;
+}
+
+.bytemd-editor,
+.bytemd-preview {
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.bytemd-editor .CodeMirror {
+  height: 100% !important;
+}
+
 /* ── ByteMD Dark Mode Overrides ── */
 [data-theme="dark"] .bytemd {
   color: var(--text-primary);
@@ -624,35 +655,4 @@ body::before {
 [data-theme="dark"] .bytemd .hljs-deletion {
   color: #f47067;
   background-color: #441516;
-}
-
-/* ── ByteMD full-height in editor modals ── */
-/* The @bytemd/react Editor wrapper <div> needs explicit height to pass
-   down to .bytemd, which uses height:100%. Without this the chain
-   breaks and the editor collapses. */
-.bytemd-host > div {
-  height: 100%;
-}
-
-.bytemd {
-  height: 100% !important;
-  border: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-.bytemd-body {
-  flex: 1 !important;
-  height: auto !important;
-  overflow: hidden !important;
-}
-
-.bytemd-editor,
-.bytemd-preview {
-  height: 100% !important;
-  overflow: hidden !important;
-}
-
-.bytemd-editor .CodeMirror {
-  height: 100% !important;
 }

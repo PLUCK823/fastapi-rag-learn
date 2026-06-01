@@ -24,7 +24,7 @@ async def ingest_document(
     filename: str,
     doc_id: int,
 ) -> dict:
-    """后台处理文档：切分 → 嵌入 → 存入 ChromaDB"""
+    """后台处理文档：切分 → 嵌入 → 存入 Qdrant"""
     from app.core.database import sync_session_factory
     from app.models.knowledge_base import Document
     from app.services.knowledge_base import _ingest_to_kb
@@ -145,10 +145,10 @@ async def batch_delete_documents(
 
 
 async def cleanup_orphan_data(ctx: dict) -> dict:
-    """清理 SQL 与 ChromaDB 不一致的孤儿数据
+    """清理 SQL 与 Qdrant 不一致的孤儿数据
 
     场景：
-    - 文档已从 SQL 删除，但 ChromaDB chunk 残留（kill -9 等极端情况）
+    - 文档已从 SQL 删除，但 Qdrant chunk 残留（kill -9 等极端情况）
     - Worker 崩溃导致 status="processing" 超时未更新
     """
     from datetime import timedelta

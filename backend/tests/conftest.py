@@ -21,6 +21,8 @@ os.environ.setdefault(
 )
 # 告知 app lifespan 不要销毁 engine（conftest 自己管理）
 os.environ["PYTEST_RUNNING"] = "1"
+# 测试环境关闭速率限制（避免跨测试配额泄漏）
+os.environ["RATE_LIMIT_REQUESTS"] = "10000"
 
 
 @pytest.fixture

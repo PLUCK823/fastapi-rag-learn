@@ -9,7 +9,7 @@ from fastapi_users.authentication import AuthenticationBackend, BearerTransport,
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import SECRET_KEY
+from app.core.config import RESET_TOKEN_SECRET, SECRET_KEY
 from app.core.database import get_async_session
 from app.models.user import User
 
@@ -29,8 +29,8 @@ async def get_user_db(
 
 
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
-    reset_password_token_secret = SECRET_KEY
-    verification_token_secret = SECRET_KEY
+    reset_password_token_secret = RESET_TOKEN_SECRET
+    verification_token_secret = RESET_TOKEN_SECRET
 
     async def on_after_forgot_password(
         self, user: models.UP, token: str, request: Request | None = None,

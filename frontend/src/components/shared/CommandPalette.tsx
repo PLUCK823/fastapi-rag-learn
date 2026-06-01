@@ -140,6 +140,8 @@ export default function CommandPalette({ open, onClose, extraCommands = [] }: Pr
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] p-4 animate-fade-in"
       style={{ backgroundColor: "var(--overlay)", backdropFilter: "blur(2px)" }}
+      role="dialog"
+      aria-modal="true"
       onClick={onClose}
     >
       <div

@@ -77,15 +77,6 @@ export async function clearMessages(kbId: number, sessionId?: string | null) {
   return api.delete(`/kb/${kbId}/messages`, { params });
 }
 
-export async function refreshToken() {
-  const res = await api.post<{
-    access_token: string;
-    token_type: string;
-    expires_in: number;
-  }>("/auth/refresh");
-  return res.data;
-}
-
 export async function listSessions(kbId: number) {
   const res = await api.get<Session[]>(`/kb/${kbId}/sessions`);
   return res.data;

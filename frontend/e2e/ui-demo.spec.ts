@@ -29,6 +29,12 @@ test("完整链路演示 — 注册→上传文档→提问→验证", async ({ 
   await page.getByPlaceholder("输入知识库名称…").fill("办公系统规范库");
   await page.getByRole("button", { name: "创建" }).click();
   await expect(page.getByText("办公系统规范库")).toBeVisible({ timeout: 5000 });
+  // Dismiss onboarding guide if shown (first KB triggers it)
+  const demoSkipBtn = page.getByText("跳过引导");
+  if (await demoSkipBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await demoSkipBtn.click();
+    await page.waitForTimeout(500);
+  }
   await page.getByText("办公系统规范库").click();
   await expect(page).toHaveURL(/\/chat\/\d+/, { timeout: 5000 });
   await page.waitForTimeout(300);

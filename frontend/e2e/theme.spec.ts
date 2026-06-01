@@ -29,6 +29,12 @@ test("theme toggle works across pages and persists", async ({ page }) => {
   await page.fill('input[placeholder="输入知识库名称…"]', "主题测试库");
   await page.click('button:has-text("创建")');
   await page.waitForTimeout(500);
+  // Dismiss onboarding guide if shown (first KB triggers it)
+  const skipGuideBtn = page.getByText("跳过引导");
+  if (await skipGuideBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await skipGuideBtn.click();
+    await page.waitForTimeout(500);
+  }
   await page.click('a:has-text("主题测试库")');
   await page.waitForURL(/\/chat\/\d+/);
 

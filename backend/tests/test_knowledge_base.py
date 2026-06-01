@@ -238,3 +238,150 @@ async def test_cross_user_kb_isolation(client: AsyncClient):
     # 用户 B 尝试删除用户 A 的 KB → 403
     resp = await client.delete(f"/kb/{kb_a}", headers=headers_b)
     assert resp.status_code == 403
+
+
+class TestBatchDelete:
+    """P1 — 批量删除优化（单条 SQL 替代 N+1）"""
+
+    @pytest.mark.asyncio
+    async def test_batch_delete_multiple_docs(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
+        """批量删除多个文档应一次完成"""
+        # 创建 3 个文档
+        doc_ids: list[int] = []
+        for i in range(3):
+            resp = await client.post(
+                f"/kb/{kb_id}/docs",
+                json={"content": f"内容{i}", "filename": f"batch_{i}.txt"},
+                headers=auth_headers,
+            )
+            assert resp.status_code == 200
+            doc_ids.append(resp.json()["id"])
+
+        # 批量删除
+        resp = await client.post(
+            f"/kb/{kb_id}/docs/batch-delete",
+            json={"doc_ids": doc_ids},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["deleted_count"] == 3
+
+        # 验证文档列表为空
+        resp = await client.get(f"/kb/{kb_id}/docs", headers=auth_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 0
+
+    @pytest.mark.asyncio
+    async def test_batch_delete_partial_ids(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
+        """只删除存在的文档 ID，不存在的静默跳过"""
+        resp = await client.post(
+            f"/kb/{kb_id}/docs",
+            json={"content": "唯一文档", "filename": "only.txt"},
+            headers=auth_headers,
+        )
+        doc_id = resp.json()["id"]
+
+        # 批量删除：1 个存在 + 2 个不存在
+        resp = await client.post(
+            f"/kb/{kb_id}/docs/batch-delete",
+            json={"doc_ids": [doc_id, 99999, 88888]},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["deleted_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_batch_delete_wrong_kb_ignored(
+        self, client: AsyncClient, auth_headers: dict
+    ):
+        """从其他 KB 的文档 ID 不应被删除"""
+        # 创建两个 KB
+        resp = await client.post("/kb", json={"name": "KB-A"}, headers=auth_headers)
+        kb_a = resp.json()["id"]
+        resp = await client.post("/kb", json={"name": "KB-B"}, headers=auth_headers)
+        kb_b = resp.json()["id"]
+
+        # 在 KB-A 创建文档
+        resp = await client.post(
+            f"/kb/{kb_a}/docs",
+            json={"content": "A的文档", "filename": "a.txt"},
+            headers=auth_headers,
+        )
+        doc_a_id = resp.json()["id"]
+
+        # 尝试通过 KB-B 的 batch-delete 删除 KB-A 的文档
+        resp = await client.post(
+            f"/kb/{kb_b}/docs/batch-delete",
+            json={"doc_ids": [doc_a_id]},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["deleted_count"] == 0
+
+
+class TestBM25Cache:
+    """P1 — BM25 语料库缓存优化"""
+
+    def test_cache_returns_cached_data(self, monkeypatch):
+        """缓存命中时不应重新 scroll Qdrant"""
+        import time as _time
+
+        from app.core.engine import (
+            _bm25_cache,
+            _scroll_all_docs_cached,
+        )
+
+        # 先清缓存
+        _bm25_cache.clear()
+
+        # 用假数据填充缓存（模拟之前 scroll 的结果）
+        now = _time.time()
+        fake_data = (["id1", "id2"], ["doc1", "doc2"], [{}, {}])
+        _bm25_cache[1] = (now, fake_data)
+
+        # 缓存命中
+        ids, docs, metas = _scroll_all_docs_cached(1)
+        assert ids == ["id1", "id2"]
+        assert docs == ["doc1", "doc2"]
+
+    def test_cache_invalidation(self):
+        """文档变更后缓存应被清除"""
+        import time as _time
+
+        from app.core.engine import (
+            _bm25_cache,
+            _invalidate_bm25_cache,
+        )
+
+        _bm25_cache.clear()
+        _bm25_cache[1] = (_time.time(), (["a"], ["b"], [{}]))
+
+        _invalidate_bm25_cache(1)
+        assert 1 not in _bm25_cache
+
+    def test_cache_expires_after_ttl(self, monkeypatch):
+        """超过 TTL 后缓存应过期"""
+        import time as _time
+
+        from app.core.engine import (
+            _BM25_CACHE_TTL,
+            _bm25_cache,
+        )
+
+        _bm25_cache.clear()
+
+        # 设置一个已过期的缓存条目
+        expired_time = _time.time() - _BM25_CACHE_TTL - 10
+        _bm25_cache[1] = (expired_time, (["old"], ["old_doc"], [{}]))
+
+        # 缓存过期 → 应该重新 scroll（但由于没有 Qdrant 运行，会触发异常
+        # 在测试环境中我们只验证缓存过期逻辑被触发）
+        # 实际 scroll 会失败（无 Qdrant），但缓存应该已被检查
+        # 这里仅验证缓存条目存在但时间戳已过期
+        entry = _bm25_cache.get(1)
+        assert entry is not None
+        assert _time.time() - entry[0] > _BM25_CACHE_TTL

@@ -17,25 +17,20 @@ test("RAG numerical accuracy - full chain test", async ({ page }) => {
   await page.getByPlaceholder("输入知识库名称…").fill("RAG精度测试库");
   await page.getByRole("button", { name: "创建" }).click();
   await expect(page.getByText("RAG精度测试库")).toBeVisible({ timeout: 5000 });
+  // Dismiss onboarding guide if shown (first KB triggers it)
+  const ragSkipBtn = page.getByText("跳过引导");
+  if (await ragSkipBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await ragSkipBtn.click();
+    await page.waitForTimeout(500);
+  }
   await page.getByText("RAG精度测试库").click();
   await expect(page).toHaveURL(/\/chat\/\d+/, { timeout: 5000 });
 
   // ── 3. Upload the document ──
   await page.locator('input[type="file"]').setInputFiles("/tmp/办公规范.md");
 
-  // Wait for toast OR document to appear in sidebar (whichever comes first)
-  const docInSidebar = page.getByText("办公规范.md");
-  try {
-    await expect(docInSidebar).toBeVisible({ timeout: 15000 });
-  } catch {
-    // Fallback: check if the page still shows the chat UI
-    console.log("Sidebar doc check timed out, checking page state...");
-  }
-
-  // Verify something was uploaded
-  const docCount = await page.locator("button:has-text('.md')").count();
-  console.log(`Documents found in sidebar: ${docCount}`);
-  expect(docCount).toBeGreaterThan(0);
+  // Wait for document to appear in sidebar
+  await page.locator("aside").getByText("办公规范.md").first().waitFor({ timeout: 15000 });
 
   // ── 4. Ask the question ──
   const question = "员工每月考勤补卡最多允许几次？单笔金额多少元以上的采购需要总经理终审？";

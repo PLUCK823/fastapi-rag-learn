@@ -17,12 +17,18 @@ test("streaming typewriter effect — cursor + incremental rendering", async ({ 
   await page.getByPlaceholder("输入知识库名称…").fill("流式测试库");
   await page.getByRole("button", { name: "创建" }).click();
   await expect(page.getByText("流式测试库")).toBeVisible({ timeout: 5000 });
+  // Dismiss onboarding guide if shown (first KB triggers it)
+  const streamSkipBtn = page.getByText("跳过引导");
+  if (await streamSkipBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await streamSkipBtn.click();
+    await page.waitForTimeout(500);
+  }
   await page.getByText("流式测试库").click();
   await expect(page).toHaveURL(/\/chat\/\d+/, { timeout: 5000 });
 
   // ── 3. Upload document ──
   await page.locator('input[type="file"]').setInputFiles("/tmp/办公规范.md");
-  await expect(page.locator("aside").locator("text=办公规范.md")).toBeVisible({ timeout: 15000 });
+  await expect(page.locator("aside").getByText("办公规范.md").first()).toBeVisible({ timeout: 15000 });
 
   // ── 4. Send question ──
   const chatInput = page.getByPlaceholder("输入问题，Enter 发送…");

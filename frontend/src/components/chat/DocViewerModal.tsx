@@ -61,6 +61,8 @@ export default function DocViewerModal({
         backgroundColor: "var(--overlay-heavy)",
         backdropFilter: "blur(3px)",
       }}
+      role="dialog"
+      aria-modal="true"
       onClick={onClose}
     >
       <div
