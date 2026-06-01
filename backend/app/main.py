@@ -68,10 +68,8 @@ def _run_migrations() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # 启动：运行数据库迁移
-    _run_migrations()
-
     # 启动：Redis 连接池（用于入队 ARQ 任务）
+    # 注：数据库迁移通过 CI pre-start 或 Docker entrypoint 执行，不在此处阻塞
     logger.info("Lifespan: attempting Redis connection...")
     try:
         redis_pool = await create_redis_pool()

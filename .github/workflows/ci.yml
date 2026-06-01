@@ -159,6 +159,12 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium --with-deps
 
+      - name: Run migrations
+        working-directory: backend
+        run: uv run alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn_test
+
       - name: Start backend
         working-directory: backend
         run: |
