@@ -56,7 +56,9 @@ test("session behavior tests", async ({ page }) => {
   await editorTextarea.fill("# Test\n\n这是一个测试文档。");
   await page.waitForTimeout(500);
   await page.getByRole("button", { name: "创建文档" }).click();
-  await page.waitForTimeout(2000);
+
+  // Wait for modal to close (save is synchronous with embedding, may take a few seconds)
+  await expect(page.getByText("新建文档")).not.toBeVisible({ timeout: 30000 });
   await expect(page.locator("aside").locator("text=test.md")).toBeVisible({ timeout: 10000 });
 
   // Send a chat message - this will create the session

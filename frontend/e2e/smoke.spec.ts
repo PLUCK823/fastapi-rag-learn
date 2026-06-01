@@ -46,10 +46,10 @@ test("full user flow", async ({ page }) => {
   // Click create button
   await page.getByRole("button", { name: "创建文档" }).click();
 
-  // Wait for modal to close and doc to appear
-  await page.waitForTimeout(2000);
+  // Wait for modal to close (save is synchronous with embedding, may take a few seconds)
+  await expect(page.getByText("新建文档")).not.toBeVisible({ timeout: 30000 });
 
-  // Modal should close and doc should appear - check in sidebar
+  // Doc should appear in sidebar
   await expect(page.locator("aside").locator("text=hello.md")).toBeVisible({ timeout: 10000 });
 
   // 6. Chat - fill input and send

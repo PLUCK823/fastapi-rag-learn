@@ -43,6 +43,8 @@ test("完整链路演示 — 注册→上传文档→提问→验证", async ({ 
   // Upload document
   await page.locator('input[type="file"]').setInputFiles("/tmp/办公规范.md");
   await expect(page.locator("aside").getByText("办公规范.md")).toBeVisible({ timeout: 15000 });
+  // Wait for async processing to complete (worker chunking + embedding)
+  await page.locator("aside").getByText("处理中…").waitFor({ state: "hidden", timeout: 120000 });
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${SCREENSHOT_DIR}/05-doc-uploaded.png`, fullPage: true });
 

@@ -236,6 +236,14 @@ async def ws_ask(
             result_suffix = code_result[len(full_answer):]
             await websocket.send_text(result_suffix)
 
+        # 先持久化对话记录（在发送 done 之前，避免前端刷新时数据未就绪）
+        if user_id:
+            def _save() -> None:
+                with sync_session_factory() as s:
+                    _save_message(s, kb_id, user_id, "user", data, None, sid)
+                    _save_message(s, kb_id, user_id, "assistant", code_result, sources, sid)
+            await _run_in_thread(_save)
+
         # 发送结束标记 + 来源信息
         await websocket.send_text(
             json.dumps(
@@ -245,14 +253,6 @@ async def ws_ask(
                 }
             )
         )
-
-        # 保存对话记录（线程池卸载）
-        if user_id:
-            def _save() -> None:
-                with sync_session_factory() as s:
-                    _save_message(s, kb_id, user_id, "user", data, None, sid)
-                    _save_message(s, kb_id, user_id, "assistant", code_result, sources, sid)
-            await _run_in_thread(_save)
     except Exception as e:
         error_msg = str(e)
         # Provide user-friendly error messages

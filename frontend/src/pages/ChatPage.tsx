@@ -240,6 +240,15 @@ export default function ChatPage() {
     }
   }, [kbIdNum]);
 
+  // 当流式响应完成时刷新 session 列表（消息此时已保存到 DB）
+  const isStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    if (isStreamingRef.current && !isStreaming) {
+      refreshSessions();
+    }
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming, refreshSessions]);
+
   useEffect(() => {
     refreshDocs();
     refreshSessions().then((list) => {

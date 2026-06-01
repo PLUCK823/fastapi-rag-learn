@@ -29,6 +29,8 @@ test("streaming typewriter effect — cursor + incremental rendering", async ({ 
   // ── 3. Upload document ──
   await page.locator('input[type="file"]').setInputFiles("/tmp/办公规范.md");
   await expect(page.locator("aside").getByText("办公规范.md").first()).toBeVisible({ timeout: 15000 });
+  // Wait for async processing to complete (worker chunking + embedding)
+  await page.locator("aside").getByText("处理中…").waitFor({ state: "hidden", timeout: 120000 });
 
   // ── 4. Send question ──
   const chatInput = page.getByPlaceholder("输入问题，Enter 发送…");

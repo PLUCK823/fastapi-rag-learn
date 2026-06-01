@@ -25,6 +25,8 @@ test("FRAME-BY-FRAME IN-BROWSER timing trace", async ({ page }) => {
   await page.waitForURL(/\/chat\/\d+/, { timeout: 5000 });
   await page.locator('input[type="file"]').setInputFiles("/tmp/办公规范.md");
   await page.locator("aside").getByText("办公规范.md").first().waitFor({ timeout: 15000 });
+  // Wait for async processing to complete (worker chunking + embedding)
+  await page.locator("aside").getByText("处理中…").waitFor({ state: "hidden", timeout: 120000 });
 
   // ── Inject frame-level tracer in browser ──
   await page.evaluate(() => {

@@ -31,6 +31,8 @@ test("RAG numerical accuracy - full chain test", async ({ page }) => {
 
   // Wait for document to appear in sidebar
   await page.locator("aside").getByText("办公规范.md").first().waitFor({ timeout: 15000 });
+  // Wait for async processing to complete (worker chunking + embedding)
+  await page.locator("aside").getByText("处理中…").waitFor({ state: "hidden", timeout: 120000 });
 
   // ── 4. Ask the question ──
   const question = "员工每月考勤补卡最多允许几次？单笔金额多少元以上的采购需要总经理终审？";

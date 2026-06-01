@@ -325,6 +325,8 @@ def add_document(
         )
 
     doc.chunk_count = chunk_count
+    doc.status = "ready"
+    doc.error_message = None
     session.commit()
     session.refresh(doc)
     _invalidate_bm25_cache(kb_id)
@@ -365,6 +367,8 @@ def update_document(
     # upsert 自动覆盖同 ID chunk，无需手动删旧
     chunk_count = _ingest_to_kb(content, doc.filename, kb_id, doc_id)
     doc.chunk_count = chunk_count
+    doc.status = "ready"
+    doc.error_message = None
     doc.updated_at = datetime.now(UTC)
     session.commit()
     session.refresh(doc)

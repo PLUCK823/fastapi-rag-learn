@@ -74,6 +74,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://raguser:devpassword@db:5432/raglearn
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6334
+      - SECRET_KEY=dev-secret-key-not-for-production
     depends_on:
       db:
         condition: service_healthy
