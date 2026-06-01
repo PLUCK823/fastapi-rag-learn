@@ -38,19 +38,25 @@ export default function DocEditorModal({
   useEffect(() => {
     if (contentInjected.current || !initialContent) return;
     contentInjected.current = true;
-    // Wait for CodeMirror to initialize
-    const timer = setInterval(() => {
+    // 使用 MutationObserver 等待 CodeMirror 初始化（替代 50ms 轮询）
+    const safetyRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+    const observer = new MutationObserver(() => {
       const cmEl = document.querySelector(".bytemd-editor .CodeMirror") as {
         CodeMirror?: { setValue(v: string): void };
       } | null;
       if (cmEl?.CodeMirror) {
         cmEl.CodeMirror.setValue(initialContent);
-        clearInterval(timer);
+        observer.disconnect();
+        if (safetyRef.current) clearTimeout(safetyRef.current);
       }
-    }, 50);
-    // Safety timeout
-    setTimeout(() => clearInterval(timer), 3000);
-    return () => clearInterval(timer);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    // 安全超时（3 秒后强制断开）
+    safetyRef.current = setTimeout(() => observer.disconnect(), 3000);
+    return () => {
+      observer.disconnect();
+      if (safetyRef.current) clearTimeout(safetyRef.current);
+    };
   }, [initialContent]);
 
   const handleSave = async () => {

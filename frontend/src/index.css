@@ -1,4 +1,9 @@
 @import "tailwindcss";
+/*
+  Google Fonts via CDN:
+  - 生产部署建议自托管字体（避免第三方请求泄露用户 IP / User-Agent）
+  - 可从 https://gwfh.mranftl.com/fonts 下载 woff2 文件放到 public/fonts/
+*/
 @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;600&display=swap");
 
 /* ── Shared Design Tokens (non-color) ── */
