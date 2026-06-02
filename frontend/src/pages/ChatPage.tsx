@@ -465,7 +465,7 @@ export default function ChatPage() {
 
         // Poll until done (tracked for cleanup on unmount)
         const startTime = Date.now();
-        const MAX_POLL_MS = 720_000; // 12 分钟（worker job_timeout=600s + 2min buffer），大文档 embedding 耗时较长
+        const MAX_POLL_MS = 1_920_000; // 32 分钟（worker job_timeout=1800s + 2min buffer）
         const poll = setInterval(async () => {
           try {
             const t = await pollTask(result.task_id);

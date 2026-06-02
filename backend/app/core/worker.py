@@ -42,10 +42,18 @@ async def ingest_document(
         # ① 切分阶段
         await update_task_progress(redis, task_id, "chunking", 10, "正在切分…")
 
-        # ② embedding + 存储 — 在独立线程运行，不阻塞事件循环
-        # model 已预加载到主线程，且 local_files_only=True，子线程不会触发网络 I/O
+        # ② embedding + 存储 — 在独立线程运行，实时上报进度
+        loop = asyncio.get_running_loop()
+
+        def _progress(p: int, msg: str) -> None:
+            asyncio.run_coroutine_threadsafe(
+                update_task_progress(redis, task_id, "processing", p, msg),
+                loop,
+            )
+
         chunk_count = await asyncio.to_thread(
             _ingest_to_kb, content, filename, kb_id, doc_id,
+            on_progress=_progress,
         )
 
         # ③ 更新 SQL
@@ -235,7 +243,7 @@ class WorkerSettings:
         cleanup_orphan_data,  # type: ignore[list-item]
     ]
     max_jobs = 10
-    job_timeout = 600  # 单任务最长 10 分钟
+    job_timeout = 1800  # 单任务最长 30 分钟（大文档 embedding 耗时较长）
     keep_result = 3600  # 结果保留 1 小时
     health_check_interval = 30
 
