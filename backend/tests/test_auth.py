@@ -51,6 +51,7 @@ async def test_register_duplicate_email_fails(client: AsyncClient):
     await client.post("/auth/register", json={"email": email, "password": "pass123456"})
     resp = await client.post("/auth/register", json={"email": email, "password": "pass123456"})
     assert resp.status_code == 400
+    assert resp.json()["detail"] == "该邮箱已被注册"
 
 
 @pytest.mark.asyncio
@@ -62,6 +63,18 @@ async def test_login_wrong_password_fails(client: AsyncClient):
         data={"username": email, "password": "wrongpassword"},
     )
     assert resp.status_code == 400
+    assert resp.json()["detail"] == "密码错误"
+
+
+@pytest.mark.asyncio
+async def test_login_user_not_found(client: AsyncClient):
+    """Login with a non-existent email returns '该账号不存在'."""
+    resp = await client.post(
+        "/auth/login",
+        data={"username": "nonexistent@test.com", "password": "anypassword"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "该账号不存在"
 
 
 async def test_health_check(client: AsyncClient):

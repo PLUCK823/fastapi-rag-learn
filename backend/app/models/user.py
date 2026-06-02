@@ -2,6 +2,7 @@
 
 from fastapi_users import schemas
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTable
+from pydantic import field_validator
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,5 +20,10 @@ class UserRead(schemas.BaseUser[int]):
 
 
 class UserCreate(schemas.BaseUserCreate):
-    pass
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("密码至少需要6个字符")
+        return v
 
