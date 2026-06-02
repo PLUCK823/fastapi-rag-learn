@@ -161,7 +161,7 @@ jobs:
 
       - name: Run migrations
         working-directory: backend
-        run: .venv/bin/alembic upgrade head
+        run: uv run alembic upgrade head
         env:
           SECRET_KEY: ci-test-secret-key-at-least-32-bytes
           DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn_test
@@ -169,7 +169,7 @@ jobs:
       - name: Start backend
         working-directory: backend
         run: |
-          .venv/bin/uvicorn app.main:app --port 8000 --host 127.0.0.1 > /tmp/backend.log 2>&1 &
+          uv run uvicorn app.main:app --port 8000 --host 127.0.0.1 > /tmp/backend.log 2>&1 &
           echo "Backend PID: $!"
         env:
           SECRET_KEY: ci-test-secret-key-at-least-32-bytes
@@ -183,7 +183,7 @@ jobs:
         run: npm run dev -- --port 5173 > /tmp/frontend.log 2>&1 &
 
       - name: Wait for servers
-        timeout-minutes: 8
+        timeout-minutes: 10
         run: |
           echo "Waiting for backend (port 8000) and frontend (port 5173)..."
           until curl -s http://127.0.0.1:8000/health > /dev/null 2>&1 && \
