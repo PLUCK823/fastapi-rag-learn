@@ -107,9 +107,18 @@ export default function ChatPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editDoc, setEditDoc] = useState<Document | null>(null);
   const [editContent, setEditContent] = useState("");
+  const UPLOAD_QUEUE_KEY = `upload_queue_${kbIdNum}`;
+
   const [uploadQueue, setUploadQueue] = useState<
     { filename: string; taskId: string; status: string; progress: number; error?: string }[]
-  >([]);
+  >(() => {
+    try {
+      const raw = localStorage.getItem(UPLOAD_QUEUE_KEY);
+      return raw ? (JSON.parse(raw) as typeof uploadQueue) : [];
+    } catch {
+      return [];
+    }
+  });
   const [docsLoading, setDocsLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
@@ -159,6 +168,67 @@ export default function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 上传队列持久化到 localStorage（刷新不丢失）
+  useEffect(() => {
+    localStorage.setItem(UPLOAD_QUEUE_KEY, JSON.stringify(uploadQueue));
+  }, [uploadQueue, UPLOAD_QUEUE_KEY]);
+
+  // 页面加载时，恢复对 in-progress 上传的轮询（刷新浏览器后继续追踪）
+  useEffect(() => {
+    for (const item of uploadQueue) {
+      if (item.status !== "uploading" || !item.taskId) continue;
+      if (pollIntervalsRef.current.has(item.taskId)) continue; // already polling
+      const filename = item.filename;
+      const startTime = Date.now();
+      const MAX_POLL_MS = 720_000;
+      const poll = setInterval(async () => {
+        try {
+          const t = await pollTask(item.taskId);
+          const elapsed = Date.now() - startTime;
+          setUploadQueue((prev) =>
+            prev.map((q) =>
+              q.taskId === item.taskId
+                ? {
+                    ...q,
+                    status:
+                      t.status === "failed"
+                        ? "error"
+                        : t.status === "done"
+                          ? "done"
+                          : elapsed > MAX_POLL_MS
+                            ? "error"
+                            : "uploading",
+                    progress: t.progress,
+                    error:
+                      t.status === "failed"
+                        ? t.message
+                        : elapsed > MAX_POLL_MS
+                          ? "处理超时，请重试"
+                          : undefined,
+                  }
+                : q,
+            ),
+          );
+          if (t.status === "done") {
+            clearInterval(poll);
+            pollIntervalsRef.current.delete(item.taskId);
+            toast(`${filename} 上传完成`, "success");
+            refreshDocs();
+          } else if (t.status === "failed" || elapsed > MAX_POLL_MS) {
+            clearInterval(poll);
+            pollIntervalsRef.current.delete(item.taskId);
+            toast(`${filename}: ${t.message || "处理超时"}`, "error");
+          }
+        } catch {
+          clearInterval(poll);
+          pollIntervalsRef.current.delete(item.taskId);
+        }
+      }, 500);
+      pollIntervalsRef.current.set(item.taskId, poll);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+  }, []);
 
   // 组件卸载时清理所有上传轮询 interval
   useEffect(() => {
