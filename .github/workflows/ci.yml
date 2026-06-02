@@ -183,14 +183,30 @@ jobs:
         run: npm run dev -- --port 5173 > /tmp/frontend.log 2>&1 &
 
       - name: Wait for servers
-        timeout-minutes: 10
+        timeout-minutes: 5
         run: |
-          echo "Waiting for backend (port 8000) and frontend (port 5173)..."
-          until curl -s http://127.0.0.1:8000/health > /dev/null 2>&1 && \
-               curl -s http://127.0.0.1:5173 > /dev/null 2>&1; do
-            sleep 3
+          echo "Waiting for backend (port 8000)..."
+          for i in $(seq 1 30); do
+            if curl -s http://127.0.0.1:8000/health > /dev/null 2>&1; then
+              echo "Backend ready after ${i}0s"
+              break
+            fi
+            sleep 10
           done
-          echo "Servers ready"
+          echo "=== Backend log ==="
+          cat /tmp/backend.log
+          echo "=== Frontend log ==="
+          cat /tmp/frontend.log
+          # Now wait for frontend too
+          for i in $(seq 1 12); do
+            if curl -s http://127.0.0.1:5173 > /dev/null 2>&1; then
+              echo "Frontend ready"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Frontend failed to start"
+          exit 1
 
       - name: Run E2E tests
         working-directory: frontend
