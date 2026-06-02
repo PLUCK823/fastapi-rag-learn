@@ -3,10 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import KBListPage from "./KBListPage";
 import LoginPage from "./LoginPage";
 import RegisterPage from "./RegisterPage";
+
+vi.mock("../stores/toastStore", () => ({
+  toast: vi.fn(),
+}));
 
 // XSS attack patterns — verified via type-and-submit tests below
 // SQL injection patterns — backend has parameterized queries, verified via API test suite
@@ -279,8 +283,11 @@ describe("Input Validation Tests", () => {
       await userEvent.type(passwordInput, "12345"); // 5 chars
       await userEvent.click(screen.getByRole("button", { name: "注册" }));
 
-      // Client-side validation should catch short password before API call
-      expect(await screen.findByText("密码至少需要 6 个字符")).toBeInTheDocument();
+      // Client-side validation should show toast for short password
+      const { toast } = await import("../stores/toastStore");
+      await vi.waitFor(() => {
+        expect(toast).toHaveBeenCalledWith("密码至少需要 6 个字符", "error");
+      });
     });
   });
 });

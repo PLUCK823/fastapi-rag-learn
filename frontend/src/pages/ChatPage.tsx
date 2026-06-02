@@ -478,7 +478,7 @@ export default function ChatPage() {
 
         // Poll until done (tracked for cleanup on unmount)
         const startTime = Date.now();
-        const MAX_POLL_MS = 180_000; // 3 分钟超时，防止 worker 不响应时无限轮询
+        const MAX_POLL_MS = 720_000; // 12 分钟（worker job_timeout=600s + 2min buffer），大文档 embedding 耗时较长
         const poll = setInterval(async () => {
           try {
             const t = await pollTask(result.task_id);
@@ -1360,7 +1360,7 @@ export default function ChatPage() {
       {/* Floating upload progress bar — visible when uploads are in progress */}
       {uploadQueue.length > 0 && (
         <div
-          className="fixed top-4 right-4 z-50 card p-4 w-80 max-h-64 overflow-y-auto shadow-lg animate-fade-in-up"
+          className="fixed top-14 right-4 z-50 card p-4 w-80 max-h-64 overflow-y-auto shadow-lg animate-fade-in-up"
           style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.18)" }}
         >
           <p

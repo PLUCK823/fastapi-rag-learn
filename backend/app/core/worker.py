@@ -231,7 +231,7 @@ class WorkerSettings:
     health_check_interval = 30
 
     async def on_startup(self) -> None:
-        """在 worker 主线程预加载 embedding 模型，避免后续 job 中的网络 I/O"""
+        """预加载 embedding 模型 + 清理上次异常退出残留的 processing 文档"""
         logger.info("ARQ Worker starting — preloading embedding model...")
         try:
             from app.core.engine import _init_shared
@@ -239,6 +239,40 @@ class WorkerSettings:
             logger.info("Embedding model loaded successfully")
         except Exception:
             logger.exception("Failed to preload embedding model on startup")
+
+        # 清理上次 worker 异常退出残留的 processing 文档（docker restart 等场景）
+        try:
+            from datetime import timedelta
+
+            from sqlalchemy import update
+
+            from app.core.database import sync_session_factory
+            from app.models.knowledge_base import Document
+
+            with sync_session_factory() as session:
+                cutoff = datetime.now(UTC) - timedelta(minutes=1)
+                result = session.execute(
+                    update(Document)
+                    .where(
+                        Document.status == "processing",
+                        Document.created_at < cutoff,
+                    )
+                    .values(
+                        status="failed",
+                        error_message="Worker 重启，请重新上传",
+                        updated_at=datetime.now(UTC),
+                    )
+                )
+                session.commit()
+                cleaned = result.rowcount  # type: ignore[attr-defined]
+                if cleaned:
+                    logger.info(
+                        "Cleaned %d orphaned processing docs from previous run",
+                        cleaned,
+                    )
+        except Exception:
+            logger.exception("Failed to clean orphaned processing docs on startup")
+
         logger.info("ARQ Worker started")
 
     async def on_shutdown(self) -> None:
