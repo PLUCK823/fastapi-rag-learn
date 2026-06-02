@@ -78,6 +78,14 @@ async def lifespan(_app: FastAPI):
         logger.warning("Redis unavailable — async tasks disabled")
         _app.state.redis = None
 
+    # 预加载 embedding 模型 — 避免首次请求时下载导致超时
+    try:
+        from app.core.engine import _init_shared
+        _init_shared()
+        logger.info("Embedding model loaded")
+    except Exception:
+        logger.warning("Failed to preload embedding model — will retry on first request")
+
     yield
 
     # 测试环境不销毁 engine（conftest 自己管理 engine 生命周期）

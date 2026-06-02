@@ -278,7 +278,10 @@ def _init_shared() -> None:
         _llm = _FakeLLM()  # type: ignore[assignment]
         _initialized = True
         return
-    _embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    _embeddings = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL,
+        model_kwargs={"local_files_only": True},
+    )
     _llm = ChatOpenAI(
         model=LLM_MODEL,
         temperature=0.7,
