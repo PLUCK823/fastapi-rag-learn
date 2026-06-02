@@ -415,16 +415,24 @@ def delete_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> 
 
 # ── Internal ──
 
-def _ingest_to_kb(content: str, filename: str, kb_id: int, doc_id: int) -> int:
+def _ingest_to_kb(
+    content: str,
+    filename: str,
+    kb_id: int,
+    doc_id: int,
+    on_progress=None,
+) -> int:
     """文档向量化存入 Qdrant（幂等 upsert + 确定性 ID）
 
-    使用 upsert + 确定性 ID（{doc_id}_{chunk_index}）：
-    - 同 ID 自动覆盖，无需手动删除旧 chunk
-    - chunk 数减少时清理由 _cleanup_stale_chunks 完成
+    on_progress(progress: int, message: str) — 可选的进度回调（用于 ARQ worker）
     """
     import logging
 
     _logger = logging.getLogger(__name__)
+
+    # ① 切分
+    if on_progress:
+        on_progress(10, "正在切分文档…")
     all_chunks = _split_content(content, filename)
 
     for i, chunk in enumerate(all_chunks):
@@ -433,14 +441,20 @@ def _ingest_to_kb(content: str, filename: str, kb_id: int, doc_id: int) -> int:
         chunk.metadata["document_name"] = filename
         chunk.metadata["chunk_index"] = i
 
+    # ② Embedding + 存储
+    if on_progress:
+        on_progress(30, f"正在向量化 {len(all_chunks)} 个分块…")
     vs = get_vectorstore(kb_id)
-    # 确定性整数 ID：doc_id * 1e6 + chunk_index，确保唯一且支持 Qdrant uint64
     id_mult = 1_000_000
     chunk_ids = [doc_id * id_mult + i for i in range(len(all_chunks))]
 
     # Qdrant add_documents(ids=...) — 同 ID 自动覆盖（upsert 语义）
+    if on_progress:
+        on_progress(60, "正在存入向量库…")
     vs.add_documents(all_chunks, ids=chunk_ids)
 
+    if on_progress:
+        on_progress(80, "正在清理旧版本…")
     # 清理上一版本残留的旧 chunk（chunk 数减少时）
     try:
         from qdrant_client import models as qdrant_models

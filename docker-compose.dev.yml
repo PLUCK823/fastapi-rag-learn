@@ -85,7 +85,7 @@ services:
     working_dir: /app
     develop:
       watch:
-        - action: sync+restart
+        - action: sync
           path: ./backend/app
           target: /app/app
           ignore:

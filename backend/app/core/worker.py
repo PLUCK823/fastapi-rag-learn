@@ -33,13 +33,20 @@ async def ingest_document(
     task_id = ctx.get("job_id", "unknown")
 
     try:
-        await update_task_progress(redis, task_id, "chunking", 10, "正在切分文档…")
+        # 进度回调 — 每个步骤实时更新 Redis，避免 worker 重启导致卡在 10%
+        def _progress(p: int, msg: str) -> None:
+            import asyncio as _asyncio
+            _asyncio.ensure_future(
+                update_task_progress(redis, task_id, "processing", p, msg)
+            )
 
         # 注：embedding 模型已在 WorkerSettings.on_startup 中加载，
         # _ingest_to_kb 只需复用已初始化的模型做纯推理（无网络 I/O）
-        chunk_count = _ingest_to_kb(content, filename, kb_id, doc_id)
+        chunk_count = _ingest_to_kb(
+            content, filename, kb_id, doc_id, on_progress=_progress,
+        )
 
-        await update_task_progress(redis, task_id, "storing", 80, "正在保存…")
+        await update_task_progress(redis, task_id, "storing", 90, "正在保存…")
 
         # 更新 SQL 中的 document 记录
         with sync_session_factory() as session:
