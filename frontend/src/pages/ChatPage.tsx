@@ -102,7 +102,7 @@ export default function ChatPage() {
   } = useChatWS(kbIdNum, activeSessionId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollIntervalsRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
+  const pollIntervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editDoc, setEditDoc] = useState<Document | null>(null);
@@ -163,7 +163,7 @@ export default function ChatPage() {
   // 组件卸载时清理所有上传轮询 interval
   useEffect(() => {
     return () => {
-      for (const id of pollIntervalsRef.current) {
+      for (const id of pollIntervalsRef.current.values()) {
         clearInterval(id);
       }
       pollIntervalsRef.current.clear();
@@ -389,7 +389,8 @@ export default function ChatPage() {
 
         if (result.sync) {
           toast(`${filename} 上传完成`, "success");
-          return; // Redis down — sync upload, already done
+          refreshDocs(); // 同步上传也刷新文档列表
+          return;
         }
 
         // Poll until done (tracked for cleanup on unmount)
@@ -426,19 +427,20 @@ export default function ChatPage() {
             );
             if (t.status === "done") {
               clearInterval(poll);
-              pollIntervalsRef.current.delete(poll);
+              pollIntervalsRef.current.delete(result.task_id);
               toast(`${filename} 上传完成`, "success");
+              refreshDocs(); // 上传成功后立即刷新文档列表
             } else if (t.status === "failed" || elapsed > MAX_POLL_MS) {
               clearInterval(poll);
-              pollIntervalsRef.current.delete(poll);
+              pollIntervalsRef.current.delete(result.task_id);
               toast(`${filename}: ${t.message || "处理超时"}`, "error");
             }
           } catch {
             clearInterval(poll);
-            pollIntervalsRef.current.delete(poll);
+            pollIntervalsRef.current.delete(result.task_id);
           }
         }, 500);
-        pollIntervalsRef.current.add(poll);
+        pollIntervalsRef.current.set(result.task_id, poll);
       } catch (err) {
         setUploadQueue((prev) => [
           ...prev,
@@ -447,8 +449,29 @@ export default function ChatPage() {
         toast(`${filename}: ${getErrorMessage(err)}`, "error");
       }
     },
-    [kbIdNum],
+    [kbIdNum, refreshDocs],
   );
+
+  /* ── Upload progress actions ── */
+  const handleStopUpload = useCallback((taskId: string) => {
+    // Clear polling interval
+    const interval = pollIntervalsRef.current.get(taskId);
+    if (interval) {
+      clearInterval(interval);
+      pollIntervalsRef.current.delete(taskId);
+    }
+    // Mark as error with "已终止" message
+    setUploadQueue((prev) =>
+      prev.map((q) =>
+        q.taskId === taskId ? { ...q, status: "error", progress: 0, error: "已终止" } : q,
+      ),
+    );
+    toast("上传已终止", "info");
+  }, []);
+
+  const handleRemoveUploadItem = useCallback((taskId: string) => {
+    setUploadQueue((prev) => prev.filter((q) => q.taskId !== taskId));
+  }, []);
 
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -459,10 +482,8 @@ export default function ChatPage() {
       for (const file of files) {
         await uploadAndPoll(file);
       }
-      // Final refresh once all are done
-      setTimeout(() => refreshDocs(), 2000);
     },
-    [uploadAndPoll, refreshDocs],
+    [uploadAndPoll],
   );
 
   /* ── Drag-and-drop upload ── */
@@ -1139,7 +1160,12 @@ export default function ChatPage() {
 
       {/* ── Upload progress modal ── */}
       {showUploadProgress && (
-        <UploadProgressModal items={uploadQueue} onClose={() => setShowUploadProgress(false)} />
+        <UploadProgressModal
+          items={uploadQueue}
+          onClose={() => setShowUploadProgress(false)}
+          onRemove={handleRemoveUploadItem}
+          onStop={handleStopUpload}
+        />
       )}
     </div>
   );
