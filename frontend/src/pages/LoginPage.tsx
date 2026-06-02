@@ -1,44 +1,45 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
 import AuthHeader from "../components/shared/AuthHeader";
 import { useAuthStore } from "../stores/authStore";
+import { toast } from "../stores/toastStore";
 import { getErrorMessage } from "../utils/error";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState(() => {
-    const msg = sessionStorage.getItem("login_message");
-    if (msg) {
-      sessionStorage.removeItem("login_message");
-      return msg;
-    }
-    return "";
-  });
   const [loading, setLoading] = useState(false);
   const setToken = useAuthStore((s) => s.setToken);
   const navigate = useNavigate();
 
+  // 从其他页面跳转带来的消息（如注册成功）通过 toast 显示
+  useEffect(() => {
+    const msg = sessionStorage.getItem("login_message");
+    if (msg) {
+      sessionStorage.removeItem("login_message");
+      toast(msg, "info");
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setError("请输入邮箱地址");
+      toast("请输入邮箱地址", "error");
       return;
     }
     if (!password.trim()) {
-      setError("请输入密码");
+      toast("请输入密码", "error");
       return;
     }
-    setError("");
     setLoading(true);
     try {
       const data = await login(email, password);
       setToken(data.access_token);
       navigate("/");
     } catch (err) {
-      setError(getErrorMessage(err));
+      toast(getErrorMessage(err), "error");
     } finally {
       setLoading(false);
     }
@@ -72,41 +73,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Error */}
-            {error && (
-              <div
-                className="mb-5 px-4 py-3 rounded-xl text-sm flex items-start gap-2.5"
-                style={{
-                  backgroundColor: "var(--danger-bg)",
-                  border: "1px solid var(--danger-border)",
-                  color: "var(--danger)",
-                }}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  className="mt-px shrink-0"
-                  aria-hidden="true"
-                >
-                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
-                  <line
-                    x1="8"
-                    y1="4.5"
-                    x2="8"
-                    y2="8.5"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="8" cy="11.2" r="0.7" fill="currentColor" />
-                </svg>
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label

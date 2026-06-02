@@ -1360,7 +1360,7 @@ export default function ChatPage() {
       {/* Floating upload progress bar — visible when uploads are in progress */}
       {uploadQueue.length > 0 && (
         <div
-          className="fixed bottom-6 right-6 z-50 card p-4 w-80 max-h-64 overflow-y-auto shadow-lg animate-fade-in-up"
+          className="fixed top-4 right-4 z-50 card p-4 w-80 max-h-64 overflow-y-auto shadow-lg animate-fade-in-up"
           style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.18)" }}
         >
           <p

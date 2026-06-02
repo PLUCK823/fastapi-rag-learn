@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -13,9 +12,6 @@ from app.core.config import REDIS_URL
 from app.core.redis import update_task_progress
 
 logger = logging.getLogger(__name__)
-
-# 单文档处理硬超时（秒）— 防止 embedding/Qdrant 卡死阻塞 worker
-INGEST_TIMEOUT = 120
 
 # ── 文档向量化 ──
 
@@ -39,12 +35,9 @@ async def ingest_document(
     try:
         await update_task_progress(redis, task_id, "chunking", 10, "正在切分文档…")
 
-        # _ingest_to_kb 是同步 CPU 密集型调用（HuggingFace embedding），
-        # 必须在独立线程中执行，否则会阻塞 ARQ 事件循环导致 job 超时重试
-        chunk_count = await asyncio.wait_for(
-            asyncio.to_thread(_ingest_to_kb, content, filename, kb_id, doc_id),
-            timeout=INGEST_TIMEOUT,
-        )
+        # 注：embedding 模型已在 WorkerSettings.on_startup 中加载，
+        # _ingest_to_kb 只需复用已初始化的模型做纯推理（无网络 I/O）
+        chunk_count = _ingest_to_kb(content, filename, kb_id, doc_id)
 
         await update_task_progress(redis, task_id, "storing", 80, "正在保存…")
 
@@ -66,30 +59,6 @@ async def ingest_document(
 
         await update_task_progress(redis, task_id, "done", 100, "处理完成")
         return {"kb_id": kb_id, "filename": filename, "chunk_count": chunk_count}
-
-    except TimeoutError:
-        logger.error(
-            "Document ingestion TIMEOUT for %s (doc %d) in kb %d after %ds",
-            filename, doc_id, kb_id, INGEST_TIMEOUT,
-        )
-        with sync_session_factory() as session:
-            from sqlalchemy import update
-
-            session.execute(
-                update(Document).where(
-                    Document.id == doc_id,
-                    Document.status == "processing",
-                ).values(
-                    status="failed",
-                    error_message=f"处理超时（超过 {INGEST_TIMEOUT} 秒），请重试",
-                    updated_at=datetime.now(UTC),
-                )
-            )
-            session.commit()
-        await update_task_progress(
-            redis, task_id, "failed", 0, f"处理超时（超过 {INGEST_TIMEOUT} 秒）"
-        )
-        raise
 
     except Exception as e:
         logger.exception(
@@ -262,6 +231,14 @@ class WorkerSettings:
     health_check_interval = 30
 
     async def on_startup(self) -> None:
+        """在 worker 主线程预加载 embedding 模型，避免后续 job 中的网络 I/O"""
+        logger.info("ARQ Worker starting — preloading embedding model...")
+        try:
+            from app.core.engine import _init_shared
+            _init_shared()
+            logger.info("Embedding model loaded successfully")
+        except Exception:
+            logger.exception("Failed to preload embedding model on startup")
         logger.info("ARQ Worker started")
 
     async def on_shutdown(self) -> None:

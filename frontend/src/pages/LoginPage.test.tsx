@@ -3,8 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import LoginPage from "./LoginPage";
+
+// Mock toast — the component now uses toast() instead of inline error display
+vi.mock("../stores/toastStore", () => ({
+  toast: vi.fn(),
+}));
 
 const server = setupServer(
   http.post("/auth/login", () =>
@@ -31,7 +36,8 @@ describe("LoginPage", () => {
     expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
   });
 
-  it("shows error on failed login", async () => {
+  it("calls toast on failed login", async () => {
+    const { toast } = await import("../stores/toastStore");
     server.use(
       http.post("/auth/login", () =>
         HttpResponse.json({ detail: "邮箱或密码不正确" }, { status: 400 }),
@@ -45,7 +51,10 @@ describe("LoginPage", () => {
     await userEvent.type(screen.getByPlaceholderText("name@example.com"), "a@b.com");
     await userEvent.type(screen.getByPlaceholderText("••••••••"), "wrong");
     await userEvent.click(screen.getByRole("button", { name: "登录" }));
-    expect(await screen.findByText("邮箱或密码不正确")).toBeInTheDocument();
+    // Wait for async error to be caught and toast to be called
+    await vi.waitFor(() => {
+      expect(toast).toHaveBeenCalledWith("邮箱或密码不正确", "error");
+    });
   });
 
   it("has registration link", () => {
