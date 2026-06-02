@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -24,7 +25,12 @@ async def ingest_document(
     filename: str,
     doc_id: int,
 ) -> dict:
-    """后台处理文档：切分 → 嵌入 → 存入 Qdrant"""
+    """后台处理文档：切分 → 嵌入 → 存入 Qdrant
+
+    embedding 模型已在 WorkerSettings.on_startup 预加载到主线程内存，
+    _ingest_to_kb 在独立线程运行（避免阻塞 ARQ 事件循环导致心跳超时重试），
+    进度更新保持在主线程（确保 Redis 写入可靠）。
+    """
     from app.core.database import sync_session_factory
     from app.models.knowledge_base import Document
     from app.services.knowledge_base import _ingest_to_kb
@@ -33,22 +39,17 @@ async def ingest_document(
     task_id = ctx.get("job_id", "unknown")
 
     try:
-        # 进度回调 — 每个步骤实时更新 Redis，避免 worker 重启导致卡在 10%
-        def _progress(p: int, msg: str) -> None:
-            import asyncio as _asyncio
-            _asyncio.ensure_future(
-                update_task_progress(redis, task_id, "processing", p, msg)
-            )
+        # ① 切分阶段
+        await update_task_progress(redis, task_id, "chunking", 10, "正在切分…")
 
-        # 注：embedding 模型已在 WorkerSettings.on_startup 中加载，
-        # _ingest_to_kb 只需复用已初始化的模型做纯推理（无网络 I/O）
-        chunk_count = _ingest_to_kb(
-            content, filename, kb_id, doc_id, on_progress=_progress,
+        # ② embedding + 存储 — 在独立线程运行，不阻塞事件循环
+        # model 已预加载到主线程，且 local_files_only=True，子线程不会触发网络 I/O
+        chunk_count = await asyncio.to_thread(
+            _ingest_to_kb, content, filename, kb_id, doc_id,
         )
 
+        # ③ 更新 SQL
         await update_task_progress(redis, task_id, "storing", 90, "正在保存…")
-
-        # 更新 SQL 中的 document 记录
         with sync_session_factory() as session:
             from sqlalchemy import update
 
@@ -64,6 +65,7 @@ async def ingest_document(
             )
             session.commit()
 
+        # ④ 完成
         await update_task_progress(redis, task_id, "done", 100, "处理完成")
         return {"kb_id": kb_id, "filename": filename, "chunk_count": chunk_count}
 
