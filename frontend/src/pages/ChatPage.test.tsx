@@ -12,6 +12,7 @@ let docState = [
     id: 1,
     filename: "readme.md",
     chunk_count: 5,
+    status: "ready",
     created_at: "2025-01-01",
     updated_at: "2025-01-01",
   },
@@ -27,7 +28,6 @@ let sessionState = [
 ];
 
 const server = setupServer(
-  // Get KB with documents (paginated response)
   http.get("/kb", () =>
     HttpResponse.json({
       items: [
@@ -45,37 +45,14 @@ const server = setupServer(
       total_pages: 1,
     }),
   ),
-  // Get sessions
   http.get("/kb/1/sessions", () => HttpResponse.json(sessionState)),
-  // Get session messages
   http.get("/kb/1/sessions/:sid/messages", () =>
     HttpResponse.json([
       { id: "1", role: "user", content: "测试问题", created_at: "2025-01-01" },
-      {
-        id: "2",
-        role: "assistant",
-        content: "测试回答",
-        created_at: "2025-01-01",
-      },
+      { id: "2", role: "assistant", content: "测试回答", created_at: "2025-01-01" },
     ]),
   ),
-  // Get document content
   http.get("/kb/1/docs/1/content", () => HttpResponse.json({ content: "文档内容" })),
-  // Rename document
-  http.put("/kb/1/docs/:docId/rename", async ({ request, params }) => {
-    const body = (await request.json()) as { filename: string };
-    docState = docState.map((d) =>
-      d.id === Number(params.docId) ? { ...d, filename: body.filename } : d,
-    );
-    return HttpResponse.json({
-      id: Number(params.docId),
-      filename: body.filename,
-      chunk_count: 5,
-      created_at: "2025-01-01",
-      updated_at: "2025-01-01",
-    });
-  }),
-  // Delete document
   http.delete("/kb/1/docs/:docId", ({ params }) => {
     docState = docState.filter((d) => d.id !== Number(params.docId));
     return HttpResponse.json({ message: "ok" });
@@ -86,12 +63,12 @@ beforeAll(() => server.listen());
 afterEach(() => {
   server.resetHandlers();
   localStorage.clear();
-  // Reset state
   docState = [
     {
       id: 1,
       filename: "readme.md",
       chunk_count: 5,
+      status: "ready",
       created_at: "2025-01-01",
       updated_at: "2025-01-01",
     },
@@ -113,7 +90,7 @@ describe("ChatPage", () => {
     localStorage.setItem("token", "fake");
   });
 
-  it("renders KB name and documents", async () => {
+  it("renders KB name and doc count", async () => {
     render(
       <MemoryRouter initialEntries={["/chat/1"]}>
         <Routes>
@@ -122,78 +99,25 @@ describe("ChatPage", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("测试知识库")).toBeInTheDocument();
+    // Doc count shown in doc management button
+    expect(await screen.findByText("(1 篇)")).toBeInTheDocument();
+  });
+
+  it("opens doc management modal and shows documents", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/chat/1"]}>
+        <Routes>
+          <Route path="/chat/:kbId" element={<ChatPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByText("测试知识库");
+
+    // Click doc management button
+    await user.click(screen.getByText(/文档管理/));
+    // Doc should appear in modal
     expect(await screen.findByText("readme.md")).toBeInTheDocument();
-  });
-
-  it("shows rename button on document hover (simulated)", async () => {
-    render(
-      <MemoryRouter initialEntries={["/chat/1"]}>
-        <Routes>
-          <Route path="/chat/:kbId" element={<ChatPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    await screen.findByText("readme.md");
-    // The rename button is hidden by default, appears on hover
-    // We can't simulate hover easily, but we can check the button exists in DOM
-    const docItem = screen.getByText("readme.md").closest("div");
-    expect(docItem).toBeInTheDocument();
-  });
-
-  it("can rename document via inline input", async () => {
-    const user = userEvent.setup();
-    render(
-      <MemoryRouter initialEntries={["/chat/1"]}>
-        <Routes>
-          <Route path="/chat/:kbId" element={<ChatPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    await screen.findByText("readme.md");
-
-    // Find and click the rename button (it's hidden, but we can force click)
-    const renameButtons = screen.getAllByRole("button");
-    const renameBtn = renameButtons.find((b) => b.textContent === "改");
-    if (renameBtn) {
-      await user.click(renameBtn);
-      // Should show inline input
-      const input = screen.getByDisplayValue("readme.md");
-      expect(input).toBeInTheDocument();
-
-      // Type new name and press Enter
-      await user.clear(input);
-      await user.type(input, "新文档名{enter}");
-
-      // Wait for the new name to appear
-      await waitFor(() => {
-        expect(screen.getByText("新文档名")).toBeInTheDocument();
-      });
-    }
-  });
-
-  it("pressing Escape cancels document rename", async () => {
-    const user = userEvent.setup();
-    render(
-      <MemoryRouter initialEntries={["/chat/1"]}>
-        <Routes>
-          <Route path="/chat/:kbId" element={<ChatPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    await screen.findByText("readme.md");
-
-    const renameButtons = screen.getAllByRole("button");
-    const renameBtn = renameButtons.find((b) => b.textContent === "改");
-    if (renameBtn) {
-      await user.click(renameBtn);
-      const input = screen.getByDisplayValue("readme.md");
-      await user.clear(input);
-      await user.type(input, "取消的名称{escape}");
-
-      // Should revert to original name
-      expect(screen.getByText("readme.md")).toBeInTheDocument();
-      expect(screen.queryByDisplayValue("取消的名称")).not.toBeInTheDocument();
-    }
   });
 
   it("renders sessions list", async () => {
@@ -204,9 +128,7 @@ describe("ChatPage", () => {
         </Routes>
       </MemoryRouter>,
     );
-    // Wait for KB name to appear
-    expect(await screen.findByText("测试知识库")).toBeInTheDocument();
-    // Session appears in sidebar - use getAllByText since it appears multiple places
+    await screen.findByText("测试知识库");
     const sessionElements = screen.getAllByText("测试问题");
     expect(sessionElements.length).toBeGreaterThan(0);
   });
@@ -222,14 +144,34 @@ describe("ChatPage", () => {
     );
     await screen.findByText("测试知识库");
 
-    // Click new session button in sessions section (there are two "+ 新建" buttons)
+    // "+ 新建" in sessions section (second one; first is for document)
     const newSessionButtons = screen.getAllByRole("button", { name: "+ 新建" });
-    // The second one is for sessions (in the "会话" section)
     await user.click(newSessionButtons[1]);
-    // Should show "新的对话" in sessions list - appears multiple times (sidebar + header)
     await waitFor(() => {
       const newSessionElements = screen.getAllByText("新的对话");
       expect(newSessionElements.length).toBeGreaterThan(0);
     });
+  });
+
+  it("filters out non-ready docs from stats", async () => {
+    // Add a processing document
+    docState.push({
+      id: 2,
+      filename: "processing.md",
+      chunk_count: 0,
+      status: "processing",
+      created_at: "2025-01-01",
+      updated_at: "2025-01-01",
+    });
+    render(
+      <MemoryRouter initialEntries={["/chat/1"]}>
+        <Routes>
+          <Route path="/chat/:kbId" element={<ChatPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByText("测试知识库");
+    // Should still show (1 篇), not (2 篇)
+    expect(await screen.findByText("(1 篇)")).toBeInTheDocument();
   });
 });

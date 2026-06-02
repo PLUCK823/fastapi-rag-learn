@@ -20,3 +20,10 @@ globalThis.localStorage = {
 
 // Mock scrollIntoView for jsdom
 Element.prototype.scrollIntoView = () => {};
+
+// Mock ResizeObserver for jsdom (used by ByteMD editor)
+(globalThis as Record<string, unknown>).ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};

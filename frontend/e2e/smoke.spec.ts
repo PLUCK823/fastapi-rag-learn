@@ -46,11 +46,22 @@ test("full user flow", async ({ page }) => {
   // Click create button
   await page.getByRole("button", { name: "创建文档" }).click();
 
-  // Wait for modal to close (save is synchronous with embedding, may take a few seconds)
+  // Wait for modal to close (save triggers async refreshDocs)
   await expect(page.getByText("新建文档")).not.toBeVisible({ timeout: 30000 });
 
-  // Doc should appear in sidebar
-  await expect(page.locator("aside").locator("text=hello.md")).toBeVisible({ timeout: 10000 });
+  // Wait for the doc list to refresh — the button text updates from "(0 篇)" to "(1 篇)"
+  await page.waitForFunction(
+    () => {
+      const btn = document.querySelector("aside button");
+      // Find the button containing "文档管理" and check its text
+      const allBtns = document.querySelectorAll("aside button");
+      for (const b of allBtns) {
+        if (b.textContent?.includes("文档管理") && b.textContent?.includes("1 篇")) return true;
+      }
+      return false;
+    },
+    { timeout: 15000 },
+  );
 
   // 6. Chat - fill input and send
   // Note: No session exists yet, will be created when message is sent

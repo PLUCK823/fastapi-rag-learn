@@ -233,6 +233,8 @@ def list_kbs_with_docs(
                     "id": d.id,
                     "filename": d.filename,
                     "chunk_count": d.chunk_count,
+                    "status": d.status,
+                    "error_message": d.error_message,
                     "created_at": d.created_at,
                     "updated_at": d.updated_at,
                 }

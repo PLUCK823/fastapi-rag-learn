@@ -2,9 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useParams } from "react-router-dom";
 import {
-  batchDeleteDocuments,
   clearMessages,
-  deleteDocument,
   deleteSession,
   getDocContent,
   listKBs,
@@ -15,10 +13,12 @@ import {
 } from "../api/kb";
 import ChatMessage from "../components/chat/ChatMessage";
 import DocEditorModal from "../components/chat/DocEditorModal";
+import DocManageModal from "../components/chat/DocManageModal";
 import DocViewerModal from "../components/chat/DocViewerModal";
 import PromptTemplates from "../components/chat/PromptTemplates";
+import UploadProgressModal from "../components/chat/UploadProgressModal";
 import ConfirmDialog from "../components/shared/ConfirmDialog";
-import { ChatSkeleton, DocListSkeleton } from "../components/shared/Skeleton";
+import { ChatSkeleton } from "../components/shared/Skeleton";
 import { useChatWS } from "../hooks/useChat";
 import { toast } from "../stores/toastStore";
 import type { Document, KBDetail, SearchResult, Session } from "../types";
@@ -113,10 +113,11 @@ export default function ChatPage() {
   const [docsLoading, setDocsLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
-  const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
-  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
   const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
   const [confirmClearChat, setConfirmClearChat] = useState(false);
+
+  const [showDocManage, setShowDocManage] = useState(false);
+  const [showUploadProgress, setShowUploadProgress] = useState(false);
 
   const [viewerDoc, setViewerDoc] = useState<{
     filename: string;
@@ -150,44 +151,8 @@ export default function ChatPage() {
     });
   }, []);
 
-  const [docFilter, setDocFilter] = useState("");
-  type DocSort =
-    | "name-asc"
-    | "name-desc"
-    | "date-newest"
-    | "date-oldest"
-    | "chunks-most"
-    | "chunks-least";
-  const [docSort, setDocSort] = useState<DocSort>("date-newest");
-  const [selectedDocIds, setSelectedDocIds] = useState<Set<number>>(new Set());
-
-  const filteredDocs = useMemo(() => {
-    const list = docFilter.trim()
-      ? docs.filter((d) => d.filename.toLowerCase().includes(docFilter.trim().toLowerCase()))
-      : [...docs];
-
-    switch (docSort) {
-      case "name-asc":
-        list.sort((a, b) => a.filename.localeCompare(b.filename));
-        break;
-      case "name-desc":
-        list.sort((a, b) => b.filename.localeCompare(a.filename));
-        break;
-      case "date-newest":
-        list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        break;
-      case "date-oldest":
-        list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        break;
-      case "chunks-most":
-        list.sort((a, b) => b.chunk_count - a.chunk_count);
-        break;
-      case "chunks-least":
-        list.sort((a, b) => a.chunk_count - b.chunk_count);
-        break;
-    }
-    return list;
-  }, [docs, docFilter, docSort]);
+  // Only show ready docs for stats and doc management
+  const readyDocs = useMemo(() => docs.filter((d) => d.status === "ready"), [docs]);
 
   const [showSidebar, setShowSidebar] = useState(false);
 
@@ -205,13 +170,16 @@ export default function ChatPage() {
     };
   }, []);
 
-  // Compute KB stats from loaded data
-  const kbStats = {
-    doc_count: docs.length,
-    chunk_count: docs.reduce((sum, d) => sum + d.chunk_count, 0),
-    session_count: sessions.length,
-    message_count: sessions.reduce((sum, s) => sum + s.message_count, 0),
-  };
+  // Compute KB stats from loaded data (only count ready docs)
+  const kbStats = useMemo(() => {
+    const readyDocs = docs.filter((d) => d.status === "ready");
+    return {
+      doc_count: readyDocs.length,
+      chunk_count: readyDocs.reduce((sum, d) => sum + d.chunk_count, 0),
+      session_count: sessions.length,
+      message_count: sessions.reduce((sum, s) => sum + s.message_count, 0),
+    };
+  }, [docs, sessions]);
 
   const refreshDocs = useCallback(async () => {
     try {
@@ -359,58 +327,6 @@ export default function ChatPage() {
     },
     [kbIdNum],
   );
-
-  const handleDeleteDoc = useCallback((doc: Document) => {
-    setConfirmDelete(doc);
-  }, []);
-
-  const executeDeleteDoc = useCallback(async () => {
-    if (!confirmDelete) return;
-    try {
-      await deleteDocument(kbIdNum, confirmDelete.id);
-      setSelectedDocIds((prev) => {
-        const next = new Set(prev);
-        next.delete(confirmDelete.id);
-        return next;
-      });
-      setConfirmDelete(null);
-      refreshDocs();
-      toast("文档已删除", "success");
-    } catch (err) {
-      toast(getErrorMessage(err));
-      setConfirmDelete(null);
-    }
-  }, [kbIdNum, confirmDelete, refreshDocs]);
-
-  const toggleDocSelection = useCallback((docId: number) => {
-    setSelectedDocIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(docId)) next.delete(docId);
-      else next.add(docId);
-      return next;
-    });
-  }, []);
-
-  const toggleSelectAll = useCallback(() => {
-    setSelectedDocIds((prev) => {
-      if (prev.size === filteredDocs.length && filteredDocs.length > 0) return new Set();
-      return new Set(filteredDocs.map((d) => d.id));
-    });
-  }, [filteredDocs]);
-
-  const executeBatchDelete = useCallback(async () => {
-    if (selectedDocIds.size === 0) return;
-    try {
-      const result = await batchDeleteDocuments(kbIdNum, Array.from(selectedDocIds));
-      setSelectedDocIds(new Set());
-      setConfirmBatchDelete(false);
-      refreshDocs();
-      toast(`已删除 ${result.deleted_count} 篇文档`, "success");
-    } catch (err) {
-      toast(getErrorMessage(err));
-      setConfirmBatchDelete(false);
-    }
-  }, [kbIdNum, selectedDocIds, refreshDocs]);
 
   const handleCitationClick = useCallback(
     async (
@@ -807,6 +723,7 @@ export default function ChatPage() {
           {kb?.name ?? "..."}
         </h2>
 
+        {/* ── Action buttons ── */}
         <div className="flex gap-1.5 mb-3">
           <button
             type="button"
@@ -838,48 +755,36 @@ export default function ChatPage() {
           />
         </div>
 
-        {/* Upload progress */}
+        {/* ── Upload progress button ── */}
         {uploadQueue.length > 0 && (
-          <div className="mb-3 p-2 rounded-md" style={{ backgroundColor: "var(--surface-bg)" }}>
-            <p className="text-[10px] font-medium mb-1" style={{ color: "var(--text-muted)" }}>
-              上传进度 ({uploadQueue.filter((q) => q.status === "done").length}/{uploadQueue.length}
-              )
-            </p>
-            <div className="max-h-24 overflow-y-auto">
-              {uploadQueue.map((item, i) => (
-                <div key={i} className="flex items-center gap-1 text-[10px] py-0.5">
-                  <span
-                    style={{
-                      color:
-                        item.status === "error"
-                          ? "var(--danger)"
-                          : item.status === "done"
-                            ? "var(--accent-sage)"
-                            : "var(--text-muted)",
-                    }}
-                  >
-                    {item.status === "done" ? "✓" : item.status === "error" ? "✗" : "↑"}
-                  </span>
-                  <span className="truncate flex-1" style={{ color: "var(--text-secondary)" }}>
-                    {item.filename}
-                  </span>
-                  {item.status === "uploading" && (
-                    <span style={{ color: "var(--text-muted)" }}>{item.progress}%</span>
-                  )}
-                  {item.error && (
-                    <span className="truncate text-[9px]" style={{ color: "var(--danger)" }}>
-                      {item.error}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <button
+            type="button"
+            className="w-full mb-3 px-3 py-2 rounded-md text-xs text-left transition-colors"
+            style={{
+              backgroundColor: "var(--surface-bg)",
+              color: "var(--text-secondary)",
+            }}
+            onClick={() => setShowUploadProgress(true)}
+          >
+            <span className="font-medium">上传进度</span>
+            <span className="ml-1" style={{ color: "var(--text-muted)" }}>
+              ({uploadQueue.filter((q) => q.status === "done").length}/{uploadQueue.length})
+            </span>
+            {uploadQueue.some((q) => q.status === "uploading") && (
+              <span
+                className="ml-2 inline-block w-2 h-2 rounded-full animate-pulse"
+                style={{ backgroundColor: "var(--accent)" }}
+              />
+            )}
+          </button>
         )}
 
-        {/* Sessions section */}
-        <div className="pb-2 mb-2" style={{ borderBottom: "var(--border-light)" }}>
-          <div className="flex items-center justify-between mb-1">
+        {/* ── Sessions section ── */}
+        <div
+          className="pb-2 mb-2 flex flex-col overflow-hidden"
+          style={{ borderBottom: "var(--border-light)", flex: "1 1 0%" }}
+        >
+          <div className="flex items-center justify-between mb-1 shrink-0">
             <span
               className="text-[10px] font-medium uppercase tracking-wider"
               style={{ color: "var(--text-muted)" }}
@@ -897,7 +802,7 @@ export default function ChatPage() {
           </div>
 
           {/* Session search */}
-          <div className="mb-2">
+          <div className="mb-2 shrink-0">
             <input
               value={sessionSearchQ}
               onChange={(e) => handleSessionSearch(e.target.value)}
@@ -908,17 +813,10 @@ export default function ChatPage() {
                 border: "var(--border-light)",
                 color: "var(--text-primary)",
               }}
-              onFocus={(e) => {
-                e.target.style.borderColor = "var(--color-copper)";
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = "var(--border-color-light)";
-              }}
             />
           </div>
 
-          <div className="-mx-4 px-4 max-h-36 overflow-y-auto">
-            {/* Show search results or normal session list */}
+          <div className="overflow-y-auto flex-1 -mx-4 px-4">
             {searchResults ? (
               searchResults.length === 0 ? (
                 <p className="text-[10px] py-1" style={{ color: "var(--text-muted)" }}>
@@ -1001,131 +899,22 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Doc search + sort + batch */}
-        {docs.length > 0 && (
-          <div className="mb-2 space-y-1.5">
-            <input
-              value={docFilter}
-              onChange={(e) => setDocFilter(e.target.value)}
-              placeholder="搜索文档…"
-              className="w-full px-2 py-1.5 rounded-md text-[11px] outline-none transition-colors"
-              style={{
-                backgroundColor: "var(--surface-bg)",
-                border: "var(--border-light)",
-                color: "var(--text-primary)",
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = "var(--color-copper)";
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = "var(--border-color-light)";
-              }}
-            />
-            <select
-              value={docSort}
-              onChange={(e) => setDocSort(e.target.value as DocSort)}
-              className="w-full px-1.5 py-1 rounded text-[10px] outline-none appearance-none"
-              style={{
-                backgroundColor: "var(--surface-bg)",
-                border: "var(--border-light)",
-                color: "var(--text-secondary)",
-              }}
-              aria-label="排序方式"
-            >
-              <option value="date-newest">时间 ↓</option>
-              <option value="date-oldest">时间 ↑</option>
-              <option value="name-asc">名称 A-Z</option>
-              <option value="name-desc">名称 Z-A</option>
-              <option value="chunks-most">分块 ↓</option>
-              <option value="chunks-least">分块 ↑</option>
-            </select>
-            <div className="flex items-center justify-between">
-              <label
-                className="flex items-center gap-1 text-[10px] cursor-pointer"
-                style={{ color: "var(--text-muted)" }}
-              >
-                <input
-                  type="checkbox"
-                  className="w-3 h-3"
-                  checked={selectedDocIds.size === filteredDocs.length && filteredDocs.length > 0}
-                  onChange={toggleSelectAll}
-                />
-                全选
-              </label>
-              {selectedDocIds.size > 0 && (
-                <button
-                  type="button"
-                  className="text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors"
-                  style={{ color: "var(--danger)" }}
-                  onClick={() => setConfirmBatchDelete(true)}
-                >
-                  删除({selectedDocIds.size})
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        <div className="flex-1 overflow-y-auto -mx-4 px-4">
-          {docsLoading ? (
-            <DocListSkeleton />
-          ) : docs.length === 0 ? (
-            <p className="text-xs text-center py-6" style={{ color: "var(--text-muted)" }}>
-              暂无文档
-            </p>
-          ) : filteredDocs.length === 0 ? (
-            <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>
-              无匹配文档
-            </p>
-          ) : (
-            filteredDocs.map((d) => (
-              <div
-                key={d.id}
-                className="flex items-center justify-between py-2 text-xs group"
-                style={{ borderBottom: "var(--border-light)" }}
-              >
-                <input
-                  type="checkbox"
-                  className="w-3 h-3 shrink-0 mr-1.5"
-                  checked={selectedDocIds.has(d.id)}
-                  onChange={() => toggleDocSelection(d.id)}
-                />
-                <button
-                  type="button"
-                  className="text-left truncate flex-1 mr-2 py-0.5 transition-colors"
-                  style={{
-                    color:
-                      d.status === "failed"
-                        ? "var(--danger)"
-                        : d.status === "processing"
-                          ? "var(--accent)"
-                          : "var(--text-secondary)",
-                  }}
-                  onClick={() => openEdit(d)}
-                >
-                  {d.filename}
-                  {d.status === "processing" && (
-                    <span className="ml-1 text-[9px]" style={{ color: "var(--text-muted)" }}>
-                      处理中…
-                    </span>
-                  )}
-                  {d.status === "failed" && (
-                    <span className="ml-1 text-[9px]" style={{ color: "var(--danger)" }}>
-                      失败
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-xs"
-                  style={{ color: "var(--text-muted)" }}
-                  onClick={() => handleDeleteDoc(d)}
-                >
-                  删除
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+        {/* ── Document management button ── */}
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-3 py-2 rounded-md text-xs transition-colors shrink-0"
+          style={{
+            backgroundColor: "var(--surface-bg)",
+            color: "var(--text-secondary)",
+          }}
+          onClick={() => setShowDocManage(true)}
+        >
+          <span className="flex items-center gap-1.5">
+            <span className="font-medium">文档管理</span>
+            <span style={{ color: "var(--text-muted)" }}>({readyDocs.length} 篇)</span>
+          </span>
+          <span style={{ color: "var(--text-muted)" }}>→</span>
+        </button>
       </aside>
 
       {/* Chat area */}
@@ -1303,26 +1092,6 @@ export default function ChatPage() {
           onSaved={refreshDocs}
         />
       )}
-      {confirmDelete && (
-        <ConfirmDialog
-          title="确认删除"
-          message={`确定删除「${confirmDelete.filename}」？此操作不可撤销。`}
-          confirmLabel="确认删除"
-          danger
-          onConfirm={executeDeleteDoc}
-          onCancel={() => setConfirmDelete(null)}
-        />
-      )}
-      {confirmBatchDelete && (
-        <ConfirmDialog
-          title="批量删除文档"
-          message={`确定删除选中的 ${selectedDocIds.size} 篇文档？此操作不可撤销。`}
-          confirmLabel="确认删除"
-          danger
-          onConfirm={executeBatchDelete}
-          onCancel={() => setConfirmBatchDelete(false)}
-        />
-      )}
       {confirmDeleteSession && (
         <ConfirmDialog
           title="确认删除"
@@ -1357,69 +1126,20 @@ export default function ChatPage() {
         />
       )}
 
-      {/* Floating upload progress bar — visible when uploads are in progress */}
-      {uploadQueue.length > 0 && (
-        <div
-          className="fixed top-14 right-4 z-50 card p-4 w-80 max-h-64 overflow-y-auto shadow-lg animate-fade-in-up"
-          style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.18)" }}
-        >
-          <p
-            className="text-xs font-semibold mb-2 uppercase tracking-wide"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            上传进度 ({uploadQueue.filter((q) => q.status === "done").length}/{uploadQueue.length})
-          </p>
-          <div className="space-y-1.5">
-            {uploadQueue.map((item, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                <span
-                  className="shrink-0 w-4 text-center"
-                  style={{
-                    color:
-                      item.status === "error"
-                        ? "var(--danger)"
-                        : item.status === "done"
-                          ? "var(--accent-sage)"
-                          : "var(--accent)",
-                  }}
-                >
-                  {item.status === "done" ? "✓" : item.status === "error" ? "✗" : "⟳"}
-                </span>
-                <span className="truncate flex-1" style={{ color: "var(--text-primary)" }}>
-                  {item.filename}
-                </span>
-                {item.status === "uploading" && (
-                  <>
-                    <div className="flex-1 h-1 rounded-full overflow-hidden bg-gray-200 max-w-20">
-                      <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{
-                          width: `${item.progress}%`,
-                          backgroundColor: "var(--accent)",
-                        }}
-                      />
-                    </div>
-                    <span
-                      className="text-[10px] w-8 text-right"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {item.progress}%
-                    </span>
-                  </>
-                )}
-                {item.error && (
-                  <span
-                    className="truncate text-[10px] max-w-24"
-                    style={{ color: "var(--danger)" }}
-                    title={item.error}
-                  >
-                    {item.error}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ── Document management modal ── */}
+      {showDocManage && (
+        <DocManageModal
+          docs={docs}
+          kbId={kbIdNum}
+          onClose={() => setShowDocManage(false)}
+          onDocClick={openEdit}
+          onSaved={refreshDocs}
+        />
+      )}
+
+      {/* ── Upload progress modal ── */}
+      {showUploadProgress && (
+        <UploadProgressModal items={uploadQueue} onClose={() => setShowUploadProgress(false)} />
       )}
     </div>
   );

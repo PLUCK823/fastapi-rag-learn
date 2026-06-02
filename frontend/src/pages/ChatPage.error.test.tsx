@@ -101,9 +101,8 @@ describe("ChatPage Error Handling", () => {
     const kbNames = await screen.findAllByText("空知识库");
     expect(kbNames.length).toBeGreaterThanOrEqual(1);
 
-    // Should show empty state for documents
-    const emptyState = screen.queryByText(/暂无文档/);
-    expect(emptyState).toBeTruthy();
+    // Doc management button should show (0 篇)
+    expect(await screen.findByText("(0 篇)")).toBeInTheDocument();
   });
 
   it("handles empty session list gracefully", async () => {
