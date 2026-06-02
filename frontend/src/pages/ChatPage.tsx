@@ -446,6 +446,7 @@ export default function ChatPage() {
           ...prev,
           { filename, taskId: "", status: "error", progress: 0, error: "文件大小不能超过 50MB" },
         ]);
+        toast(`${filename}: 文件大小不能超过 50MB`);
         return;
       }
 
@@ -454,8 +455,11 @@ export default function ChatPage() {
           ...prev,
           { filename, taskId: "", status: "error", progress: 0, error: "不支持的格式" },
         ]);
+        toast(`${filename}: 不支持的格式`);
         return;
       }
+
+      toast(`${filename} 上传中…`, "info");
 
       try {
         const result = await uploadFileAsync(kbIdNum, file);
@@ -467,12 +471,19 @@ export default function ChatPage() {
         };
         setUploadQueue((prev) => [...prev, item]);
 
-        if (result.sync) return; // Redis down — sync upload, already done
+        if (result.sync) {
+          toast(`${filename} 上传完成`, "success");
+          return; // Redis down — sync upload, already done
+        }
 
         // Poll until done (tracked for cleanup on unmount)
+        const startTime = Date.now();
+        const MAX_POLL_MS = 180_000; // 3 分钟超时，防止 worker 不响应时无限轮询
         const poll = setInterval(async () => {
           try {
             const t = await pollTask(result.task_id);
+            const elapsed = Date.now() - startTime;
+
             setUploadQueue((prev) =>
               prev.map((q) =>
                 q.taskId === result.task_id
@@ -483,16 +494,28 @@ export default function ChatPage() {
                           ? "error"
                           : t.status === "done"
                             ? "done"
-                            : "uploading",
+                            : elapsed > MAX_POLL_MS
+                              ? "error"
+                              : "uploading",
                       progress: t.progress,
-                      error: t.status === "failed" ? t.message : undefined,
+                      error:
+                        t.status === "failed"
+                          ? t.message
+                          : elapsed > MAX_POLL_MS
+                            ? "处理超时，请重试"
+                            : undefined,
                     }
                   : q,
               ),
             );
-            if (t.status === "done" || t.status === "failed") {
+            if (t.status === "done") {
               clearInterval(poll);
               pollIntervalsRef.current.delete(poll);
+              toast(`${filename} 上传完成`, "success");
+            } else if (t.status === "failed" || elapsed > MAX_POLL_MS) {
+              clearInterval(poll);
+              pollIntervalsRef.current.delete(poll);
+              toast(`${filename}: ${t.message || "处理超时"}`, "error");
             }
           } catch {
             clearInterval(poll);
@@ -505,6 +528,7 @@ export default function ChatPage() {
           ...prev,
           { filename, taskId: "", status: "error", progress: 0, error: getErrorMessage(err) },
         ]);
+        toast(`${filename}: ${getErrorMessage(err)}`, "error");
       }
     },
     [kbIdNum],
@@ -1331,6 +1355,71 @@ export default function ChatPage() {
           onConfirm={executeClearChat}
           onCancel={() => setConfirmClearChat(false)}
         />
+      )}
+
+      {/* Floating upload progress bar — visible when uploads are in progress */}
+      {uploadQueue.length > 0 && (
+        <div
+          className="fixed bottom-6 right-6 z-50 card p-4 w-80 max-h-64 overflow-y-auto shadow-lg animate-fade-in-up"
+          style={{ boxShadow: "0 8px 30px rgba(0,0,0,0.18)" }}
+        >
+          <p
+            className="text-xs font-semibold mb-2 uppercase tracking-wide"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            上传进度 ({uploadQueue.filter((q) => q.status === "done").length}/{uploadQueue.length})
+          </p>
+          <div className="space-y-1.5">
+            {uploadQueue.map((item, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span
+                  className="shrink-0 w-4 text-center"
+                  style={{
+                    color:
+                      item.status === "error"
+                        ? "var(--danger)"
+                        : item.status === "done"
+                          ? "var(--accent-sage)"
+                          : "var(--accent)",
+                  }}
+                >
+                  {item.status === "done" ? "✓" : item.status === "error" ? "✗" : "⟳"}
+                </span>
+                <span className="truncate flex-1" style={{ color: "var(--text-primary)" }}>
+                  {item.filename}
+                </span>
+                {item.status === "uploading" && (
+                  <>
+                    <div className="flex-1 h-1 rounded-full overflow-hidden bg-gray-200 max-w-20">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${item.progress}%`,
+                          backgroundColor: "var(--accent)",
+                        }}
+                      />
+                    </div>
+                    <span
+                      className="text-[10px] w-8 text-right"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {item.progress}%
+                    </span>
+                  </>
+                )}
+                {item.error && (
+                  <span
+                    className="truncate text-[10px] max-w-24"
+                    style={{ color: "var(--danger)" }}
+                    title={item.error}
+                  >
+                    {item.error}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

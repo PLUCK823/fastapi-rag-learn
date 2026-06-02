@@ -1,5 +1,6 @@
 """知识库 + 文档管理路由（同步，避免 greenlet）"""
 
+import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -32,6 +33,8 @@ from app.models.schemas import (
 )
 from app.models.user import User
 from app.services import knowledge_base as kb_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/kb", tags=["knowledge_base"])
 
@@ -221,6 +224,24 @@ async def upload_document(
     ).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="知识库中已存在同名文档")
+
+    # 自动清理卡死的 processing 文档（worker 崩溃等异常场景）
+    from datetime import UTC, datetime, timedelta
+
+    stale_cutoff = datetime.now(UTC) - timedelta(minutes=5)
+    stale_docs = session.execute(
+        sa_select(kb_service.Document).where(
+            kb_service.Document.kb_id == kb_id,
+            kb_service.Document.status == "processing",
+            kb_service.Document.created_at < stale_cutoff,
+        )
+    ).scalars().all()
+    if stale_docs:
+        for sd in stale_docs:
+            sd.status = "failed"  # type: ignore[attr-defined]
+            sd.error_message = "Worker 未响应（超过 5 分钟），自动标记为失败"  # type: ignore[attr-defined]
+        session.commit()
+        logger.info("Auto-failed %d stale processing docs in kb %d", len(stale_docs), kb_id)
 
     # 尝试入队 ARQ 后台任务
     task_id = str(uuid4())
