@@ -70,15 +70,13 @@ def _run_migrations() -> None:
 async def lifespan(_app: FastAPI):
     # 启动：Redis 连接池（用于入队 ARQ 任务）
     # 注：数据库迁移通过 CI pre-start 或 Docker entrypoint 执行，不在此处阻塞
-    logger.info("Lifespan: startup begin")
     try:
         redis_pool = await create_redis_pool()
         _app.state.redis = redis_pool
         logger.info("Redis pool created")
-    except Exception as e:
-        logger.warning("Redis unavailable — async tasks disabled: %s", e)
+    except Exception:
+        logger.warning("Redis unavailable — async tasks disabled")
         _app.state.redis = None
-    logger.info("Lifespan: startup complete, yielding")
 
     yield
 
