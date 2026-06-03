@@ -47,10 +47,12 @@ else:
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 
-# Embedding（本地模型，无需 API key）
-# Qwen3-Embedding-0.6B — C-MTEB ~71，1024d，Apache 2.0
-# 注：Youtu-Embedding (C-MTEB #1) 需要 transformers 4.x，与当前 5.x 不兼容
-EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-0.6B"
+# Embedding — 支持两种模式：
+#   "local" = HuggingFace 本地模型（默认，无需 API）
+#   "api"   = OpenAI-compatible Embedding API（需 OPENAI_API_KEY + OPENAI_BASE_URL）
+# API 模式：复用 LLM 的 OPENAI_API_KEY / OPENAI_BASE_URL，可单独指定模型名
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local")
+EMBEDDING_API_MODEL = os.getenv("EMBEDDING_API_MODEL", "text-embedding-3-small")
 
 # Reranker（精排）— Qwen3-Reranker-4B，当前最强免费 cross-encoder
 RERANKER_MODEL = "Qwen/Qwen3-Reranker-4B"

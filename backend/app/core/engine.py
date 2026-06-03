@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_qdrant import Qdrant
 from qdrant_client import QdrantClient, models
 
@@ -23,7 +23,8 @@ if TYPE_CHECKING:
     from sentence_transformers import CrossEncoder
 
 from app.core.config import (
-    EMBEDDING_MODEL,
+    EMBEDDING_API_MODEL,
+    EMBEDDING_PROVIDER,
     LLM_MODEL,
     OPENAI_BASE_URL,
     QDRANT_URL,
@@ -54,7 +55,7 @@ def _init_jieba() -> None:
     _jieba_loaded = True
 
 _initialized = False
-_embeddings: HuggingFaceEmbeddings | None = None
+_embeddings: HuggingFaceEmbeddings | OpenAIEmbeddings | None = None
 _llm: ChatOpenAI | None = None
 _reranker: CrossEncoder | None = None
 
@@ -278,10 +279,27 @@ def _init_shared() -> None:
         _llm = _FakeLLM()  # type: ignore[assignment]
         _initialized = True
         return
-    _embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-        model_kwargs={"local_files_only": True},
-    )
+
+    # Embedding provider：api（OpenAI 兼容 API）或 local（HuggingFace 本地模型）
+    if EMBEDDING_PROVIDER == "api":
+        logger.info(
+            "Using API embedding: model=%s base_url=%s",
+            EMBEDDING_API_MODEL, OPENAI_BASE_URL,
+        )
+        api_kwargs: dict[str, Any] = {
+            "model": EMBEDDING_API_MODEL,
+            "chunk_size": 200,
+        }
+        if OPENAI_BASE_URL:
+            api_kwargs["openai_api_base"] = str(OPENAI_BASE_URL)
+        _embeddings = OpenAIEmbeddings(**api_kwargs)  # type: ignore[arg-type]
+    else:
+        logger.info("Using local embedding: model=Qwen/Qwen3-Embedding-0.6B")
+        _embeddings = HuggingFaceEmbeddings(
+            model_name="Qwen/Qwen3-Embedding-0.6B",
+            model_kwargs={"local_files_only": True},
+        )
+
     _llm = ChatOpenAI(
         model=LLM_MODEL,
         temperature=0.7,
