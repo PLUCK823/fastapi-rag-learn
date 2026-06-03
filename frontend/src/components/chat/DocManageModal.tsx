@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { deleteDocument } from "../../api/kb";
 import { toast } from "../../stores/toastStore";
 import type { Document } from "../../types";
-import { getErrorMessage } from "../../utils/error";
 
 type DocSort =
   | "name-asc"

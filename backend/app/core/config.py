@@ -64,6 +64,9 @@ QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6334")
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 120
 
+# 嵌入批次大小 — 控制单次向量化的 chunk 数量，避免大文档 OOM 且实现细粒度进度
+EMBEDDING_BATCH_SIZE = 200
+
 # 检索
 RETRIEVAL_K = 8
 

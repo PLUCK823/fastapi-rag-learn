@@ -441,17 +441,25 @@ def _ingest_to_kb(
         chunk.metadata["document_name"] = filename
         chunk.metadata["chunk_index"] = i
 
-    # ② Embedding + 存储
+    # ② Embedding + 存储（分批向量化，避免大文档 OOM 且进度可感知）
     if on_progress:
         on_progress(30, f"正在向量化 {len(all_chunks)} 个分块…")
     vs = get_vectorstore(kb_id)
     id_mult = 1_000_000
     chunk_ids = [doc_id * id_mult + i for i in range(len(all_chunks))]
 
-    # Qdrant add_documents(ids=...) — 同 ID 自动覆盖（upsert 语义）
-    if on_progress:
-        on_progress(60, "正在存入向量库…")
-    vs.add_documents(all_chunks, ids=chunk_ids)
+    from app.core.config import EMBEDDING_BATCH_SIZE
+
+    total = len(all_chunks)
+    for batch_start in range(0, total, EMBEDDING_BATCH_SIZE):
+        batch_end = min(batch_start + EMBEDDING_BATCH_SIZE, total)
+        batch_chunks = all_chunks[batch_start:batch_end]
+        batch_ids = chunk_ids[batch_start:batch_end]
+        # add_documents(ids=...) — 同 ID 自动覆盖（upsert 语义）
+        vs.add_documents(batch_chunks, ids=batch_ids)
+        if on_progress:
+            pct = 30 + int(30 * batch_end / total)
+            on_progress(pct, f"正在向量化 {batch_end}/{total}…")
 
     if on_progress:
         on_progress(80, "正在清理旧版本…")

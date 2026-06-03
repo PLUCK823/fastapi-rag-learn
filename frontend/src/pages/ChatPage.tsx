@@ -119,7 +119,7 @@ export default function ChatPage() {
       return [];
     }
   });
-  const [docsLoading, setDocsLoading] = useState(true);
+  const [, setDocsLoading] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
   const [confirmDeleteSession, setConfirmDeleteSession] = useState<Session | null>(null);
