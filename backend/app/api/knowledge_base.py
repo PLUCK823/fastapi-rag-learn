@@ -210,15 +210,15 @@ async def upload_document(
 
     # PDF/DOCX 经 Docling 已转为 Markdown，统一后缀
     import os as _os
-    name, ext = _os.path.splitext(filename)
-    if ext.lower() in {".pdf", ".docx"}:
-        filename = f"{name}.md"
+    orig_basename = _os.path.splitext(filename)[0]  # 不含后缀的原始名
+    if _os.path.splitext(filename)[1].lower() in {".pdf", ".docx"}:
+        filename = f"{orig_basename}.md"
 
-    # 检查重复文件名（跳过已失败的记录，允许重试）
+    # 按基础名（不含后缀）查重：上传 report.pdf 后不能再传 report.docx / report.txt
     existing = session.execute(
         sa_select(kb_service.Document).where(
             kb_service.Document.kb_id == kb_id,
-            kb_service.Document.filename == filename,
+            func.split_part(kb_service.Document.filename, ".", 1) == orig_basename,
             kb_service.Document.status != "failed",
         )
     ).scalar_one_or_none()
