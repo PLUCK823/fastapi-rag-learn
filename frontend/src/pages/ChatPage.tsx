@@ -456,6 +456,7 @@ export default function ChatPage() {
           progress: 0,
         };
         setUploadQueue((prev) => [...prev, item]);
+        setShowUploadProgress(true); // 自动弹出进度面板
 
         if (result.sync) {
           toast(`${filename} 上传完成`, "success");
