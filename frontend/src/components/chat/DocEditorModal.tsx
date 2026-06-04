@@ -93,7 +93,7 @@ export default function DocEditorModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-6 animate-fade-in"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-6 animate-fade-in"
       style={{
         backgroundColor: "var(--overlay-heavy)",
         backdropFilter: "blur(3px)",
