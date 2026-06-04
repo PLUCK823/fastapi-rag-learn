@@ -23,7 +23,9 @@ if TYPE_CHECKING:
     from sentence_transformers import CrossEncoder
 
 from app.core.config import (
+    EMBEDDING_API_KEY,
     EMBEDDING_API_MODEL,
+    EMBEDDING_BASE_URL,
     EMBEDDING_PROVIDER,
     LLM_MODEL,
     OPENAI_BASE_URL,
@@ -282,16 +284,20 @@ def _init_shared() -> None:
 
     # Embedding provider：api（OpenAI 兼容 API）或 local（HuggingFace 本地模型）
     if EMBEDDING_PROVIDER == "api":
+        api_base = EMBEDDING_BASE_URL or str(OPENAI_BASE_URL) if OPENAI_BASE_URL else None
+        api_key = EMBEDDING_API_KEY or None  # OpenAIEmbeddings 默认读 OPENAI_API_KEY 环境变量
         logger.info(
             "Using API embedding: model=%s base_url=%s",
-            EMBEDDING_API_MODEL, OPENAI_BASE_URL,
+            EMBEDDING_API_MODEL, api_base,
         )
         api_kwargs: dict[str, Any] = {
             "model": EMBEDDING_API_MODEL,
             "chunk_size": 200,
         }
-        if OPENAI_BASE_URL:
-            api_kwargs["openai_api_base"] = str(OPENAI_BASE_URL)
+        if api_key:
+            api_kwargs["openai_api_key"] = api_key
+        if api_base:
+            api_kwargs["openai_api_base"] = api_base
         _embeddings = OpenAIEmbeddings(**api_kwargs)  # type: ignore[arg-type]
     else:
         logger.info("Using local embedding: model=Qwen/Qwen3-Embedding-0.6B")

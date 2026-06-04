@@ -49,10 +49,13 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 
 # Embedding — 支持两种模式：
 #   "local" = HuggingFace 本地模型（默认，无需 API）
-#   "api"   = OpenAI-compatible Embedding API（需 OPENAI_API_KEY + OPENAI_BASE_URL）
-# API 模式：复用 LLM 的 OPENAI_API_KEY / OPENAI_BASE_URL，可单独指定模型名
+#   "api"   = OpenAI-compatible Embedding API
+# API 模式默认复用 LLM 的 OPENAI_API_KEY / OPENAI_BASE_URL，
+# 也可单独指定 EMBEDDING_API_KEY / EMBEDDING_BASE_URL（如 LLM 和 Embedding 不同服务商）
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local")
-EMBEDDING_API_MODEL = os.getenv("EMBEDDING_API_MODEL", "text-embedding-3-small")
+EMBEDDING_API_MODEL = os.getenv("EMBEDDING_API_MODEL", "BAAI/bge-large-zh-v1.5")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")  # 未设置则 fallback 到 OPENAI_API_KEY
+EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL")  # 未设置则 fallback 到 OPENAI_BASE_URL
 
 # Reranker（精排）— Qwen3-Reranker-4B，当前最强免费 cross-encoder
 RERANKER_MODEL = "Qwen/Qwen3-Reranker-4B"
