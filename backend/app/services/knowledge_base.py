@@ -448,6 +448,8 @@ def _ingest_to_kb(
     id_mult = 1_000_000
     chunk_ids = [doc_id * id_mult + i for i in range(len(all_chunks))]
 
+    import time as _time
+
     from app.core.config import EMBEDDING_BATCH_SIZE
 
     total = len(all_chunks)
@@ -456,10 +458,36 @@ def _ingest_to_kb(
         batch_chunks = all_chunks[batch_start:batch_end]
         batch_ids = chunk_ids[batch_start:batch_end]
         # add_documents(ids=...) — 同 ID 自动覆盖（upsert 语义）
-        vs.add_documents(batch_chunks, ids=batch_ids)
+        # 带限流重试：API embedding 可能触发 429
+        for attempt in range(5):
+            try:
+                vs.add_documents(batch_chunks, ids=batch_ids)
+                break
+            except Exception as e:
+                msg = str(e)
+                if "429" in msg or "rate" in msg.lower():
+                    wait = 2 ** attempt  # 1, 2, 4, 8, 16s 指数退避
+                    _logger.warning(
+                        "Rate limited on batch %d/%d, retry in %ds (attempt %d)",
+                        batch_end, total, wait, attempt + 1,
+                    )
+                    if on_progress:
+                        on_progress(
+                            30 + int(30 * batch_start / total),
+                            f"限流等待 {wait}s… ({batch_end}/{total})",
+                        )
+                    _time.sleep(wait)
+                else:
+                    raise
+        else:
+            raise RuntimeError(
+                f"Embedding batch {batch_start}-{batch_end} failed after 5 retries"
+            )
         if on_progress:
             pct = 30 + int(30 * batch_end / total)
             on_progress(pct, f"正在向量化 {batch_end}/{total}…")
+        # 批次间小延迟，避免触发限流
+        _time.sleep(0.5)
 
     if on_progress:
         on_progress(80, "正在清理旧版本…")
