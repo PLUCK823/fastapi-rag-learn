@@ -33,18 +33,17 @@ COPY app/ ./app/
 COPY alembic.ini ./
 COPY alembic/ ./alembic/
 
-# 预下载 reranker 模型（避免首次请求等很久）
-# embedding 模型仅 local 模式需要，api 模式可传 --build-arg SKIP_EMBEDDING_MODEL=true 跳过下载
-# 国内部署用镜像加速（hf-mirror.com），海外部署注释掉这行
-ENV HF_ENDPOINT=https://hf-mirror.com
-ARG SKIP_EMBEDDING_MODEL=false
-RUN if [ "$SKIP_EMBEDDING_MODEL" = "true" ]; then \
-        echo ">>> Skipping embedding model (EMBEDDING_PROVIDER=api)"; \
+# 预下载本地模型（仅 EMBEDDING_PROVIDER=local 或 RERANKER_PROVIDER=local 时需要）
+# 全部 API 模式时传 --build-arg SKIP_LOCAL_MODELS=true 跳过下载（节省 ~10 分钟）
+ARG SKIP_LOCAL_MODELS=false
+RUN if [ "$SKIP_LOCAL_MODELS" = "true" ]; then \
+        echo ">>> All models use API — skipping local downloads"; \
+        mkdir -p /root/.cache/huggingface; \
     else \
+        echo ">>> Downloading local models (use SKIP_LOCAL_MODELS=true for API-only mode)"; \
         .venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')" || true; \
-    fi ; \
-    .venv/bin/python3 -c "from sentence_transformers import CrossEncoder; CrossEncoder('Qwen/Qwen3-Reranker-4B')" || \
-    (echo ">>> Reranker download failed — will download at runtime" && mkdir -p /root/.cache/huggingface)
+        .venv/bin/python3 -c "from sentence_transformers import CrossEncoder; CrossEncoder('Qwen/Qwen3-Reranker-4B')" || true; \
+    fi
 
 # ============================================================
 # 阶段 2: 运行

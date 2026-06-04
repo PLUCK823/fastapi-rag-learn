@@ -57,8 +57,15 @@ EMBEDDING_API_MODEL = os.getenv("EMBEDDING_API_MODEL", "BAAI/bge-large-zh-v1.5")
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")  # 未设置则 fallback 到 OPENAI_API_KEY
 EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL")  # 未设置则 fallback 到 OPENAI_BASE_URL
 
-# Reranker（精排）— Qwen3-Reranker-4B，当前最强免费 cross-encoder
-RERANKER_MODEL = "Qwen/Qwen3-Reranker-4B"
+# Reranker（精排）— 支持两种模式：
+#   "local" = HuggingFace 本地 CrossEncoder
+#   "api"   = SiliconFlow / Jina 兼容的 /v1/rerank API
+# API 模式默认复用 EMBEDDING_API_KEY / EMBEDDING_BASE_URL
+RERANKER_PROVIDER = os.getenv("RERANKER_PROVIDER", "local")
+RERANKER_API_MODEL = os.getenv("RERANKER_API_MODEL", "BAAI/bge-reranker-v2-m3")
+RERANKER_API_KEY = os.getenv("RERANKER_API_KEY")  # fallback → EMBEDDING_API_KEY → OPENAI_API_KEY
+# RERANKER_BASE_URL fallback → EMBEDDING_BASE_URL → OPENAI_BASE_URL
+RERANKER_BASE_URL = os.getenv("RERANKER_BASE_URL")
 RERANKER_TOP_K = 5  # 精排后保留的 chunk 数
 RERANKER_CANDIDATE_K = 20  # 进入精排的候选数（RRF 后取 top-N 送入 reranker）
 

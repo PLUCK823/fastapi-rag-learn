@@ -30,8 +30,11 @@ from app.core.config import (
     LLM_MODEL,
     OPENAI_BASE_URL,
     QDRANT_URL,
+    RERANKER_API_KEY,
+    RERANKER_API_MODEL,
+    RERANKER_BASE_URL,
     RERANKER_CANDIDATE_K,
-    RERANKER_MODEL,
+    RERANKER_PROVIDER,
     RERANKER_TOP_K,
     RETRIEVAL_K,
 )
@@ -317,29 +320,70 @@ def _init_shared() -> None:
 
 
 def _get_reranker() -> CrossEncoder:
-    """懒加载 reranker 单例，避免拖慢首次 /ask 响应"""
+    """懒加载本地 reranker 单例（仅 local 模式使用）"""
     global _reranker
     if _reranker is not None:
         return _reranker
     from sentence_transformers import CrossEncoder
 
-    logger.info("Loading reranker model: %s", RERANKER_MODEL)
-    _reranker = CrossEncoder(RERANKER_MODEL)
+    logger.info("Loading local reranker: Qwen/Qwen3-Reranker-4B")
+    _reranker = CrossEncoder("Qwen/Qwen3-Reranker-4B")
     return _reranker
 
 
+def _rerank_api(query: str, docs: list[Document], top_k: int) -> list[Document]:
+    """API 精排：调用 SiliconFlow / Jina 兼容的 /v1/rerank 端点"""
+    import httpx
+
+    api_key = RERANKER_API_KEY or EMBEDDING_API_KEY or os.getenv("OPENAI_API_KEY", "")
+    api_base = (
+        RERANKER_BASE_URL or EMBEDDING_BASE_URL
+        or (str(OPENAI_BASE_URL) if OPENAI_BASE_URL else "")
+    )
+    # 去掉 /v1 后缀再拼 /v1/rerank（兼容各种 base_url 格式）
+    base = api_base.rstrip("/")
+    if base.endswith("/v1"):
+        url = f"{base}/rerank"
+    else:
+        url = f"{base}/v1/rerank"
+
+    payload = {
+        "model": RERANKER_API_MODEL,
+        "query": query,
+        "documents": [d.page_content for d in docs],
+        "top_n": top_k,
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    resp = httpx.post(url, json=payload, headers=headers, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+
+    # 按 relevance_score 降序排列
+    results = data.get("results", [])
+    ranked = sorted(results, key=lambda r: r["relevance_score"], reverse=True)
+    indices = [r["index"] for r in ranked[:top_k]]
+    return [docs[i] for i in indices if i < len(docs)]
+
+
 def _rerank(query: str, docs: list[Document], top_k: int) -> list[Document]:
-    """Cross-encoder 精排：对候选 doc 列表按与 query 的相关性重新排序"""
+    """精排：按 provider 选择 local CrossEncoder 或 API"""
     if _test_mode_enabled():
         return docs[:top_k]
     if not docs or top_k >= len(docs):
         return docs
-    reranker = _get_reranker()
-    pairs = [(query, d.page_content) for d in docs]
-    scores = reranker.predict(pairs)  # type: ignore[arg-type]
-    # 按分数降序排列
-    ranked = sorted(zip(docs, scores), key=lambda x: x[1], reverse=True)
-    return [d for d, _ in ranked[:top_k]]
+
+    if RERANKER_PROVIDER == "api":
+        try:
+            return _rerank_api(query, docs, top_k)
+        except Exception:
+            logger.exception("API rerank failed, falling back to no-rerank")
+            return docs[:top_k]
+    else:
+        reranker = _get_reranker()
+        pairs = [(query, d.page_content) for d in docs]
+        scores = reranker.predict(pairs)  # type: ignore[arg-type]
+        ranked = sorted(zip(docs, scores), key=lambda x: x[1], reverse=True)
+        return [d for d, _ in ranked[:top_k]]
 
 
 # ── Qdrant 客户端（模块级复用，避免每次创建新连接） ──
