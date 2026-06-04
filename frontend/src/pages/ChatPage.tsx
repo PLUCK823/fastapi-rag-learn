@@ -847,29 +847,35 @@ export default function ChatPage() {
           />
         </div>
 
-        {/* ── Upload progress button ── */}
-        {uploadQueue.length > 0 && (
-          <button
-            type="button"
-            className="w-full mb-3 px-3 py-2 rounded-md text-xs text-left transition-colors"
-            style={{
-              backgroundColor: "var(--surface-bg)",
-              color: "var(--text-secondary)",
-            }}
-            onClick={() => setShowUploadProgress(true)}
-          >
-            <span className="font-medium">上传进度</span>
+        {/* ── Upload progress — 常驻侧边栏 ── */}
+        <button
+          type="button"
+          className="w-full mb-3 px-3 py-2 rounded-md text-xs text-left transition-colors"
+          style={{
+            backgroundColor: "var(--surface-bg)",
+            color: uploadQueue.length > 0 ? "var(--text-secondary)" : "var(--text-muted)",
+          }}
+          onClick={() => setShowUploadProgress(true)}
+        >
+          <span className="font-medium">上传进度</span>
+          {uploadQueue.length > 0 ? (
+            <>
+              <span className="ml-1" style={{ color: "var(--text-muted)" }}>
+                ({uploadQueue.filter((q) => q.status === "done").length}/{uploadQueue.length})
+              </span>
+              {uploadQueue.some((q) => q.status === "uploading") && (
+                <span
+                  className="ml-2 inline-block w-2 h-2 rounded-full animate-pulse"
+                  style={{ backgroundColor: "var(--accent)" }}
+                />
+              )}
+            </>
+          ) : (
             <span className="ml-1" style={{ color: "var(--text-muted)" }}>
-              ({uploadQueue.filter((q) => q.status === "done").length}/{uploadQueue.length})
+              (空)
             </span>
-            {uploadQueue.some((q) => q.status === "uploading") && (
-              <span
-                className="ml-2 inline-block w-2 h-2 rounded-full animate-pulse"
-                style={{ backgroundColor: "var(--accent)" }}
-              />
-            )}
-          </button>
-        )}
+          )}
+        </button>
 
         {/* ── Sessions section ── */}
         <div
