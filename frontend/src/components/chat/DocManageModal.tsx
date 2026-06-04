@@ -205,10 +205,7 @@ export default function DocManageModal({
                     type="button"
                     className="text-left truncate hover:underline"
                     style={{ color: "var(--text-secondary)" }}
-                    onClick={() => {
-                      onDocClick(d);
-                      onClose();
-                    }}
+                    onClick={() => onDocClick(d)}
                   >
                     {d.filename}
                   </button>
