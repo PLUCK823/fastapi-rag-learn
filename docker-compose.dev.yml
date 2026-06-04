@@ -67,6 +67,8 @@ services:
     build:
       context: ./backend
       target: dev
+      args:
+        SKIP_EMBEDDING_MODEL: "true"
     command: uv run arq app.core.worker.WorkerSettings
     env_file:
       - ./backend/.env
@@ -101,6 +103,8 @@ services:
     build:
       context: ./backend
       target: dev
+      args:
+        SKIP_EMBEDDING_MODEL: "true"
     command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"

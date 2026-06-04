@@ -33,11 +33,18 @@ COPY app/ ./app/
 COPY alembic.ini ./
 COPY alembic/ ./alembic/
 
-# 预下载 embedding + reranker 模型（避免首次请求等很久）
-# 国内部署可取消注释下面这行用镜像加速:
-# ENV HF_ENDPOINT=https://hf-mirror.com
-RUN .venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')" && \
-    .venv/bin/python3 -c "from sentence_transformers import CrossEncoder; CrossEncoder('Qwen/Qwen3-Reranker-4B')"
+# 预下载 reranker 模型（避免首次请求等很久）
+# embedding 模型仅 local 模式需要，api 模式可传 --build-arg SKIP_EMBEDDING_MODEL=true 跳过下载
+# 国内部署用镜像加速（hf-mirror.com），海外部署注释掉这行
+ENV HF_ENDPOINT=https://hf-mirror.com
+ARG SKIP_EMBEDDING_MODEL=false
+RUN if [ "$SKIP_EMBEDDING_MODEL" = "true" ]; then \
+        echo ">>> Skipping embedding model (EMBEDDING_PROVIDER=api)"; \
+    else \
+        .venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')" || true; \
+    fi ; \
+    .venv/bin/python3 -c "from sentence_transformers import CrossEncoder; CrossEncoder('Qwen/Qwen3-Reranker-4B')" || \
+    (echo ">>> Reranker download failed — will download at runtime" && mkdir -p /root/.cache/huggingface)
 
 # ============================================================
 # 阶段 2: 运行
@@ -58,7 +65,8 @@ RUN groupadd -r appuser && useradd -r -g appuser -u 1001 appuser
 
 # 复制 venv 和预下载模型
 COPY --from=builder /app/.venv .venv
-COPY --from=builder /root/.cache/huggingface /home/appuser/.cache/huggingface
+# 复制 venv；模型缓存可能在 builder（production）或 dev（含预下载）中
+COPY --from=dev /root/.cache/huggingface /home/appuser/.cache/huggingface
 
 # 应用代码（仅代码，数据通过 volume 挂载）
 COPY app/ ./app/
