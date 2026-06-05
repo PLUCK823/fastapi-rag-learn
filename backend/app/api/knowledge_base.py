@@ -85,24 +85,13 @@ def _parse_with_docling(raw: bytes, suffix: str) -> str:
         raise HTTPException(status_code=400, detail=f"PDF 解析失败: {e}")
 
 
-def _parse_upload(file: UploadFile) -> str:
-    """解析上传文件内容，支持 txt / md / pdf"""
-    raw = file.file.read()
-    if len(raw) > _MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="文件大小不能超过 50MB")
-    filename = file.filename or "untitled"
-
+def _parse_upload(raw: bytes, filename: str) -> str:
+    """解析上传文件内容，支持 txt / md / pdf / docx"""
     ext = filename.lower()
-    if not any(ext.endswith(e) for e in _ALLOWED_EXTENSIONS):
-        raise HTTPException(
-            status_code=400,
-            detail=f"不支持的文件类型，仅支持: {', '.join(sorted(_ALLOWED_EXTENSIONS))}",
-        )
 
     # PDF / DOCX 二进制文件 → Docling
     if ext.endswith(".pdf") or ext.endswith(".docx"):
-        suffix = ext  # e.g. ".pdf", ".docx"
-        return _parse_with_docling(raw, suffix)
+        return _parse_with_docling(raw, ext)
 
     # txt / md → UTF-8 文本
     try:
@@ -205,16 +194,26 @@ async def upload_document(
 ):
     """上传文件（txt / md / pdf / docx）— 返回 task_id，后台异步处理"""
 
-    content = _parse_upload(file)
+    raw = file.file.read()
     filename = file.filename or "untitled"
+
+    # ① 快速校验（大小 + 格式）
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="文件大小不能超过 50MB")
+    ext = filename.lower()
+    if not any(ext.endswith(e) for e in _ALLOWED_EXTENSIONS):
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件类型，仅支持: {', '.join(sorted(_ALLOWED_EXTENSIONS))}",
+        )
 
     # PDF/DOCX 经 Docling 已转为 Markdown，统一后缀
     import os as _os
-    orig_basename = _os.path.splitext(filename)[0]  # 不含后缀的原始名
+    orig_basename = _os.path.splitext(filename)[0]
     if _os.path.splitext(filename)[1].lower() in {".pdf", ".docx"}:
         filename = f"{orig_basename}.md"
 
-    # 按基础名（不含后缀）查重：上传 report.pdf 后不能再传 report.docx / report.txt
+    # ② 查重（按基础名）
     existing = session.execute(
         sa_select(kb_service.Document).where(
             kb_service.Document.kb_id == kb_id,
@@ -225,9 +224,8 @@ async def upload_document(
     if existing:
         raise HTTPException(status_code=409, detail="知识库中已存在同名文档")
 
-    # 自动清理卡死的 processing 文档（worker 崩溃等异常场景）
+    # 自动清理卡死的 processing 文档
     from datetime import UTC, datetime, timedelta
-
     stale_cutoff = datetime.now(UTC) - timedelta(minutes=5)
     stale_docs = session.execute(
         sa_select(kb_service.Document).where(
@@ -238,43 +236,52 @@ async def upload_document(
     ).scalars().all()
     if stale_docs:
         for sd in stale_docs:
-            sd.status = "failed"  # type: ignore[attr-defined]
-            sd.error_message = "Worker 未响应（超过 5 分钟），自动标记为失败"  # type: ignore[attr-defined]
+            sd.status = "failed"
+            sd.error_message = "Worker 未响应（超过 5 分钟），自动标记为失败"
         session.commit()
         logger.info("Auto-failed %d stale processing docs in kb %d", len(stale_docs), kb_id)
 
-    # 尝试入队 ARQ 后台任务
+    # ③ 先创建 tracking 记录 + task_id，前端立刻看到进度
     task_id = str(uuid4())
-    try:
-        import app.main as _main_mod
-        from app.core.redis import update_task_progress
+    import app.main as _main_mod
+    from app.core.redis import update_task_progress
+    app_instance = _main_mod.app
+    redis = getattr(app_instance.state, "redis", None)
 
-        app_instance = _main_mod.app
-        redis = getattr(app_instance.state, "redis", None)
-        if redis:
-            # 创建 "processing" 临时记录
-            doc = kb_service.Document(
-                kb_id=kb_id, filename=filename, status="processing"
-            )
-            session.add(doc)
+    if redis:
+        doc = kb_service.Document(kb_id=kb_id, filename=filename, status="processing")
+        session.add(doc)
+        session.commit()
+        session.refresh(doc)
+
+        await update_task_progress(redis, task_id, "parsing", 5, "正在解析文档…")
+
+        # ④ 解析文件（PDF/DOCX 首次需下载 OCR 模型 ~26MB，其余即时）
+        try:
+            content = _parse_upload(raw, filename)
+        except HTTPException:
+            # 解析失败 → 标记失败，前端能立即看到
+            doc.status = "failed"
+            doc.error_message = "文档解析失败，请检查文件格式"
             session.commit()
-            session.refresh(doc)
+            await update_task_progress(redis, task_id, "failed", 0, "文档解析失败")
+            raise
 
-            await update_task_progress(redis, task_id, "pending", 0, "排队中…")
-            await redis.enqueue_job(
-                "ingest_document",
-                kb_id=kb_id,
-                user_id=user.id,
-                content=content,
-                filename=filename,
-                doc_id=doc.id,
-                _job_id=task_id,
-            )
-            return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
-    except Exception:
-        session.rollback()
+        # ⑤ 入队后台处理
+        await update_task_progress(redis, task_id, "pending", 0, "排队中…")
+        await redis.enqueue_job(
+            "ingest_document",
+            kb_id=kb_id, user_id=user.id,
+            content=content, filename=filename, doc_id=doc.id,
+            _job_id=task_id,
+        )
+        return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
 
     # Redis 不可用 → 同步处理
+    try:
+        content = _parse_upload(raw, filename)
+    except HTTPException:
+        raise
     try:
         doc = kb_service.add_document(session, kb_id, user.id, content, filename)
     except sa_exc.IntegrityError:
