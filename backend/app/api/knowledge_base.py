@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -202,7 +203,6 @@ async def _parse_and_enqueue(
     filename: str,
 ) -> None:
     """后台：解析文件 → 入队 ARQ worker（解析在线程中运行，不阻塞事件循环）"""
-    import asyncio
     import logging as _logging
 
     _log = _logging.getLogger(__name__)
@@ -307,7 +307,6 @@ async def upload_document(
         await update_task_progress(redis, task_id, "parsing", 5, "正在解析文档…")
 
         # ④ 解析 + 入队放到后台 → 响应立刻返回 task_id
-        import asyncio
         asyncio.create_task(
             _parse_and_enqueue(
                 redis, task_id, doc.id, kb_id, user.id,

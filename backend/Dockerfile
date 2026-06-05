@@ -33,6 +33,9 @@ COPY app/ ./app/
 COPY alembic.ini ./
 COPY alembic/ ./alembic/
 
+# Docling / HuggingFace 模型下载使用国内镜像（加速 + 避免网络不可达）
+ENV HF_ENDPOINT=https://hf-mirror.com
+
 # 预下载本地模型（仅 EMBEDDING_PROVIDER=local 或 RERANKER_PROVIDER=local 时需要）
 # 全部 API 模式时传 --build-arg SKIP_LOCAL_MODELS=true 跳过下载（节省 ~10 分钟）
 ARG SKIP_LOCAL_MODELS=false
