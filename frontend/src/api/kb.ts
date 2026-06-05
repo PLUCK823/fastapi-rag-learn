@@ -56,6 +56,11 @@ export async function getDocContent(kbId: number, docId: number) {
   return res.data;
 }
 
+export async function getKB(kbId: number) {
+  const res = await api.get<KBDetail>(`/kb/${kbId}`);
+  return res.data;
+}
+
 export async function listDocuments(kbId: number, page = 1, pageSize = 200) {
   const res = await api.get<Document[]>(`/kb/${kbId}/docs`, {
     params: { page, page_size: pageSize },

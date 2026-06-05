@@ -150,6 +150,24 @@ def list_kbs(
     )
 
 
+@router.get("/{kb_id}", response_model=KBDetail)
+def get_kb(
+    kb_id: int,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_sync_session),
+):
+    kb = kb_service._get_kb(session, kb_id, user.id)
+    return KBDetail(
+        id=kb.id,
+        name=kb.name,
+        document_count=sum(1 for d in kb.documents if d.status == "ready"),
+        documents=[
+            DocInfo.model_validate(d) for d in kb.documents
+        ],
+        created_at=kb.created_at,
+    )
+
+
 @router.put("/{kb_id}", response_model=KBInfo)
 def rename_kb(
     kb_id: int,

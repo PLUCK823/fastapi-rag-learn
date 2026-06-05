@@ -5,7 +5,7 @@ import {
   clearMessages,
   deleteSession,
   getDocContent,
-  listDocuments,
+  getKB,
   listSessions,
   pollTask,
   searchMessages,
@@ -251,22 +251,27 @@ export default function ChatPage() {
     };
   }, [docs, sessions]);
 
+  // 进入知识库时加载 KB 信息 + 文档列表
+  useEffect(() => {
+    if (!kbIdNum) return;
+    (async () => {
+      try {
+        const kbData = await getKB(kbIdNum);
+        setKb(kbData);
+        setDocs(kbData.documents ?? []);
+      } catch (err) {
+        toast(getErrorMessage(err));
+      }
+    })();
+  }, [kbIdNum]);
+
   const refreshDocs = useCallback(async () => {
     if (!kbIdNum) return;
     try {
       setDocsLoading(true);
-      const docs = await listDocuments(kbIdNum);
-      setDocs(docs);
-      // 同步更新 KB 的文档计数
-      setKb((prev) =>
-        prev
-          ? {
-              ...prev,
-              document_count: docs.filter((d) => d.status === "ready").length,
-              documents: docs,
-            }
-          : null,
-      );
+      const kbData = await getKB(kbIdNum);
+      setKb(kbData);
+      setDocs(kbData.documents ?? []);
     } catch (err) {
       toast(getErrorMessage(err));
     } finally {
