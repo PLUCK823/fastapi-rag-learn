@@ -5,7 +5,7 @@ import {
   clearMessages,
   deleteSession,
   getDocContent,
-  listKBs,
+  listDocuments,
   listSessions,
   pollTask,
   searchMessages,
@@ -252,14 +252,21 @@ export default function ChatPage() {
   }, [docs, sessions]);
 
   const refreshDocs = useCallback(async () => {
+    if (!kbIdNum) return;
     try {
       setDocsLoading(true);
-      const kbs = (await listKBs(true)) as KBDetail[];
-      const current = kbs.find((k) => k.id === kbIdNum);
-      if (current) {
-        setKb(current);
-        setDocs(current.documents ?? []);
-      }
+      const docs = await listDocuments(kbIdNum);
+      setDocs(docs);
+      // 同步更新 KB 的文档计数
+      setKb((prev) =>
+        prev
+          ? {
+              ...prev,
+              document_count: docs.filter((d) => d.status === "ready").length,
+              documents: docs,
+            }
+          : null,
+      );
     } catch (err) {
       toast(getErrorMessage(err));
     } finally {
