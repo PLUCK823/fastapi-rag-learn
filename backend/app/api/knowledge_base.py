@@ -1,13 +1,19 @@
 """知识库 + 文档管理路由（同步，避免 greenlet）"""
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, desc, func
 from sqlalchemy import exc as sa_exc
 from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    from arq.connections import ArqRedis
 
 from app.core.auth import current_user
 from app.core.database import get_sync_session
@@ -185,10 +191,47 @@ def add_document(
     return DocInfo.model_validate(doc)
 
 
+async def _parse_and_enqueue(
+    redis: ArqRedis,
+    task_id: str,
+    doc_id: int,
+    kb_id: int,
+    user_id: int,
+    raw: bytes,
+    orig_filename: str,
+    filename: str,
+) -> None:
+    """后台：解析文件 → 入队 ARQ worker（解析失败则标记 doc 为 failed）"""
+    from app.core.database import sync_session_factory
+    from app.core.redis import update_task_progress
+    from app.models.knowledge_base import Document as DocModel
+
+    try:
+        content = _parse_upload(raw, orig_filename)
+    except HTTPException:
+        await update_task_progress(redis, task_id, "failed", 0, "文档解析失败")
+        with sync_session_factory() as s:
+            doc = s.get(DocModel, doc_id)
+            if doc:
+                doc.status = "failed"
+                doc.error_message = "文档解析失败，请检查文件格式"
+                s.commit()
+        return
+
+    await update_task_progress(redis, task_id, "pending", 0, "排队中…")
+    await redis.enqueue_job(
+        "ingest_document",
+        kb_id=kb_id, user_id=user_id,
+        content=content, filename=filename, doc_id=doc_id,
+        _job_id=task_id,
+    )
+
+
 @router.post("/{kb_id}/upload", status_code=202)
 async def upload_document(
     kb_id: int,
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks | None = None,
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
@@ -257,25 +300,18 @@ async def upload_document(
 
         await update_task_progress(redis, task_id, "parsing", 5, "正在解析文档…")
 
-        # ④ 解析文件（PDF/DOCX 首次需下载 OCR 模型 ~26MB，其余即时）
-        try:
-            content = _parse_upload(raw, orig_filename)  # 用原始后缀判断类型
-        except HTTPException:
-            # 解析失败 → 标记失败，前端能立即看到
-            doc.status = "failed"
-            doc.error_message = "文档解析失败，请检查文件格式"
-            session.commit()
-            await update_task_progress(redis, task_id, "failed", 0, "文档解析失败")
-            raise
-
-        # ⑤ 入队后台处理
-        await update_task_progress(redis, task_id, "pending", 0, "排队中…")
-        await redis.enqueue_job(
-            "ingest_document",
-            kb_id=kb_id, user_id=user.id,
-            content=content, filename=filename, doc_id=doc.id,
-            _job_id=task_id,
-        )
+        # ④ 解析 + 入队放到后台 → 响应立刻返回 task_id
+        if background_tasks:
+            background_tasks.add_task(
+                _parse_and_enqueue,
+                redis, task_id, doc.id, kb_id, user.id,
+                raw, orig_filename, filename,
+            )
+        else:
+            await _parse_and_enqueue(
+                redis, task_id, doc.id, kb_id, user.id,
+                raw, orig_filename, filename,
+            )
         return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
 
     # Redis 不可用 → 同步处理
