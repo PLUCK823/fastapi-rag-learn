@@ -36,14 +36,29 @@ COPY alembic/ ./alembic/
 # Docling / HuggingFace 模型下载使用国内镜像（加速 + 避免网络不可达）
 ENV HF_ENDPOINT=https://hf-mirror.com
 
-# 预下载本地模型（仅 EMBEDDING_PROVIDER=local 或 RERANKER_PROVIDER=local 时需要）
-# 全部 API 模式时传 --build-arg SKIP_LOCAL_MODELS=true 跳过下载（节省 ~10 分钟）
+# 预下载 Docling PDF 解析模型 ~200-300MB（避免首次上传 PDF 时等待）
+# 用最小 PDF 触发一次解析，缓存所有模型到 /root/.cache/huggingface
+RUN .venv/bin/python3 -c "
+import base64, os, tempfile
+# 最小合法 PDF（空页面）
+pdf = base64.b64decode('JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL01lZGlhQm94WzAgMCA2MTIgNzkyXS9QYXJlbnQgMiAwIFIvUmVzb3VyY2VzPDw+Pj4+ZW5kb2JqCnhyZWYKMCA0CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKdHJhaWxlcjw8L1NpemUgNC9Sb290IDEgMCBSPj4Kc3RhcnR4cmVmCjE5MAolJUVPRg==')
+with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+    f.write(pdf); tmp = f.name
+try:
+    from docling.document_converter import DocumentConverter
+    converter = DocumentConverter()
+    result = converter.convert(tmp)
+    print(f'Docling OK — parsed {len(result.document.export_to_markdown())} chars')
+finally:
+    os.unlink(tmp)
+" && echo ">>> Docling models pre-downloaded"
+
+# 预下载 embedding/reranker 本地模型（仅 local 模式需要）
 ARG SKIP_LOCAL_MODELS=false
 RUN if [ "$SKIP_LOCAL_MODELS" = "true" ]; then \
-        echo ">>> All models use API — skipping local downloads"; \
-        mkdir -p /root/.cache/huggingface; \
+        echo ">>> Skipping embedding/reranker models (using API)"; \
     else \
-        echo ">>> Downloading local models (use SKIP_LOCAL_MODELS=true for API-only mode)"; \
+        echo ">>> Downloading local embedding/reranker models"; \
         .venv/bin/python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('Qwen/Qwen3-Embedding-0.6B')" || true; \
         .venv/bin/python3 -c "from sentence_transformers import CrossEncoder; CrossEncoder('Qwen/Qwen3-Reranker-4B')" || true; \
     fi
