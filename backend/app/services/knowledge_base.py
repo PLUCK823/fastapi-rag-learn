@@ -203,7 +203,7 @@ def list_kbs(
         {
             "id": kb.id,
             "name": kb.name,
-            "document_count": len(kb.documents),
+            "document_count": sum(1 for d in kb.documents if d.status == "ready"),
             "created_at": kb.created_at,
         }
         for kb in kbs
@@ -226,7 +226,7 @@ def list_kbs_with_docs(
         {
             "id": kb.id,
             "name": kb.name,
-            "document_count": len(kb.documents),
+            "document_count": sum(1 for d in kb.documents if d.status == "ready"),
             "created_at": kb.created_at,
             "documents": [
                 {
