@@ -203,6 +203,9 @@ async def _parse_and_enqueue(
 ) -> None:
     """后台：解析文件 → 入队 ARQ worker（解析在线程中运行，不阻塞事件循环）"""
     import asyncio
+    import logging as _logging
+
+    _log = _logging.getLogger(__name__)
 
     from app.core.database import sync_session_factory
     from app.core.redis import update_task_progress
@@ -210,13 +213,15 @@ async def _parse_and_enqueue(
 
     try:
         content = await asyncio.to_thread(_parse_upload, raw, orig_filename)
-    except HTTPException:
-        await update_task_progress(redis, task_id, "failed", 0, "文档解析失败")
+    except Exception as exc:
+        err_msg = str(exc) if str(exc) else type(exc).__name__
+        _log.exception("Parse failed for %s (doc %d)", orig_filename, doc_id)
+        await update_task_progress(redis, task_id, "failed", 0, err_msg[:200])
         with sync_session_factory() as s:
             doc = s.get(DocModel, doc_id)
             if doc:
                 doc.status = "failed"
-                doc.error_message = "文档解析失败，请检查文件格式"
+                doc.error_message = err_msg[:500]
                 s.commit()
         return
 
