@@ -195,23 +195,24 @@ async def upload_document(
     """上传文件（txt / md / pdf / docx）— 返回 task_id，后台异步处理"""
 
     raw = file.file.read()
-    filename = file.filename or "untitled"
+    orig_filename = file.filename or "untitled"  # 保留原始后缀（用于解析判断）
 
     # ① 快速校验（大小 + 格式）
     if len(raw) > _MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="文件大小不能超过 50MB")
-    ext = filename.lower()
-    if not any(ext.endswith(e) for e in _ALLOWED_EXTENSIONS):
+    if not any(orig_filename.lower().endswith(e) for e in _ALLOWED_EXTENSIONS):
         raise HTTPException(
             status_code=400,
             detail=f"不支持的文件类型，仅支持: {', '.join(sorted(_ALLOWED_EXTENSIONS))}",
         )
 
-    # PDF/DOCX 经 Docling 已转为 Markdown，统一后缀
+    # PDF/DOCX 经 Docling 已转为 Markdown，统一后缀（仅数据库存储名）
     import os as _os
-    orig_basename = _os.path.splitext(filename)[0]
-    if _os.path.splitext(filename)[1].lower() in {".pdf", ".docx"}:
+    orig_basename = _os.path.splitext(orig_filename)[0]
+    if _os.path.splitext(orig_filename)[1].lower() in {".pdf", ".docx"}:
         filename = f"{orig_basename}.md"
+    else:
+        filename = orig_filename
 
     # ② 查重（按基础名）
     existing = session.execute(
@@ -258,7 +259,7 @@ async def upload_document(
 
         # ④ 解析文件（PDF/DOCX 首次需下载 OCR 模型 ~26MB，其余即时）
         try:
-            content = _parse_upload(raw, filename)
+            content = _parse_upload(raw, orig_filename)  # 用原始后缀判断类型
         except HTTPException:
             # 解析失败 → 标记失败，前端能立即看到
             doc.status = "failed"
@@ -279,7 +280,7 @@ async def upload_document(
 
     # Redis 不可用 → 同步处理
     try:
-        content = _parse_upload(raw, filename)
+        content = _parse_upload(raw, orig_filename)
     except HTTPException:
         raise
     try:
