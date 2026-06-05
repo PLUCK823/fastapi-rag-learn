@@ -500,7 +500,9 @@ export default function ChatPage() {
               clearInterval(poll);
               pollIntervalsRef.current.delete(result.task_id);
               toast(`${filename} 上传完成`, "success");
-              refreshDocs(); // 上传成功后立即刷新文档列表
+              // 确保 DB 写入可见后再刷新，加二次刷新兜底
+              setTimeout(() => refreshDocs(), 500);
+              setTimeout(() => refreshDocs(), 2000);
             } else if (t.status === "failed" || elapsed > MAX_POLL_MS) {
               clearInterval(poll);
               pollIntervalsRef.current.delete(result.task_id);
