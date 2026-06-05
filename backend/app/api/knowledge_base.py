@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, desc, func
 from sqlalchemy import exc as sa_exc
 from sqlalchemy import select as sa_select
@@ -231,7 +231,6 @@ async def _parse_and_enqueue(
 async def upload_document(
     kb_id: int,
     file: UploadFile = File(...),
-    background_tasks: BackgroundTasks | None = None,
     user: User = Depends(current_user),
     session: Session = Depends(get_sync_session),
 ):
@@ -301,17 +300,13 @@ async def upload_document(
         await update_task_progress(redis, task_id, "parsing", 5, "正在解析文档…")
 
         # ④ 解析 + 入队放到后台 → 响应立刻返回 task_id
-        if background_tasks:
-            background_tasks.add_task(
-                _parse_and_enqueue,
+        import asyncio
+        asyncio.create_task(
+            _parse_and_enqueue(
                 redis, task_id, doc.id, kb_id, user.id,
                 raw, orig_filename, filename,
             )
-        else:
-            await _parse_and_enqueue(
-                redis, task_id, doc.id, kb_id, user.id,
-                raw, orig_filename, filename,
-            )
+        )
         return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
 
     # Redis 不可用 → 同步处理
