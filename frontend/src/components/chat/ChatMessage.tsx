@@ -57,20 +57,20 @@ function CodeBlockWithCopy({ raw, children }: { raw: string; children: React.Rea
   );
 }
 
-/** 格式化时间戳 */
+/** 格式化时间戳（数据库存 UTC，浏览器自动转本地时区） */
 function formatTime(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const now = Date.now();
-  const diffSec = Math.floor((now - d.getTime()) / 1000);
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
   if (diffSec < 60) return "刚刚";
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)} 分钟前`;
-  const nowDate = new Date(now);
+  // 用 UTC 日期比较，避免跨时区偏差：北京时间 04:00 的 UTC 日期可能还是前一天
   if (
-    d.getFullYear() === nowDate.getFullYear() &&
-    d.getMonth() === nowDate.getMonth() &&
-    d.getDate() === nowDate.getDate()
+    d.getUTCFullYear() === now.getUTCFullYear() &&
+    d.getUTCMonth() === now.getUTCMonth() &&
+    d.getUTCDate() === now.getUTCDate()
   ) {
     return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
   }
