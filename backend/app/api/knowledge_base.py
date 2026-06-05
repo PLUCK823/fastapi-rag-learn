@@ -201,13 +201,15 @@ async def _parse_and_enqueue(
     orig_filename: str,
     filename: str,
 ) -> None:
-    """后台：解析文件 → 入队 ARQ worker（解析失败则标记 doc 为 failed）"""
+    """后台：解析文件 → 入队 ARQ worker（解析在线程中运行，不阻塞事件循环）"""
+    import asyncio
+
     from app.core.database import sync_session_factory
     from app.core.redis import update_task_progress
     from app.models.knowledge_base import Document as DocModel
 
     try:
-        content = _parse_upload(raw, orig_filename)
+        content = await asyncio.to_thread(_parse_upload, raw, orig_filename)
     except HTTPException:
         await update_task_progress(redis, task_id, "failed", 0, "文档解析失败")
         with sync_session_factory() as s:
