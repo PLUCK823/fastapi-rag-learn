@@ -38,9 +38,9 @@ ENV HF_ENDPOINT=https://hf-mirror.com
 
 # 预下载 Docling PDF 解析模型 ~200-300MB（避免首次上传 PDF 时等待）
 # 用最小 PDF 触发一次解析，缓存所有模型到 /root/.cache/huggingface
-RUN .venv/bin/python3 -c "
+# 使用 heredoc 避免多行引号被 Docker BuildKit 误解析
+RUN .venv/bin/python3 << 'PYEOF'
 import base64, os, tempfile
-# 最小合法 PDF（空页面）
 pdf = base64.b64decode('JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL01lZGlhQm94WzAgMCA2MTIgNzkyXS9QYXJlbnQgMiAwIFIvUmVzb3VyY2VzPDw+Pj4+ZW5kb2JqCnhyZWYKMCA0CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKdHJhaWxlcjw8L1NpemUgNC9Sb290IDEgMCBSPj4Kc3RhcnR4cmVmCjE5MAolJUVPRg==')
 with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
     f.write(pdf); tmp = f.name
@@ -51,7 +51,8 @@ try:
     print(f'Docling OK — parsed {len(result.document.export_to_markdown())} chars')
 finally:
     os.unlink(tmp)
-" && echo ">>> Docling models pre-downloaded"
+PYEOF
+RUN echo ">>> Docling models pre-downloaded"
 
 # 预下载 embedding/reranker 本地模型（仅 local 模式需要）
 ARG SKIP_LOCAL_MODELS=false
