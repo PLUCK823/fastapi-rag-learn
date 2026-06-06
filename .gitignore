@@ -9,6 +9,16 @@ wheels/
 # Virtual environments
 .venv
 
+# Tool caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Coverage
+htmlcov/
+.coverage
+coverage.xml
+
 # Secrets
 .env
 
@@ -21,6 +31,9 @@ CLAUDE.md
 # Frontend artifacts（防止从根目录误跑）
 node_modules/
 test-results/
+
+# Playwright
+playwright-report/
 
 # macOS
 .DS_Store
