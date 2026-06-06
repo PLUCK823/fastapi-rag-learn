@@ -17,6 +17,15 @@ let kbState = {
 let sessionState: unknown[] = [];
 
 const server = setupServer(
+  // GET /kb/{id} — KB detail (used by ChatPage to load KB info)
+  http.get("/kb/:kbId", ({ params }) => {
+    const id = Number(params.kbId);
+    if (id !== kbState.id) {
+      return new HttpResponse(null, { status: 404 });
+    }
+    return HttpResponse.json(kbState);
+  }),
+  // GET /kb — list KBs (for KB list page)
   http.get("/kb", () =>
     HttpResponse.json({
       items: [kbState],
@@ -82,10 +91,12 @@ describe("ChatPage Error Handling", () => {
     localStorage.setItem("token", "fake-token");
 
     server.use(
-      http.get("/kb", () =>
+      http.get("/kb/:kbId", () =>
         HttpResponse.json({
-          items: [{ id: 1, name: "空知识库", document_count: 0, documents: [] }],
-          total: 1,
+          id: 1,
+          name: "空知识库",
+          document_count: 0,
+          documents: [],
         }),
       ),
     );

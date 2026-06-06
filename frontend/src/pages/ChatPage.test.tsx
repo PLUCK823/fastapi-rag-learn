@@ -28,6 +28,17 @@ let sessionState = [
 ];
 
 const server = setupServer(
+  // GET /kb/{id} — KB detail (used by ChatPage to load KB info)
+  http.get("/kb/:kbId", () =>
+    HttpResponse.json({
+      id: 1,
+      name: "测试知识库",
+      document_count: docState.length,
+      created_at: "2025-01-01",
+      documents: docState,
+    }),
+  ),
+  // GET /kb — list KBs (for KB list page)
   http.get("/kb", () =>
     HttpResponse.json({
       items: [
