@@ -15,9 +15,7 @@ async def test_get_profile(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_update_nickname(client: AsyncClient, auth_headers: dict):
-    resp = await client.put(
-        "/auth/me", json={"nickname": "小明"}, headers=auth_headers
-    )
+    resp = await client.put("/auth/me", json={"nickname": "小明"}, headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["nickname"] == "小明"
@@ -29,9 +27,7 @@ async def test_update_nickname(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_update_nickname_empty_is_none(client: AsyncClient, auth_headers: dict):
-    resp = await client.put(
-        "/auth/me", json={"nickname": "   "}, headers=auth_headers
-    )
+    resp = await client.put("/auth/me", json={"nickname": "   "}, headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json()["nickname"] is None
 

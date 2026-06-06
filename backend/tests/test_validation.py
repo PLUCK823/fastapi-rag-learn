@@ -54,9 +54,7 @@ async def test_update_document_empty_content_fails(
 
 @pytest.mark.asyncio
 async def test_ask_empty_question_fails(client: AsyncClient, auth_headers: dict, kb_id: int):
-    resp = await client.post(
-        "/ask", json={"kb_id": kb_id, "text": "  "}, headers=auth_headers
-    )
+    resp = await client.post("/ask", json={"kb_id": kb_id, "text": "  "}, headers=auth_headers)
     assert resp.status_code == 422
 
 

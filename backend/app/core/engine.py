@@ -59,6 +59,7 @@ def _init_jieba() -> None:
     jieba.initialize()
     _jieba_loaded = True
 
+
 _initialized = False
 _embeddings: HuggingFaceEmbeddings | OpenAIEmbeddings | None = None
 _llm: ChatOpenAI | None = None
@@ -252,15 +253,10 @@ def _fake_answer(prompt: str) -> str:
 
     # 只问采购（预留）
     if has_procurement:
-        return (
-            "根据公司规范，单笔金额超过 **5000 元** 的采购、"
-            "正式合同还需提交至总经理终审。"
-        )
+        return "根据公司规范，单笔金额超过 **5000 元** 的采购、" "正式合同还需提交至总经理终审。"
 
     # ── Python 知识库相关 ──
-    if "Python" in prompt and any(
-        term in prompt for term in ["编程语言", "Web 开发", "适合"]
-    ):
+    if "Python" in prompt and any(term in prompt for term in ["编程语言", "Web 开发", "适合"]):
         return "Python 是一门编程语言，广泛用于 Web 开发、数据分析、人工智能等领域。"
 
     # ── 通用问题 ──
@@ -291,7 +287,8 @@ def _init_shared() -> None:
         api_key = EMBEDDING_API_KEY or None  # OpenAIEmbeddings 默认读 OPENAI_API_KEY 环境变量
         logger.info(
             "Using API embedding: model=%s base_url=%s",
-            EMBEDDING_API_MODEL, api_base,
+            EMBEDDING_API_MODEL,
+            api_base,
         )
         api_kwargs: dict[str, Any] = {
             "model": EMBEDDING_API_MODEL,
@@ -337,8 +334,7 @@ def _rerank_api(query: str, docs: list[Document], top_k: int) -> list[Document]:
 
     api_key = RERANKER_API_KEY or EMBEDDING_API_KEY or os.getenv("OPENAI_API_KEY", "")
     api_base = (
-        RERANKER_BASE_URL or EMBEDDING_BASE_URL
-        or (str(OPENAI_BASE_URL) if OPENAI_BASE_URL else "")
+        RERANKER_BASE_URL or EMBEDDING_BASE_URL or (str(OPENAI_BASE_URL) if OPENAI_BASE_URL else "")
     )
     # 去掉 /v1 后缀再拼 /v1/rerank（兼容各种 base_url 格式）
     base = api_base.rstrip("/")
@@ -418,6 +414,7 @@ def _get_kb_vectorstore(kb_id: int) -> Qdrant:
     # 注意：worker 可能已异步创建集合，因此需处理 ALREADY_EXISTS 竞态
     if not client.collection_exists(col):
         from qdrant_client.models import Distance, VectorParams
+
         try:
             client.create_collection(
                 col,
@@ -464,10 +461,12 @@ def delete_document_chunks(kb_id: int, document_id: int) -> int:
     count_result = client.count(
         col,
         count_filter=models.Filter(
-            must=[models.FieldCondition(
-                key="metadata.document_id",
-                match=models.MatchValue(value=document_id),
-            )]
+            must=[
+                models.FieldCondition(
+                    key="metadata.document_id",
+                    match=models.MatchValue(value=document_id),
+                )
+            ]
         ),
     )
     before = count_result.count
@@ -479,10 +478,12 @@ def delete_document_chunks(kb_id: int, document_id: int) -> int:
         col,
         points_selector=models.FilterSelector(
             filter=models.Filter(
-                must=[models.FieldCondition(
-                    key="metadata.document_id",
-                    match=models.MatchValue(value=document_id),
-                )]
+                must=[
+                    models.FieldCondition(
+                        key="metadata.document_id",
+                        match=models.MatchValue(value=document_id),
+                    )
+                ]
             )
         ),
     )
@@ -491,10 +492,12 @@ def delete_document_chunks(kb_id: int, document_id: int) -> int:
     after = client.count(
         col,
         count_filter=models.Filter(
-            must=[models.FieldCondition(
-                key="metadata.document_id",
-                match=models.MatchValue(value=document_id),
-            )]
+            must=[
+                models.FieldCondition(
+                    key="metadata.document_id",
+                    match=models.MatchValue(value=document_id),
+                )
+            ]
         ),
     ).count
     if after > 0:
@@ -576,16 +579,19 @@ def extract_sources(docs: list[Document], question: str = "") -> list[SourceInfo
         if doc_id and doc_id not in seen:
             seen.add(doc_id)
             snippet = _best_snippet(d.page_content, keywords)
-            sources.append(SourceInfo(
-                index=idx,
-                document_id=int(doc_id),
-                document_name=str(d.metadata.get("document_name", "") if d.metadata else ""),
-                snippet=snippet,
-            ))
+            sources.append(
+                SourceInfo(
+                    index=idx,
+                    document_id=int(doc_id),
+                    document_name=str(d.metadata.get("document_name", "") if d.metadata else ""),
+                    snippet=snippet,
+                )
+            )
     return sources
 
 
 # ── Python 代码执行 ──
+
 
 def _execute_python(code: str) -> str:
     """安全地执行 Python 代码，返回 stdout 输出或错误信息"""
@@ -660,6 +666,7 @@ def _scroll_all_docs_cached(kb_id: int) -> tuple[list[str], list[str], list[dict
 
 # ── 检索 ──
 
+
 def _scroll_all_docs(kb_id: int) -> tuple[list[str], list[str], list[dict]]:
     """从 Qdrant scroll 获取集合中全部文档（用于 BM25 索引）"""
     client = _get_qdrant_client()
@@ -671,7 +678,11 @@ def _scroll_all_docs(kb_id: int) -> tuple[list[str], list[str], list[dict]]:
     offset: str | int | None = None
     while True:
         points, next_offset = client.scroll(
-            col, limit=1000, offset=offset, with_payload=True, with_vectors=False,
+            col,
+            limit=1000,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
         )
         if not points:
             break
@@ -686,9 +697,7 @@ def _scroll_all_docs(kb_id: int) -> tuple[list[str], list[str], list[dict]]:
     return ids, docs, metas
 
 
-def _keyword_search(
-    question: str, kb_id: int, exclude_ids: set[str], k: int = 3
-) -> list[Document]:
+def _keyword_search(question: str, kb_id: int, exclude_ids: set[str], k: int = 3) -> list[Document]:
     """BM25 关键词检索"""
     from rank_bm25 import BM25Okapi
 
@@ -736,11 +745,13 @@ def _keyword_search(
         if score <= 0:
             continue
         meta = metadatas[orig_idx] if orig_idx < len(metadatas) else {}
-        result.append(Document(
-            id=ids[orig_idx],
-            page_content=docs_raw[orig_idx] if isinstance(docs_raw[orig_idx], str) else "",
-            metadata=meta or {},
-        ))
+        result.append(
+            Document(
+                id=ids[orig_idx],
+                page_content=docs_raw[orig_idx] if isinstance(docs_raw[orig_idx], str) else "",
+                metadata=meta or {},
+            )
+        )
         if len(result) >= k:
             break
 
@@ -830,6 +841,7 @@ def ask(
 
 # ── 文档内容 ──
 
+
 def get_document_content(kb_id: int, document_id: int) -> str:
     """从 Qdrant 重建文档内容（按 chunk_index 排序合并）"""
     client = _get_qdrant_client()
@@ -837,10 +849,12 @@ def get_document_content(kb_id: int, document_id: int) -> str:
     points, _ = client.scroll(
         col,
         scroll_filter=models.Filter(
-            must=[models.FieldCondition(
-                key="metadata.document_id",
-                match=models.MatchValue(value=document_id),
-            )]
+            must=[
+                models.FieldCondition(
+                    key="metadata.document_id",
+                    match=models.MatchValue(value=document_id),
+                )
+            ]
         ),
         with_payload=True,
     )
@@ -857,6 +871,7 @@ def get_document_content(kb_id: int, document_id: int) -> str:
 
 
 # ── 流式问答 ──
+
 
 def ask_stream(
     question: str,

@@ -51,9 +51,7 @@ async def custom_login(
         raise HTTPException(status_code=400, detail="该账号已被禁用")
 
     # Step 3: verify password
-    verified, updated_hash = ph.verify_and_update(
-        credentials.password, user.hashed_password
-    )
+    verified, updated_hash = ph.verify_and_update(credentials.password, user.hashed_password)
     if not verified:
         raise HTTPException(status_code=400, detail="密码错误")
 
@@ -77,9 +75,7 @@ async def custom_register(
 ):
     """Custom register with distinct Chinese error messages."""
     try:
-        created_user = await user_manager.create(
-            user_create, safe=True, request=request
-        )
+        created_user = await user_manager.create(user_create, safe=True, request=request)
     except users_exceptions.UserAlreadyExists:
         raise HTTPException(status_code=400, detail="该邮箱已被注册")
     except users_exceptions.InvalidPasswordException as e:

@@ -99,9 +99,7 @@ class TestWebSocketIntegration:
         )
 
         session_id = "sess_test_123"
-        with client.websocket_connect(
-            f"/ws/{kb_id}?token={token}&session_id={session_id}"
-        ) as ws:
+        with client.websocket_connect(f"/ws/{kb_id}?token={token}&session_id={session_id}") as ws:
             ws.send_text("Python 是什么？")
             responses = []
             while True:

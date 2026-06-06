@@ -17,6 +17,7 @@ _DEFAULT_DATABASE_URL = "postgresql+asyncpg://raguser:devpassword@localhost:5432
 DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_DATABASE_URL)
 if DATABASE_URL == _DEFAULT_DATABASE_URL:
     import warnings
+
     warnings.warn(
         "DATABASE_URL is using the default value. "
         "Set DATABASE_URL in production to a secure value.",
@@ -39,9 +40,8 @@ if _RESET_TOKEN_SECRET:
     RESET_TOKEN_SECRET = _RESET_TOKEN_SECRET
 else:
     import hashlib
-    RESET_TOKEN_SECRET = hashlib.sha256(
-        SECRET_KEY.encode() + b":reset-token-v1"
-    ).hexdigest()
+
+    RESET_TOKEN_SECRET = hashlib.sha256(SECRET_KEY.encode() + b":reset-token-v1").hexdigest()
 
 # LLM
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
@@ -91,9 +91,7 @@ CORS_ALLOW_ORIGINS = [
 CORS_ALLOW_METHODS = [
     m.strip() for m in os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
 ]
-CORS_ALLOW_HEADERS = [
-    h.strip() for h in os.getenv("CORS_ALLOW_HEADERS", "*").split(",")
-]
+CORS_ALLOW_HEADERS = [h.strip() for h in os.getenv("CORS_ALLOW_HEADERS", "*").split(",")]
 
 # Rate Limiting
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))

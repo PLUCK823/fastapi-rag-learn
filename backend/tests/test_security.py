@@ -13,7 +13,7 @@ class TestSQLInjection:
         # 尝试 SQL 注入
         malicious_names = [
             "test'; DROP TABLE knowledge_bases; --",
-            "test\" OR 1=1 --",
+            'test" OR 1=1 --',
             "test') UNION SELECT * FROM users --",
         ]
 
@@ -32,7 +32,9 @@ class TestSQLInjection:
                 assert found_kb is not None
 
     @pytest.mark.asyncio
-    async def test_sql_injection_in_document_filename(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_sql_injection_in_document_filename(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """文档文件名中的 SQL 注入应该被过滤"""
         malicious_filenames = [
             "file'; DELETE FROM documents; --",
@@ -48,7 +50,9 @@ class TestSQLInjection:
             assert resp.status_code in [200, 400, 422]
 
     @pytest.mark.asyncio
-    async def test_sql_injection_in_chat_message(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_sql_injection_in_chat_message(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """聊天消息中的 SQL 注入应该被过滤"""
         await client.post(
             f"/kb/{kb_id}/docs",
@@ -58,7 +62,7 @@ class TestSQLInjection:
 
         malicious_questions = [
             "'; DROP TABLE chat_messages; --",
-            "\" OR 1=1 --",
+            '" OR 1=1 --',
         ]
 
         for question in malicious_questions:
@@ -95,7 +99,9 @@ class TestXSSProtection:
                 assert resp2.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_xss_in_document_content(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_xss_in_document_content(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """文档内容中的 XSS 脚本应该被安全存储"""
         xss_content = """
         <script>alert('xss')</script>
@@ -144,8 +150,12 @@ class TestJWTSecurity:
     async def test_jwt_expired_token(self, client: AsyncClient):
         """过期 JWT 应该返回 401"""
         # 创建用户
-        await client.post("/auth/register", json={"email": "jwt@test.com", "password": "test123456"})
-        resp = await client.post("/auth/login", data={"username": "jwt@test.com", "password": "test123456"})
+        await client.post(
+            "/auth/register", json={"email": "jwt@test.com", "password": "test123456"}
+        )
+        resp = await client.post(
+            "/auth/login", data={"username": "jwt@test.com", "password": "test123456"}
+        )
         token = resp.json()["access_token"]
 
         # 正常 Token 应该工作
@@ -154,7 +164,9 @@ class TestJWTSecurity:
 
         # 手动构造一个明显过期的 Token（修改 payload）
         # 这里我们用无效 Token 测试
-        invalid_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNjAwMDAwMDAwfQ.invalid"
+        invalid_token = (
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNjAwMDAwMDAwfQ.invalid"
+        )
         resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {invalid_token}"})
         assert resp.status_code == 401
 
@@ -162,13 +174,19 @@ class TestJWTSecurity:
     async def test_jwt_tampered_token(self, client: AsyncClient):
         """篡改的 JWT 应该返回 401"""
         # 创建用户获取有效 Token
-        await client.post("/auth/register", json={"email": "tamper@test.com", "password": "test123456"})
-        resp = await client.post("/auth/login", data={"username": "tamper@test.com", "password": "test123456"})
+        await client.post(
+            "/auth/register", json={"email": "tamper@test.com", "password": "test123456"}
+        )
+        resp = await client.post(
+            "/auth/login", data={"username": "tamper@test.com", "password": "test123456"}
+        )
         valid_token = resp.json()["access_token"]
 
         # 篡改 Token（翻转中间字符，确保签名校验失败）
         mid = len(valid_token) // 2
-        tampered_token = valid_token[:mid] + ("0" if valid_token[mid] != "0" else "1") + valid_token[mid+1:]
+        tampered_token = (
+            valid_token[:mid] + ("0" if valid_token[mid] != "0" else "1") + valid_token[mid + 1 :]
+        )
 
         resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {tampered_token}"})
         assert resp.status_code == 401
@@ -184,7 +202,9 @@ class TestJWTSecurity:
         """使用错误算法签名的 JWT 应该返回 401"""
         # 构造一个 none 算法的 Token（攻击尝试）
         none_algorithm_token = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiIxIn0."
-        resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {none_algorithm_token}"})
+        resp = await client.get(
+            "/auth/me", headers={"Authorization": f"Bearer {none_algorithm_token}"}
+        )
         assert resp.status_code == 401
 
 
@@ -258,15 +278,23 @@ class TestAuthorization:
     async def test_access_other_user_kb(self, client: AsyncClient):
         """用户不能访问其他用户的 KB"""
         # 用户 A
-        await client.post("/auth/register", json={"email": "auth_a@test.com", "password": "test123456"})
-        resp = await client.post("/auth/login", data={"username": "auth_a@test.com", "password": "test123456"})
+        await client.post(
+            "/auth/register", json={"email": "auth_a@test.com", "password": "test123456"}
+        )
+        resp = await client.post(
+            "/auth/login", data={"username": "auth_a@test.com", "password": "test123456"}
+        )
         headers_a = {"Authorization": f"Bearer {resp.json()['access_token']}"}
         resp = await client.post("/kb", json={"name": "A的库"}, headers=headers_a)
         kb_a = resp.json()["id"]
 
         # 用户 B
-        await client.post("/auth/register", json={"email": "auth_b@test.com", "password": "test123456"})
-        resp = await client.post("/auth/login", data={"username": "auth_b@test.com", "password": "test123456"})
+        await client.post(
+            "/auth/register", json={"email": "auth_b@test.com", "password": "test123456"}
+        )
+        resp = await client.post(
+            "/auth/login", data={"username": "auth_b@test.com", "password": "test123456"}
+        )
         headers_b = {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
         # 用户 B 尝试访问用户 A 的 KB 文档列表
@@ -281,8 +309,12 @@ class TestAuthorization:
     async def test_access_other_user_document(self, client: AsyncClient):
         """用户不能访问其他用户的文档"""
         # 用户 A 创建 KB 和文档
-        await client.post("/auth/register", json={"email": "doc_a@test.com", "password": "test123456"})
-        resp = await client.post("/auth/login", data={"username": "doc_a@test.com", "password": "test123456"})
+        await client.post(
+            "/auth/register", json={"email": "doc_a@test.com", "password": "test123456"}
+        )
+        resp = await client.post(
+            "/auth/login", data={"username": "doc_a@test.com", "password": "test123456"}
+        )
         headers_a = {"Authorization": f"Bearer {resp.json()['access_token']}"}
         resp = await client.post("/kb", json={"name": "A的库"}, headers=headers_a)
         kb_a = resp.json()["id"]
@@ -294,8 +326,12 @@ class TestAuthorization:
         doc_a = resp.json()["id"]
 
         # 用户 B
-        await client.post("/auth/register", json={"email": "doc_b@test.com", "password": "test123456"})
-        resp = await client.post("/auth/login", data={"username": "doc_b@test.com", "password": "test123456"})
+        await client.post(
+            "/auth/register", json={"email": "doc_b@test.com", "password": "test123456"}
+        )
+        resp = await client.post(
+            "/auth/login", data={"username": "doc_b@test.com", "password": "test123456"}
+        )
         headers_b = {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
         # 用户 B 尝试访问用户 A 的文档
@@ -360,6 +396,5 @@ class TestTokenLoggingSanitization:
             headers={"Authorization": f"Bearer {token_b}"},
         )
         assert resp.status_code == 403, (
-            f"用户 B 不应能访问用户 A 的 KB（kb_id={kb_id}），"
-            f"但得到了 {resp.status_code}"
+            f"用户 B 不应能访问用户 A 的 KB（kb_id={kb_id}），" f"但得到了 {resp.status_code}"
         )

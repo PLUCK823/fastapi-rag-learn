@@ -22,7 +22,11 @@ EMBEDDING_DIM = 1024
 
 # 假文档（用于 mock retriever 返回）
 _FAKE_DOCS = [
-    Document(id="0", page_content="这是测试文档内容", metadata={"document_id": 1, "document_name": "test.md", "chunk_index": 0}),
+    Document(
+        id="0",
+        page_content="这是测试文档内容",
+        metadata={"document_id": 1, "document_name": "test.md", "chunk_index": 0},
+    ),
 ]
 
 
@@ -48,10 +52,14 @@ class FakeLLM:
             mock.content = "汽车是一种交通工具，由发动机驱动。"
         elif "苹果" in prompt and any(term in prompt for term in ["水果", "维生素", "消化"]):
             mock.content = "苹果是一种水果，富含维生素 C。"
-        elif "Python" in prompt and any(term in prompt for term in ["编程语言", "Web 开发", "适合"]):
+        elif "Python" in prompt and any(
+            term in prompt for term in ["编程语言", "Web 开发", "适合"]
+        ):
             mock.content = "Python 是一门编程语言，广泛用于 Web 开发、数据分析、人工智能等领域。"
         elif "考勤补卡" in prompt or "补卡次数" in prompt:
-            mock.content = "根据《智能办公系统使用规范与功能说明》，员工每月允许补卡次数最多为 3 次。"
+            mock.content = (
+                "根据《智能办公系统使用规范与功能说明》，员工每月允许补卡次数最多为 3 次。"
+            )
         elif "采购" in prompt and "总经理" in prompt:
             mock.content = "根据公司规范，单笔金额超过 5000 元的采购需要总经理终审。"
         elif any(word in prompt for word in ["这是什么", "测试文档", "总结"]):
@@ -157,7 +165,8 @@ class FakeQdrantClient:
         if document_id is None:
             return sorted(points, key=lambda p: str(p.id))
         return [
-            p for p in sorted(points, key=lambda p: str(p.id))
+            p
+            for p in sorted(points, key=lambda p: str(p.id))
             if p.payload.get("metadata", {}).get("document_id") == document_id
         ]
 
@@ -220,10 +229,14 @@ def mock_engine_init():
         patch.object(engine_mod, "_llm", FakeLLM()),
         patch.object(engine_mod, "_initialized", True),
         patch.object(
-            engine_mod, "_get_kb_vectorstore", side_effect=fake_vectorstore,
+            engine_mod,
+            "_get_kb_vectorstore",
+            side_effect=fake_vectorstore,
         ),
         patch.object(
-            engine_mod, "_get_qdrant_client", return_value=fake_client,
+            engine_mod,
+            "_get_qdrant_client",
+            return_value=fake_client,
         ),
         patch("app.core.engine.get_vectorstore", side_effect=fake_vectorstore),
         patch.object(kb_service_mod, "get_vectorstore", side_effect=fake_vectorstore),

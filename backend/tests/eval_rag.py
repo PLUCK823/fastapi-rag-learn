@@ -289,9 +289,7 @@ def main():
                 gen_ok += 1
 
             status = "✅" if (hit and gen_pass) else "⚠️"
-            print(
-                f"  [{i:2d}/{total}] {status} {qtype}: {query[:40]}..."
-            )
+            print(f"  [{i:2d}/{total}] {status} {qtype}: {query[:40]}...")
 
         except Exception as e:
             print(f"  [{i:2d}/{total}] ❌ {qtype}: {query[:40]}... → {e}")

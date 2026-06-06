@@ -75,7 +75,9 @@ class TestEmbeddingErrorHandling:
     """Embedding 服务错误处理测试"""
 
     @pytest.mark.asyncio
-    async def test_embedding_error_on_document_create(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_embedding_error_on_document_create(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """Embedding 错误应该阻止文档创建"""
         # 注意：当前实现中，Embedding 错误会导致未处理的异常
         # 这个测试验证异常被抛出（应用应该添加错误处理）
@@ -98,7 +100,9 @@ class TestEmbeddingErrorHandling:
                 pass
 
     @pytest.mark.asyncio
-    async def test_embedding_error_on_search(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_embedding_error_on_search(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """Embedding 错误应该阻止搜索"""
         await client.post(
             f"/kb/{kb_id}/docs",
@@ -147,7 +151,9 @@ class TestVectorStoreErrorHandling:
     """向量库错误处理测试（Qdrant）"""
 
     @pytest.mark.asyncio
-    async def test_vector_store_collection_not_found(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_vector_store_collection_not_found(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """向量库 collection 不存在时的处理"""
         # 删除 KB 后再尝试提问（collection 应该被删除）
         await client.post(
@@ -210,9 +216,10 @@ class TestWebSocketErrorHandling:
 
         # 访问不存在的 KB（id=99999）— REST API 层应拒绝（403 禁止或 404 未找到）
         resp = await client.get("/kb/99999/docs", headers=headers)
-        assert resp.status_code in [403, 404], (
-            f"访问不存在的 KB 应返回 403 或 404，实际 {resp.status_code}"
-        )
+        assert resp.status_code in [
+            403,
+            404,
+        ], f"访问不存在的 KB 应返回 403 或 404，实际 {resp.status_code}"
 
         # 对不存在的 KB 发送 /ask 也应被拒绝（KB 所有权校验现在会先执行）
         resp = await client.post(
@@ -220,9 +227,10 @@ class TestWebSocketErrorHandling:
             json={"kb_id": 99999, "text": "测试"},
             headers=headers,
         )
-        assert resp.status_code in [403, 404], (
-            f"对不存在 KB 提问应返回 403 或 404，实际 {resp.status_code}"
-        )
+        assert resp.status_code in [
+            403,
+            404,
+        ], f"对不存在 KB 提问应返回 403 或 404，实际 {resp.status_code}"
 
 
 class TestTokenExpiryHandling:
@@ -232,8 +240,12 @@ class TestTokenExpiryHandling:
     async def test_expired_token_refresh(self, client: AsyncClient):
         """Token 过期后应该能刷新"""
         # 创建用户
-        await client.post("/auth/register", json={"email": "expire@test.com", "password": "test123456"})
-        resp = await client.post("/auth/login", data={"username": "expire@test.com", "password": "test123456"})
+        await client.post(
+            "/auth/register", json={"email": "expire@test.com", "password": "test123456"}
+        )
+        resp = await client.post(
+            "/auth/login", data={"username": "expire@test.com", "password": "test123456"}
+        )
         token = resp.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
 
@@ -250,9 +262,13 @@ class TestTokenExpiryHandling:
     async def test_refresh_expired_token_fails(self, client: AsyncClient):
         """过期 Token 刷新应该失败"""
         # 使用明显过期的 Token
-        expired_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNjAwMDAwMDAwfQ.invalid"
+        expired_token = (
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZXhwIjoxNjAwMDAwMDAwfQ.invalid"
+        )
 
-        resp = await client.post("/auth/refresh", headers={"Authorization": f"Bearer {expired_token}"})
+        resp = await client.post(
+            "/auth/refresh", headers={"Authorization": f"Bearer {expired_token}"}
+        )
         assert resp.status_code == 401
 
 
@@ -277,7 +293,9 @@ class TestGracefulDegradation:
             assert len(answer) > 0 or "没有" in answer or "无" in answer
 
     @pytest.mark.asyncio
-    async def test_empty_document_content(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_empty_document_content(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """空文档内容应该被拒绝"""
         resp = await client.post(
             f"/kb/{kb_id}/docs",

@@ -34,9 +34,7 @@ async def test_rename_document(client: AsyncClient, auth_headers: dict, kb_id: i
 
 
 @pytest.mark.asyncio
-async def test_rename_document_duplicate_fails(
-    client: AsyncClient, auth_headers: dict, kb_id: int
-):
+async def test_rename_document_duplicate_fails(client: AsyncClient, auth_headers: dict, kb_id: int):
     await client.post(
         f"/kb/{kb_id}/docs",
         json={"content": "aaa", "filename": "a.txt"},
@@ -104,9 +102,7 @@ async def test_upload_md_file(client: AsyncClient, auth_headers: dict, kb_id: in
 
 
 @pytest.mark.asyncio
-async def test_upload_unsupported_type_fails(
-    client: AsyncClient, auth_headers: dict, kb_id: int
-):
+async def test_upload_unsupported_type_fails(client: AsyncClient, auth_headers: dict, kb_id: int):
     resp = await client.post(
         f"/kb/{kb_id}/upload",
         files={"file": ("image.png", BytesIO(b"\x89PNG"), "image/png")},
@@ -116,9 +112,7 @@ async def test_upload_unsupported_type_fails(
 
 
 @pytest.mark.asyncio
-async def test_upload_duplicate_filename_fails(
-    client: AsyncClient, auth_headers: dict, kb_id: int
-):
+async def test_upload_duplicate_filename_fails(client: AsyncClient, auth_headers: dict, kb_id: int):
     content = b"test"
     resp = await client.post(
         f"/kb/{kb_id}/upload",
@@ -171,9 +165,7 @@ async def test_docs_pagination(client: AsyncClient, auth_headers: dict, kb_id: i
             headers=auth_headers,
         )
 
-    resp = await client.get(
-        f"/kb/{kb_id}/docs?page=1&page_size=2", headers=auth_headers
-    )
+    resp = await client.get(f"/kb/{kb_id}/docs?page=1&page_size=2", headers=auth_headers)
     assert len(resp.json()) == 2
 
 
@@ -191,7 +183,5 @@ async def test_messages_pagination(client: AsyncClient, auth_headers: dict, kb_i
         headers=auth_headers,
     )
 
-    resp = await client.get(
-        f"/kb/{kb_id}/messages?page=1&page_size=1", headers=auth_headers
-    )
+    resp = await client.get(f"/kb/{kb_id}/messages?page=1&page_size=1", headers=auth_headers)
     assert len(resp.json()) == 1

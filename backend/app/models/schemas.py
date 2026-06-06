@@ -228,4 +228,3 @@ class BatchDeleteRequest(BaseModel):
 
 class BatchDeleteResponse(BaseModel):
     deleted_count: int
-

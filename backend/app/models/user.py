@@ -26,4 +26,3 @@ class UserCreate(schemas.BaseUserCreate):
         if len(v) < 6:
             raise ValueError("密码至少需要6个字符")
         return v
-

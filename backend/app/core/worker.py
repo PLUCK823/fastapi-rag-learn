@@ -52,7 +52,11 @@ async def ingest_document(
             )
 
         chunk_count = await asyncio.to_thread(
-            _ingest_to_kb, content, filename, kb_id, doc_id,
+            _ingest_to_kb,
+            content,
+            filename,
+            kb_id,
+            doc_id,
             on_progress=_progress,
         )
 
@@ -62,10 +66,12 @@ async def ingest_document(
             from sqlalchemy import update
 
             session.execute(
-                update(Document).where(
+                update(Document)
+                .where(
                     Document.id == doc_id,
                     Document.status == "processing",
-                ).values(
+                )
+                .values(
                     chunk_count=chunk_count,
                     status="ready",
                     updated_at=datetime.now(UTC),
@@ -80,17 +86,21 @@ async def ingest_document(
     except Exception as e:
         logger.exception(
             "Document ingestion failed for %s (doc %d) in kb %d",
-            filename, doc_id, kb_id,
+            filename,
+            doc_id,
+            kb_id,
         )
         # 标记失败（用 doc_id 精准定位，避免更名后匹配不到）
         with sync_session_factory() as session:
             from sqlalchemy import update
 
             session.execute(
-                update(Document).where(
+                update(Document)
+                .where(
                     Document.id == doc_id,
                     Document.status == "processing",
-                ).values(
+                )
+                .values(
                     status="failed",
                     error_message=str(e)[:500],
                     updated_at=datetime.now(UTC),
@@ -123,17 +133,24 @@ async def batch_delete_documents(
         from app.models.knowledge_base import Document
 
         await update_task_progress(
-            redis, task_id, "processing", 10,
+            redis,
+            task_id,
+            "processing",
+            10,
             f"正在删除 {len(doc_ids)} 篇文档…",
         )
 
         with sync_session_factory() as session:
-            docs = session.execute(
-                select(Document).where(
-                    Document.kb_id == kb_id,
-                    Document.id.in_(doc_ids),
+            docs = (
+                session.execute(
+                    select(Document).where(
+                        Document.kb_id == kb_id,
+                        Document.id.in_(doc_ids),
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             deleted = 0
             for i, doc in enumerate(docs):
@@ -182,12 +199,16 @@ async def cleanup_orphan_data(ctx: dict) -> dict:
         from sqlalchemy import select
 
         # 清理超过 1 小时仍卡在 processing 的文档
-        stuck_docs = session.execute(
-            select(Document).where(
-                Document.status == "processing",
-                Document.created_at < datetime.now(UTC) - timedelta(hours=1),
+        stuck_docs = (
+            session.execute(
+                select(Document).where(
+                    Document.status == "processing",
+                    Document.created_at < datetime.now(UTC) - timedelta(hours=1),
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         for doc in stuck_docs:
             try:
@@ -252,6 +273,7 @@ class WorkerSettings:
         logger.info("ARQ Worker starting — preloading embedding model...")
         try:
             from app.core.engine import _init_shared
+
             _init_shared()
             logger.info("Embedding model loaded successfully")
         except Exception:

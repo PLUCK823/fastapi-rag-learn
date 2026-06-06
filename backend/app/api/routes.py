@@ -25,6 +25,7 @@ async def _run_in_thread(fn: Callable[..., Any], *args: Any) -> Any:
     """将同步阻塞调用卸载到线程池，避免阻塞 ASGI 事件循环。"""
     return await asyncio.to_thread(fn, *args)
 
+
 router = APIRouter()
 
 
@@ -118,19 +119,10 @@ def ask_endpoint(
         # Handle LLM/embedding failures gracefully
         error_msg = str(e)
         if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
-            raise HTTPException(
-                status_code=503,
-                detail="LLM 服务暂时不可用，请稍后再试"
-            )
+            raise HTTPException(status_code=503, detail="LLM 服务暂时不可用，请稍后再试")
         if "api" in error_msg.lower() or "key" in error_msg.lower():
-            raise HTTPException(
-                status_code=500,
-                detail="LLM 服务配置错误，请联系管理员"
-            )
-        raise HTTPException(
-            status_code=500,
-            detail=f"生成回答时发生错误: {error_msg}"
-        )
+            raise HTTPException(status_code=500, detail="LLM 服务配置错误，请联系管理员")
+        raise HTTPException(status_code=500, detail=f"生成回答时发生错误: {error_msg}")
 
     _save_message(session, req.kb_id, user.id, "user", req.text, None, req.session_id)
     _save_message(session, req.kb_id, user.id, "assistant", answer, sources, req.session_id)
@@ -145,11 +137,15 @@ def feedback_endpoint(
     session: Session = Depends(get_sync_session),
 ):
     """更新消息反馈（赞/踩），仅允许 assistant 消息且仅自己的消息"""
-    msg = session.query(ChatMessage).filter(
-        ChatMessage.id == message_id,
-        ChatMessage.role == "assistant",
-        ChatMessage.user_id == user.id,
-    ).first()
+    msg = (
+        session.query(ChatMessage)
+        .filter(
+            ChatMessage.id == message_id,
+            ChatMessage.role == "assistant",
+            ChatMessage.user_id == user.id,
+        )
+        .first()
+    )
     if msg is None:
         raise HTTPException(status_code=404, detail="消息不存在或无权操作")
     msg.feedback = feedback
@@ -215,15 +211,15 @@ async def ws_ask(
     # 获取多轮对话历史（线程池卸载）
     history: list[tuple[str, str]] = []
     if sid and user_id:
+
         def _fetch() -> list[tuple[str, str]]:
             with sync_session_factory() as s:
                 return _fetch_history(s, kb_id, user_id, sid)
+
         history = await _run_in_thread(_fetch)
 
     try:
-        stream, sources = ask_stream_with_sources(
-            data, kb_id, history if history else None
-        )
+        stream, sources = ask_stream_with_sources(data, kb_id, history if history else None)
         for chunk in stream:
             full_answer_parts.append(chunk)
             await websocket.send_text(chunk)
@@ -233,15 +229,17 @@ async def ws_ask(
         code_result = _execute_code_blocks(full_answer)
         if code_result != full_answer:
             # 提取新增的运算结果部分并发送
-            result_suffix = code_result[len(full_answer):]
+            result_suffix = code_result[len(full_answer) :]
             await websocket.send_text(result_suffix)
 
         # 先持久化对话记录（在发送 done 之前，避免前端刷新时数据未就绪）
         if user_id:
+
             def _save() -> None:
                 with sync_session_factory() as s:
                     _save_message(s, kb_id, user_id, "user", data, None, sid)
                     _save_message(s, kb_id, user_id, "assistant", code_result, sources, sid)
+
             await _run_in_thread(_save)
 
         # 发送结束标记 + 来源信息

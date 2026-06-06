@@ -33,15 +33,22 @@ class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     verification_token_secret = RESET_TOKEN_SECRET
 
     async def on_after_forgot_password(
-        self, user: models.UP, token: str, request: Request | None = None,
+        self,
+        user: models.UP,
+        token: str,
+        request: Request | None = None,
     ) -> None:
         """打印密码重置链接到日志（开发者通过日志查看 token）"""
         logger.info(
-            "Password reset requested for %s — token: %s", user.email, token,
+            "Password reset requested for %s — token: %s",
+            user.email,
+            token,
         )
 
     async def on_after_reset_password(
-        self, user: models.UP, request: Request | None = None,
+        self,
+        user: models.UP,
+        request: Request | None = None,
     ) -> None:
         logger.info("Password reset successful for %s", user.email)
 

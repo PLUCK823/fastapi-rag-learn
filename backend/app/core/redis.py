@@ -28,9 +28,7 @@ async def create_redis_pool() -> ArqRedis | None:
         port = 6379
     try:
         pool = await asyncio.wait_for(
-            create_pool(
-                RedisSettings(host=host, port=port, conn_timeout=2, conn_retries=0)
-            ),
+            create_pool(RedisSettings(host=host, port=port, conn_timeout=2, conn_retries=0)),
             timeout=3.0,
         )
         await asyncio.wait_for(pool.ping(), timeout=2.0)

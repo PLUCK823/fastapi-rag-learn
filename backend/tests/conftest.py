@@ -16,9 +16,7 @@ os.environ.setdefault(
     "DATABASE_URL",
     "postgresql+asyncpg://raguser:devpassword@localhost:5432/raglearn_test",
 )
-os.environ.setdefault(
-    "SECRET_KEY", "test-secret-key-for-jwt-signing-must-be-at-least-32-bytes"
-)
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-jwt-signing-must-be-at-least-32-bytes")
 # 告知 app lifespan 不要销毁 engine（conftest 自己管理）
 os.environ["PYTEST_RUNNING"] = "1"
 # 测试环境关闭速率限制（避免跨测试配额泄漏）
@@ -45,9 +43,7 @@ async def client() -> AsyncClient:
 
     from app.main import app
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
         # 清理：在 AsyncClient 关闭前执行
         async with async_engine.begin() as conn:

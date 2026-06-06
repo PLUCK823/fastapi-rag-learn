@@ -52,9 +52,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # and auth endpoints (login, register — prevents brute-force)
         _limited_prefixes = ("/ws/",)
         _limited_exact = {"/ask", "/auth/login", "/auth/register"}
-        _is_limited = path in _limited_exact or any(
-            path.startswith(p) for p in _limited_prefixes
-        )
+        _is_limited = path in _limited_exact or any(path.startswith(p) for p in _limited_prefixes)
         if not _is_limited:
             return await call_next(request)
 

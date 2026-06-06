@@ -111,6 +111,7 @@ def _parse_upload(raw: bytes, filename: str) -> str:
 
 # ── KB ──
 
+
 @router.post("", response_model=KBInfo)
 def create_kb(
     req: KBCreateRequest,
@@ -161,9 +162,7 @@ def get_kb(
         id=kb.id,
         name=kb.name,
         document_count=sum(1 for d in kb.documents if d.status == "ready"),
-        documents=[
-            DocInfo.model_validate(d) for d in kb.documents
-        ],
+        documents=[DocInfo.model_validate(d) for d in kb.documents],
         created_at=kb.created_at,
     )
 
@@ -198,6 +197,7 @@ def delete_kb(
 
 
 # ── Documents ──
+
 
 @router.post("/{kb_id}/docs", response_model=DocInfo)
 def add_document(
@@ -246,8 +246,11 @@ async def _parse_and_enqueue(
     await update_task_progress(redis, task_id, "pending", 0, "排队中…")
     await redis.enqueue_job(
         "ingest_document",
-        kb_id=kb_id, user_id=user_id,
-        content=content, filename=filename, doc_id=doc_id,
+        kb_id=kb_id,
+        user_id=user_id,
+        content=content,
+        filename=filename,
+        doc_id=doc_id,
         _job_id=task_id,
     )
 
@@ -275,6 +278,7 @@ async def upload_document(
 
     # PDF/DOCX 经 Docling 已转为 Markdown，统一后缀（仅数据库存储名）
     import os as _os
+
     orig_basename = _os.path.splitext(orig_filename)[0]
     if _os.path.splitext(orig_filename)[1].lower() in {".pdf", ".docx"}:
         filename = f"{orig_basename}.md"
@@ -294,14 +298,19 @@ async def upload_document(
 
     # 自动清理卡死的 processing 文档
     from datetime import UTC, datetime, timedelta
+
     stale_cutoff = datetime.now(UTC) - timedelta(minutes=5)
-    stale_docs = session.execute(
-        sa_select(kb_service.Document).where(
-            kb_service.Document.kb_id == kb_id,
-            kb_service.Document.status == "processing",
-            kb_service.Document.created_at < stale_cutoff,
+    stale_docs = (
+        session.execute(
+            sa_select(kb_service.Document).where(
+                kb_service.Document.kb_id == kb_id,
+                kb_service.Document.status == "processing",
+                kb_service.Document.created_at < stale_cutoff,
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if stale_docs:
         for sd in stale_docs:
             sd.status = "failed"
@@ -313,6 +322,7 @@ async def upload_document(
     task_id = str(uuid4())
     import app.main as _main_mod
     from app.core.redis import update_task_progress
+
     app_instance = _main_mod.app
     redis = getattr(app_instance.state, "redis", None)
 
@@ -327,8 +337,14 @@ async def upload_document(
         # ④ 解析 + 入队放到后台 → 响应立刻返回 task_id
         asyncio.create_task(
             _parse_and_enqueue(
-                redis, task_id, doc.id, kb_id, user.id,
-                raw, orig_filename, filename,
+                redis,
+                task_id,
+                doc.id,
+                kb_id,
+                user.id,
+                raw,
+                orig_filename,
+                filename,
             )
         )
         return {"doc_id": doc.id, "task_id": task_id, "status": "processing"}
@@ -381,21 +397,23 @@ def batch_delete_docs(
     kb_service._get_kb(session, kb_id, user.id)
 
     # ② 查询该 KB 下属于请求的文档 ID（确保用户拥有这些文档）
-    existing = session.execute(
-        sa_select(kb_service.Document.id).where(
-            kb_service.Document.kb_id == kb_id,
-            kb_service.Document.id.in_(req.doc_ids),
+    existing = (
+        session.execute(
+            sa_select(kb_service.Document.id).where(
+                kb_service.Document.kb_id == kb_id,
+                kb_service.Document.id.in_(req.doc_ids),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     valid_ids = set(existing)
 
     if not valid_ids:
         return BatchDeleteResponse(deleted_count=0)
 
     # ③ 批量删除（单条 SQL，避免 N+1）
-    stmt = delete(kb_service.Document).where(
-        kb_service.Document.id.in_(list(valid_ids))
-    )
+    stmt = delete(kb_service.Document).where(kb_service.Document.id.in_(list(valid_ids)))
     session.execute(stmt)
     session.commit()
     deleted_count = len(valid_ids)
@@ -470,6 +488,7 @@ def get_doc_content(
 
 # ── Chat Messages ──
 
+
 @router.get("/{kb_id}/messages", response_model=list[MessageInfo])
 def list_messages(
     kb_id: int,
@@ -499,9 +518,7 @@ def clear_messages(
 ):
     """清空聊天记录。如果指定 session_id，只清空该会话；否则清空全部。"""
     kb_service._get_kb(session, kb_id, user.id)
-    stmt = delete(ChatMessage).where(
-        ChatMessage.kb_id == kb_id, ChatMessage.user_id == user.id
-    )
+    stmt = delete(ChatMessage).where(ChatMessage.kb_id == kb_id, ChatMessage.user_id == user.id)
     if session_id:
         stmt = stmt.where(ChatMessage.session_id == session_id)
     session.execute(stmt)

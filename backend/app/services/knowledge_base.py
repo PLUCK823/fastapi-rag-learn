@@ -19,9 +19,7 @@ from app.core.engine import (
 from app.models.knowledge_base import Document, KnowledgeBase
 
 # Markdown 表格检测（保护表格不被切分）
-_TABLE_RE = re.compile(
-    r"(\|.+\|\s*\n\|[-| :]+\|\s*\n(?:\|.+\|\s*\n?)+)", re.MULTILINE
-)
+_TABLE_RE = re.compile(r"(\|.+\|\s*\n\|[-| :]+\|\s*\n(?:\|.+\|\s*\n?)+)", re.MULTILINE)
 
 # MarkdownHeaderTextSplitter 切分层级
 _HEADERS_TO_SPLIT = [
@@ -40,10 +38,18 @@ def _splitter() -> RecursiveCharacterTextSplitter:
         separators=[
             "\n\n",
             "\n",
-            "。", "？", "！",  # 中文句末标点
-            "；", "：", "，",  # 中文句中标点
-            ". ", "? ", "! ",
-            "; ", ": ", ", ",
+            "。",
+            "？",
+            "！",  # 中文句末标点
+            "；",
+            "：",
+            "，",  # 中文句中标点
+            ". ",
+            "? ",
+            "! ",
+            "; ",
+            ": ",
+            ", ",
             " ",
         ],
     )
@@ -118,11 +124,7 @@ def _split_content(content: str, filename: str) -> list[LCDocument]:
     md_chunks = md_splitter.split_text(content)
 
     # 检测是否有实际标题层级（无标题时 splitter 返回一个整块且无 header metadata）
-    has_headers = any(
-        k in chunk.metadata
-        for chunk in md_chunks
-        for k in ["h1", "h2", "h3", "h4"]
-    )
+    has_headers = any(k in chunk.metadata for chunk in md_chunks for k in ["h1", "h2", "h3", "h4"])
 
     # 2. 无标题 → 纯文本 fallback
     if not has_headers:
@@ -159,16 +161,13 @@ def _split_content(content: str, filename: str) -> list[LCDocument]:
             result.append(chunk)
         else:
             # 超长 section → 二次切分（保护表格）
-            result.extend(
-                _split_oversized(
-                    chunk.page_content, filename, ctx, chunk.metadata
-                )
-            )
+            result.extend(_split_oversized(chunk.page_content, filename, ctx, chunk.metadata))
 
     return result
 
 
 # ── KB CRUD ──
+
 
 def create_kb(session: Session, user_id: int, name: str) -> KnowledgeBase:
     existing = session.execute(
@@ -187,9 +186,7 @@ def create_kb(session: Session, user_id: int, name: str) -> KnowledgeBase:
     return kb
 
 
-def list_kbs(
-    session: Session, user_id: int, page: int = 1, page_size: int = 20
-) -> list[dict]:
+def list_kbs(session: Session, user_id: int, page: int = 1, page_size: int = 20) -> list[dict]:
     offset = (page - 1) * page_size
     result = session.execute(
         select(KnowledgeBase)
@@ -256,9 +253,7 @@ def count_kbs(session: Session, user_id: int) -> int:
 
 
 def _get_kb(session: Session, kb_id: int, user_id: int) -> KnowledgeBase:
-    result = session.execute(
-        select(KnowledgeBase).where(KnowledgeBase.id == kb_id)
-    )
+    result = session.execute(select(KnowledgeBase).where(KnowledgeBase.id == kb_id))
     kb = result.scalar_one_or_none()
     if not kb:
         raise HTTPException(status_code=404, detail="知识库不存在")
@@ -297,6 +292,7 @@ def delete_kb(session: Session, kb_id: int, user_id: int) -> int:
 
 
 # ── Document CRUD ──
+
 
 def add_document(
     session: Session, kb_id: int, user_id: int, content: str, filename: str
@@ -352,9 +348,7 @@ def list_documents(
 
 def get_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> Document:
     _get_kb(session, kb_id, user_id)
-    result = session.execute(
-        select(Document).where(Document.id == doc_id, Document.kb_id == kb_id)
-    )
+    result = session.execute(select(Document).where(Document.id == doc_id, Document.kb_id == kb_id))
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
@@ -415,6 +409,7 @@ def delete_document(session: Session, kb_id: int, doc_id: int, user_id: int) -> 
 
 # ── Internal ──
 
+
 def _ingest_to_kb(
     content: str,
     filename: str,
@@ -466,10 +461,13 @@ def _ingest_to_kb(
             except Exception as e:
                 msg = str(e)
                 if "429" in msg or "rate" in msg.lower():
-                    wait = 2 ** attempt  # 1, 2, 4, 8, 16s 指数退避
+                    wait = 2**attempt  # 1, 2, 4, 8, 16s 指数退避
                     _logger.warning(
                         "Rate limited on batch %d/%d, retry in %ds (attempt %d)",
-                        batch_end, total, wait, attempt + 1,
+                        batch_end,
+                        total,
+                        wait,
+                        attempt + 1,
                     )
                     if on_progress:
                         on_progress(
@@ -480,9 +478,7 @@ def _ingest_to_kb(
                 else:
                     raise
         else:
-            raise RuntimeError(
-                f"Embedding batch {batch_start}-{batch_end} failed after 5 retries"
-            )
+            raise RuntimeError(f"Embedding batch {batch_start}-{batch_end} failed after 5 retries")
         if on_progress:
             pct = 30 + int(30 * batch_end / total)
             on_progress(pct, f"正在向量化 {batch_end}/{total}…")
@@ -503,8 +499,11 @@ def _ingest_to_kb(
         offset: int | str | None = None
         while True:
             pts, nxt = client.scroll(
-                col, limit=1000, offset=offset,
-                with_payload=False, with_vectors=False,
+                col,
+                limit=1000,
+                offset=offset,
+                with_payload=False,
+                with_vectors=False,
             )
             if not pts:
                 break

@@ -19,7 +19,9 @@ class TestLongInput:
         assert resp.status_code in [200, 400, 422]
 
     @pytest.mark.asyncio
-    async def test_very_long_document_content(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_very_long_document_content(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """超长文档内容应该被正确分块"""
         # 100KB 的内容
         long_content = "这是测试内容。" * 5000
@@ -45,7 +47,9 @@ class TestLongInput:
         assert resp.status_code in [200, 400, 422]
 
     @pytest.mark.asyncio
-    async def test_very_long_chat_question(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_very_long_chat_question(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """超长聊天问题应该被处理"""
         await client.post(
             f"/kb/{kb_id}/docs",
@@ -90,7 +94,9 @@ class TestSpecialCharacters:
             assert found_kb["name"] == name
 
     @pytest.mark.asyncio
-    async def test_special_characters_in_filename(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_special_characters_in_filename(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """文件名中的特殊字符应该被处理"""
         special_filenames = [
             "file with spaces.txt",
@@ -109,7 +115,9 @@ class TestSpecialCharacters:
             assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_newlines_in_document_content(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_newlines_in_document_content(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """文档内容中的换行符应该被保留"""
         content_with_newlines = "第一行\n第二行\n\n第四行\r\n第五行"
         resp = await client.post(
@@ -125,7 +133,9 @@ class TestSpecialCharacters:
         assert "\n" in content
 
     @pytest.mark.asyncio
-    async def test_html_in_document_content(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_html_in_document_content(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """文档内容中的 HTML 应该被保留"""
         html_content = "<html><body><h1>标题</h1><p>段落</p></body></html>"
         resp = await client.post(
@@ -136,7 +146,9 @@ class TestSpecialCharacters:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_markdown_in_document_content(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_markdown_in_document_content(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """文档内容中的 Markdown 应该被保留"""
         markdown_content = """
 # 标题
@@ -170,8 +182,7 @@ class TestConcurrentOperations:
         """并发创建 KB 应该正确处理"""
         # 同时创建 5 个 KB
         tasks = [
-            client.post("/kb", json={"name": f"并发KB{i}"}, headers=auth_headers)
-            for i in range(5)
+            client.post("/kb", json={"name": f"并发KB{i}"}, headers=auth_headers) for i in range(5)
         ]
         responses = await asyncio.gather(*tasks)
 
@@ -185,7 +196,9 @@ class TestConcurrentOperations:
         assert len(kbs) >= 5
 
     @pytest.mark.asyncio
-    async def test_concurrent_document_creation(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_concurrent_document_creation(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """并发创建文档应该正确处理"""
         tasks = [
             client.post(
@@ -206,7 +219,9 @@ class TestConcurrentOperations:
         assert len(docs) >= 5
 
     @pytest.mark.asyncio
-    async def test_concurrent_kb_deletion_different_kbs(self, client: AsyncClient, auth_headers: dict):
+    async def test_concurrent_kb_deletion_different_kbs(
+        self, client: AsyncClient, auth_headers: dict
+    ):
         """并发删除不同 KB 应该正确处理"""
         # 创建 3 个 KB
         kb_ids = []
@@ -215,10 +230,7 @@ class TestConcurrentOperations:
             kb_ids.append(resp.json()["id"])
 
         # 并发删除
-        tasks = [
-            client.delete(f"/kb/{kb_id}", headers=auth_headers)
-            for kb_id in kb_ids
-        ]
+        tasks = [client.delete(f"/kb/{kb_id}", headers=auth_headers) for kb_id in kb_ids]
         responses = await asyncio.gather(*tasks)
 
         for resp in responses:
@@ -285,7 +297,9 @@ class TestInvalidIds:
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_nonexistent_document_id(self, client: AsyncClient, auth_headers: dict, kb_id: int):
+    async def test_nonexistent_document_id(
+        self, client: AsyncClient, auth_headers: dict, kb_id: int
+    ):
         """访问不存在的文档应该返回 404"""
         resp = await client.get(f"/kb/{kb_id}/docs/99999/content", headers=auth_headers)
         assert resp.status_code == 404
@@ -306,4 +320,8 @@ class TestInvalidIds:
         # 尝试获取负数 KB 的文档列表
         resp = await client.get("/kb/-1/docs", headers=auth_headers)
         # FastAPI 路径参数验证会拒绝负数
-        assert resp.status_code in [404, 422, 403]  # 可能是 404（路由不匹配）或 422（验证失败）或 403（权限）
+        assert resp.status_code in [
+            404,
+            422,
+            403,
+        ]  # 可能是 404（路由不匹配）或 422（验证失败）或 403（权限）

@@ -32,13 +32,28 @@ dependencies = [
 [dependency-groups]
 dev = [
     "alembic>=1.18.4",
+    "black>=26.5.1",
     "httpx>=0.28.1",
     "mypy>=2.1.0",
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.14",
+    "safety>=3.8.1",
 ]
 
+# ── Black: 代码格式化 ──
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+exclude = '''
+/(
+    \.venv
+  | alembic
+)/
+'''
+
+# ── Ruff: Lint（不负责格式化，格式化交给 Black）──
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -51,10 +66,24 @@ per-file-ignores = { "tests/**/*.py" = ["E501"] }
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
-
+# ── Mypy: 类型检查 ──
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
+
+# ── Pytest + pytest-cov: 测试 + 覆盖率 ──
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=app --cov-report=term-missing --cov-report=html"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*", "alembic/*"]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

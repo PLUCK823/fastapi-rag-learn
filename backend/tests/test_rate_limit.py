@@ -18,6 +18,7 @@ class TestRateLimiterMemoryLeak:
         rl.requests["10.0.0.1"] = [(0.0, "/ask")]
         # 添加一条仍然有效的记录
         import time as _time
+
         now = _time.time()
         rl.requests["10.0.0.2"] = [(now, "/ask")]
 

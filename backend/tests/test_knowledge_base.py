@@ -5,6 +5,7 @@ from httpx import AsyncClient
 
 # ── KB CRUD ──
 
+
 @pytest.mark.asyncio
 async def test_create_and_list_kb(client: AsyncClient, auth_headers: dict):
     resp = await client.post("/kb", json={"name": "我的知识库"}, headers=auth_headers)
@@ -51,9 +52,7 @@ async def test_delete_kb(client: AsyncClient, auth_headers: dict, kb_id: int):
 
 
 @pytest.mark.asyncio
-async def test_delete_kb_cascades_docs(
-    client: AsyncClient, auth_headers: dict, kb_id: int
-):
+async def test_delete_kb_cascades_docs(client: AsyncClient, auth_headers: dict, kb_id: int):
     await client.post(
         f"/kb/{kb_id}/docs",
         json={"content": "Hello world", "filename": "test.txt"},
@@ -64,6 +63,7 @@ async def test_delete_kb_cascades_docs(
 
 
 # ── Document CRUD ──
+
 
 @pytest.mark.asyncio
 async def test_add_and_list_docs(client: AsyncClient, auth_headers: dict, kb_id: int):
@@ -129,9 +129,7 @@ async def test_delete_document(client: AsyncClient, auth_headers: dict, kb_id: i
     )
     doc_id = resp.json()["id"]
 
-    resp = await client.delete(
-        f"/kb/{kb_id}/docs/{doc_id}", headers=auth_headers
-    )
+    resp = await client.delete(f"/kb/{kb_id}/docs/{doc_id}", headers=auth_headers)
     assert resp.status_code == 200
 
     resp = await client.get(f"/kb/{kb_id}/docs", headers=auth_headers)
@@ -139,6 +137,7 @@ async def test_delete_document(client: AsyncClient, auth_headers: dict, kb_id: i
 
 
 # ── Ask with sources ──
+
 
 @pytest.mark.asyncio
 async def test_ask_returns_sources(client: AsyncClient, auth_headers: dict, kb_id: int):
@@ -165,6 +164,7 @@ async def test_ask_returns_sources(client: AsyncClient, auth_headers: dict, kb_i
 
 
 # ── Cross-KB isolation ──
+
 
 @pytest.mark.asyncio
 async def test_cross_kb_isolation(client: AsyncClient, auth_headers: dict):
@@ -206,6 +206,7 @@ async def test_cross_kb_isolation(client: AsyncClient, auth_headers: dict):
 
 
 # ── Cross-user isolation ──
+
 
 @pytest.mark.asyncio
 async def test_cross_user_kb_isolation(client: AsyncClient):
@@ -295,9 +296,7 @@ class TestBatchDelete:
         assert resp.json()["deleted_count"] == 1
 
     @pytest.mark.asyncio
-    async def test_batch_delete_wrong_kb_ignored(
-        self, client: AsyncClient, auth_headers: dict
-    ):
+    async def test_batch_delete_wrong_kb_ignored(self, client: AsyncClient, auth_headers: dict):
         """从其他 KB 的文档 ID 不应被删除"""
         # 创建两个 KB
         resp = await client.post("/kb", json={"name": "KB-A"}, headers=auth_headers)

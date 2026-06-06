@@ -57,19 +57,25 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      - name: Format (black)
+        run: uv run black --check --diff .
+
       - name: Lint (ruff)
         run: uv run ruff check .
 
       - name: Type-check (mypy)
         run: uv run mypy app/
 
-      - name: Unit tests (pytest)
-        run: uv run pytest tests/ -v
+      - name: Unit tests (pytest + coverage)
+        run: uv run pytest tests/ -v --cov=app --cov-report=term-missing
         env:
           SECRET_KEY: ci-test-secret-key-at-least-32-bytes
           DATABASE_URL: postgresql+asyncpg://raguser:citest@localhost:5432/raglearn_test
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+
+      - name: Security scan (safety)
+        run: uv run safety check --full-report
 
   # ── Frontend: lint + type-check + test ──
   frontend:

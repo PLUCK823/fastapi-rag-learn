@@ -81,6 +81,7 @@ async def lifespan(_app: FastAPI):
     # 预加载 embedding 模型 — 避免首次请求时下载导致超时
     try:
         from app.core.engine import _init_shared
+
         _init_shared()
         logger.info("Embedding model loaded")
     except Exception:
@@ -115,6 +116,7 @@ async def sanitize_token_logging(request: Request, call_next):
     qs = request.scope.get("query_string", b"")
     if b"token=" in qs:
         import re as _re
+
         sanitized = _re.sub(b"token=[^&]*", b"token=[REDACTED]", qs)
         request.scope["query_string"] = sanitized
     return await call_next(request)
