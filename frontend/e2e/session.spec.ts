@@ -59,7 +59,18 @@ test("session behavior tests", async ({ page }) => {
 
   // Wait for modal to close (save is synchronous with embedding, may take a few seconds)
   await expect(page.getByText("新建文档")).not.toBeVisible({ timeout: 30000 });
-  await expect(page.locator("aside").locator("text=test.md")).toBeVisible({ timeout: 10000 });
+
+  // Wait for the doc list to refresh — the button text updates from "(0 篇)" to "(1 篇)"
+  await page.waitForFunction(
+    () => {
+      const allBtns = document.querySelectorAll("aside button");
+      for (const b of allBtns) {
+        if (b.textContent?.includes("文档管理") && b.textContent?.includes("1 篇")) return true;
+      }
+      return false;
+    },
+    { timeout: 15000 },
+  );
 
   // Send a chat message - this will create the session
   const chatInput = page.getByPlaceholder("输入问题，Enter 发送…");
