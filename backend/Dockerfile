@@ -14,19 +14,17 @@ RUN apt-get update && \
     libxcb1 libx11-6 libgl1-mesa-glx libglib2.0-0 libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
-# 装 Python 依赖（利用 BuildKit cache mount 加速）
+# 装 Python 依赖
 COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project
 
 # ============================================================
 # 阶段 1b: dev 构建（包含 dev 依赖，用于本地开发热重载）
 # ============================================================
 FROM builder AS dev
 
-# 安装所有依赖（含 dev）
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project
+# 安装所有依赖（含 dev）— 不用缓存 mount，确保新依赖被安装
+RUN uv sync --frozen --no-install-project
 
 # 复制代码+迁移配置（初始状态，后续 watch sync 更新）
 COPY app/ ./app/
@@ -38,7 +36,7 @@ ENV HF_ENDPOINT=https://hf-mirror.com
 
 # 预下载 Docling PDF 解析模型 ~200-300MB（避免首次上传 PDF 时等待）
 # 用最小 PDF 触发一次解析，缓存所有模型到 /root/.cache/huggingface
-# 使用 heredoc 避免多行引号被 Docker BuildKit 误解析
+# 网络不可达时允许失败 — 首次上传时会自动下载
 RUN .venv/bin/python3 << 'PYEOF'
 import base64, os, tempfile
 pdf = base64.b64decode('JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL01lZGlhQm94WzAgMCA2MTIgNzkyXS9QYXJlbnQgMiAwIFIvUmVzb3VyY2VzPDw+Pj4+ZW5kb2JqCnhyZWYKMCA0CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKdHJhaWxlcjw8L1NpemUgNC9Sb290IDEgMCBSPj4Kc3RhcnR4cmVmCjE5MAolJUVPRg==')
@@ -49,10 +47,13 @@ try:
     converter = DocumentConverter()
     result = converter.convert(tmp)
     print(f'Docling OK — parsed {len(result.document.export_to_markdown())} chars')
+    print('>>> Docling models pre-downloaded')
+except Exception as e:
+    print(f'[WARN] Docling model pre-download skipped: {e}')
+    print('Models will be downloaded on first PDF upload.')
 finally:
     os.unlink(tmp)
 PYEOF
-RUN echo ">>> Docling models pre-downloaded"
 
 # 预下载 embedding/reranker 本地模型（仅 local 模式需要）
 ARG SKIP_LOCAL_MODELS=false
