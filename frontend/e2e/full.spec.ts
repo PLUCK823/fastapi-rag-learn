@@ -131,7 +131,7 @@ test.describe("Full E2E Test Suite", () => {
     await expect(page).toHaveURL(/\/chat\/\d+/);
 
     // Create document
-    await page.getByRole("button", { name: "+ 新建" }).first().click();
+    await page.getByRole("button", { name: "新建文档" }).click();
     await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
 
     await page.getByPlaceholder("例如: readme").fill("test-doc");
@@ -215,7 +215,7 @@ test.describe("Full E2E Test Suite", () => {
     await expect(page.getByRole("heading", { name: "新的对话" })).toBeVisible({ timeout: 5000 });
 
     // Create document
-    await page.getByRole("button", { name: "+ 新建" }).first().click();
+    await page.getByRole("button", { name: "新建文档" }).click();
     await page.getByPlaceholder("例如: readme").fill("chat-doc");
 
     const editorTextarea = page.locator(".bytemd-editor textarea");
@@ -249,8 +249,8 @@ test.describe("Full E2E Test Suite", () => {
     await expect(page.getByText("暂无历史会话")).not.toBeVisible({ timeout: 5000 });
 
     // Create new session - click "新建" button
-    const newSessionButtons = page.getByRole("button", { name: "+ 新建" });
-    await newSessionButtons.nth(1).click();
+    const newSessionBtn = page.getByRole("button", { name: "新建会话" });
+    await newSessionBtn.click();
     await page.waitForTimeout(500);
 
     // Should see empty state again (no session selected)
@@ -295,8 +295,8 @@ test.describe("Full E2E Test Suite", () => {
     await expect(page.getByRole("heading", { name: "新的对话" })).toBeVisible({ timeout: 5000 });
 
     // Click "新建会话" when no session exists - should stay on empty state
-    const newSessionButtons = page.getByRole("button", { name: "+ 新建" });
-    await newSessionButtons.nth(1).click();
+    const newSessionBtn = page.getByRole("button", { name: "新建会话" });
+    await newSessionBtn.click();
     await page.waitForTimeout(500);
 
     // Should still show empty state (no sessions created)

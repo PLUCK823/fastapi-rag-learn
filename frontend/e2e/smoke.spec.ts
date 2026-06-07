@@ -28,8 +28,8 @@ test("full user flow", async ({ page }) => {
   await page.getByText("E2E 测试库").click();
   await expect(page).toHaveURL(/\/chat\/\d+/);
 
-  // 4. Open "新建" modal (first + 新建 button is for documents)
-  await page.getByRole("button", { name: "+ 新建" }).first().click();
+  // 4. Open "新建" modal (for documents)
+  await page.getByRole("button", { name: "新建文档" }).click();
   await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
 
   // 5. Fill filename and Markdown content

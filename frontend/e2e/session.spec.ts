@@ -39,15 +39,15 @@ test("session behavior tests", async ({ page }) => {
   await expect(page.getByText("暂无历史会话")).toBeVisible({ timeout: 5000 });
 
   // 5. Test 2: Clicking "新建" when no session exists should stay on empty state
-  const newSessionButtons = page.getByRole("button", { name: "+ 新建" });
-  await newSessionButtons.nth(1).click();
+  const newSessionButtons = page.getByRole("button", { name: "新建会话" });
+  await newSessionButtons.click();
   await page.waitForTimeout(500);
 
   // Should still show "暂无历史会话" (no sessions created)
   await expect(page.getByText("暂无历史会话")).toBeVisible({ timeout: 5000 });
 
   // 6. Test 3: Create document and send message to create session
-  await page.getByRole("button", { name: "+ 新建" }).first().click();
+  await page.getByRole("button", { name: "新建文档" }).click();
   await expect(page.getByText("新建文档")).toBeVisible({ timeout: 3000 });
   await page.getByPlaceholder("例如: readme").fill("test");
 
@@ -91,7 +91,7 @@ test("session behavior tests", async ({ page }) => {
   await expect(page.getByText("暂无历史会话")).not.toBeVisible({ timeout: 5000 });
 
   // 8. Test 5: Now clicking "新建" should clear and go to empty state
-  await newSessionButtons.nth(1).click();
+  await newSessionButtons.click();
   await page.waitForTimeout(500);
 
   // Should see empty state again
