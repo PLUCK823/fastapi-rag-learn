@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 interface UploadItem {
   filename: string;
@@ -15,11 +15,9 @@ interface UploadProgressModalProps {
   onStop: (taskId: string) => void;
 }
 
-type SortKey = "name-asc" | "name-desc" | "status" | "progress";
+type SortKey = "name-asc" | "name-desc" | "status" | "progress" | "time";
 
-import React from "react";
-
-export default React.memo(function UploadProgressModal({
+function UploadProgressModal({
   items,
   onClose,
   onRemove,
@@ -40,8 +38,11 @@ export default React.memo(function UploadProgressModal({
       case "name-desc":
         list.sort((a, b) => b.filename.localeCompare(a.filename));
         break;
+      case "time":
+        // Newest first (by insertion order — reversed items array)
+        list.reverse();
+        break;
       case "status":
-        // done → uploading → error order
         list.sort((a, b) => {
           const order: Record<string, number> = { uploading: 0, error: 1, done: 2 };
           return (order[a.status] ?? 0) - (order[b.status] ?? 0);
@@ -58,7 +59,7 @@ export default React.memo(function UploadProgressModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-6 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-6"
       style={{ backgroundColor: "var(--overlay-heavy)", backdropFilter: "blur(3px)" }}
       onClick={onClose}
       role="dialog"
@@ -112,6 +113,7 @@ export default React.memo(function UploadProgressModal({
               color: "var(--text-secondary)",
             }}
           >
+            <option value="time">按时间</option>
             <option value="status">按状态</option>
             <option value="progress">按进度</option>
             <option value="name-asc">名称 A-Z</option>
@@ -155,7 +157,6 @@ export default React.memo(function UploadProgressModal({
                       {item.progress}%
                     </span>
                   )}
-                  {/* Stop button — only for in-progress uploads */}
                   {item.status === "uploading" && (
                     <button
                       type="button"
@@ -166,7 +167,6 @@ export default React.memo(function UploadProgressModal({
                       终止
                     </button>
                   )}
-                  {/* Delete button — for done/failed uploads */}
                   {(item.status === "done" || item.status === "error") && (
                     <button
                       type="button"
@@ -211,4 +211,7 @@ export default React.memo(function UploadProgressModal({
       </div>
     </div>
   );
-});
+}
+
+// Only re-render when items array reference changes (ignore callback props)
+export default React.memo(UploadProgressModal, (prev, next) => prev.items === next.items);
