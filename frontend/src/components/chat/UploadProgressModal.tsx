@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface UploadItem {
   filename: string;
@@ -17,12 +18,7 @@ interface UploadProgressModalProps {
 
 type SortKey = "name-asc" | "name-desc" | "status" | "progress" | "time";
 
-function UploadProgressModal({
-  items,
-  onClose,
-  onRemove,
-  onStop,
-}: UploadProgressModalProps) {
+function UploadProgressModal({ items, onClose, onRemove, onStop }: UploadProgressModalProps) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("status");
 
@@ -57,7 +53,7 @@ function UploadProgressModal({
 
   const done = items.filter((q) => q.status === "done").length;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
       style={{ backgroundColor: "var(--overlay-heavy)", backdropFilter: "blur(3px)" }}
@@ -209,7 +205,8 @@ function UploadProgressModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

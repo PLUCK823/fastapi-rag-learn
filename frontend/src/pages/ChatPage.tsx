@@ -197,11 +197,7 @@ export default function ChatPage() {
 
           setUploadQueue((prev) => {
             const existing = prev.find((q) => q.taskId === item.taskId);
-            if (
-              existing &&
-              existing.status === newStatus &&
-              existing.progress === t.progress
-            ) {
+            if (existing && existing.status === newStatus && existing.progress === t.progress) {
               return prev;
             }
             return prev.map((q) =>
@@ -531,11 +527,7 @@ export default function ChatPage() {
             // Only update state if something changed (prevents flicker)
             setUploadQueue((prev) => {
               const existing = prev.find((q) => q.taskId === result.task_id);
-              if (
-                existing &&
-                existing.status === newStatus &&
-                existing.progress === t.progress
-              ) {
+              if (existing && existing.status === newStatus && existing.progress === t.progress) {
                 return prev;
               }
               return prev.map((q) =>
