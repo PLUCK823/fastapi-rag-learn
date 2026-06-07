@@ -195,6 +195,22 @@ body {
   line-height: 1.6;
 }
 
+/* ── Typography Polish ── */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.display-text {
+  text-wrap: balance;
+}
+p,
+li,
+figcaption {
+  text-wrap: pretty;
+}
+
 /* Tabular numbers prevent layout shift on dynamically updating values */
 .tabular-nums,
 [data-tabular-nums] {
@@ -321,6 +337,12 @@ body::before {
   100% {
     background-position: 200% 0;
   }
+}
+
+/* ── Suggested Question Button ── */
+.suggest-btn:hover {
+  border-color: var(--color-copper);
+  color: var(--text-primary);
 }
 
 /* ── Animation Utility Classes ── */
