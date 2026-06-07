@@ -26,6 +26,28 @@ export function useChatWS(kbId: number, sessionId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  // DEBUG: track renders
+  const dcRef = useRef(0);
+  dcRef.current += 1;
+  const prevM = useRef(messages.length);
+  const prevS = useRef(isStreaming);
+  const prevL = useRef(messagesLoading);
+  if (dcRef.current % 20 === 0)
+    console.log(
+      `[useChatWS] #${dcRef.current} msgs=${messages.length} stream=${isStreaming} load=${messagesLoading}`,
+    );
+  if (
+    messages.length !== prevM.current ||
+    isStreaming !== prevS.current ||
+    messagesLoading !== prevL.current
+  ) {
+    console.log(
+      `[useChatWS] #${dcRef.current} STATE CHANGED: msgs ${prevM.current}→${messages.length} stream ${prevS.current}→${isStreaming} load ${prevL.current}→${messagesLoading}`,
+    );
+    prevM.current = messages.length;
+    prevS.current = isStreaming;
+    prevL.current = messagesLoading;
+  }
   const wsRef = useRef<WebSocket | null>(null);
   const doneRef = useRef(false);
   const sessionIdRef = useRef(sessionId);
