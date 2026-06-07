@@ -195,6 +195,65 @@ body {
   line-height: 1.6;
 }
 
+/* ── Typography Polish (make-interfaces-feel-better) ── */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.display-text {
+  text-wrap: balance;
+}
+
+p,
+li,
+figcaption {
+  text-wrap: pretty;
+}
+
+/* Tabular numbers prevent layout shift on dynamically updating values */
+.tabular-nums,
+[data-tabular-nums] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Focus Ring Utility ── */
+/* Use :focus-visible to avoid drawing rings on mouse clicks */
+*:focus-visible {
+  outline: 2px solid var(--color-copper);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Reduced Motion (a11y) ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .animate-fade-in-up,
+  .animate-fade-in,
+  .animate-slide-in-right {
+    animation: none !important;
+    opacity: 1;
+  }
+}
+
+/* ── Touch Target Minimum (a11y — 44×44px) ── */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a:not([href^="#"]),
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* ── Paper Texture Overlay ── */
 body::before {
   content: "";
@@ -279,6 +338,12 @@ body::before {
   100% {
     background-position: 200% 0;
   }
+}
+
+/* ── Suggested Question Button ── */
+.suggest-btn:hover {
+  border-color: var(--color-copper) !important;
+  color: var(--text-primary) !important;
 }
 
 /* ── Animation Utility Classes ── */

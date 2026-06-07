@@ -155,9 +155,9 @@ describe("ChatPage", () => {
     );
     await screen.findByText("测试知识库");
 
-    // "+ 新建" in sessions section (second one; first is for document)
-    const newSessionButtons = screen.getAllByRole("button", { name: "+ 新建" });
-    await user.click(newSessionButtons[1]);
+    // "+ 新建" for sessions (accessible name is "新建会话")
+    const newSessionBtn = screen.getByRole("button", { name: "新建会话" });
+    await user.click(newSessionBtn);
     await waitFor(() => {
       const newSessionElements = screen.getAllByText("新的对话");
       expect(newSessionElements.length).toBeGreaterThan(0);

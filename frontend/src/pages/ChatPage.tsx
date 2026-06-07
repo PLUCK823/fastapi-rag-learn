@@ -12,6 +12,8 @@ import {
   uploadFileAsync,
 } from "../api/kb";
 import ChatMessage from "../components/chat/ChatMessage";
+import ChatSidebar from "../components/chat/ChatSidebar";
+import DashboardView from "../components/chat/DashboardView";
 import DocEditorModal from "../components/chat/DocEditorModal";
 import DocManageModal from "../components/chat/DocManageModal";
 import DocViewerModal from "../components/chat/DocViewerModal";
@@ -42,13 +44,6 @@ const SEND_ICON = (
     <polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
-
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  return `${m}/${day}`;
-}
 
 /** Generate markdown from messages and trigger download */
 function exportConversation(messages: { role: string; content: string }[], title: string) {
@@ -160,7 +155,6 @@ export default function ChatPage() {
     });
   }, []);
 
-  // Only show ready docs for stats and doc management
   const readyDocs = useMemo(() => docs.filter((d) => d.status === "ready"), [docs]);
 
   const [showSidebar, setShowSidebar] = useState(false);
@@ -169,16 +163,16 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // 上传队列持久化到 localStorage（刷新不丢失）
+  // Upload queue persistence
   useEffect(() => {
     localStorage.setItem(UPLOAD_QUEUE_KEY, JSON.stringify(uploadQueue));
   }, [uploadQueue, UPLOAD_QUEUE_KEY]);
 
-  // 页面加载时，恢复对 in-progress 上传的轮询（刷新浏览器后继续追踪）
+  // Resume in-progress upload polling after page refresh
   useEffect(() => {
     for (const item of uploadQueue) {
       if (item.status !== "uploading" || !item.taskId) continue;
-      if (pollIntervalsRef.current.has(item.taskId)) continue; // already polling
+      if (pollIntervalsRef.current.has(item.taskId)) continue;
       const filename = item.filename;
       const startTime = Date.now();
       const MAX_POLL_MS = 720_000;
@@ -227,10 +221,10 @@ export default function ChatPage() {
       }, 500);
       pollIntervalsRef.current.set(item.taskId, poll);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 组件卸载时清理所有上传轮询 interval
+  // Cleanup poll intervals on unmount
   useEffect(() => {
     return () => {
       for (const id of pollIntervalsRef.current.values()) {
@@ -240,7 +234,7 @@ export default function ChatPage() {
     };
   }, []);
 
-  // Compute KB stats from loaded data (only count ready docs)
+  // Compute KB stats
   const kbStats = useMemo(() => {
     const readyDocs = docs.filter((d) => d.status === "ready");
     return {
@@ -251,7 +245,7 @@ export default function ChatPage() {
     };
   }, [docs, sessions]);
 
-  // 进入知识库时加载 KB 信息 + 文档列表
+  // Load KB info
   useEffect(() => {
     if (!kbIdNum) return;
     (async () => {
@@ -290,7 +284,7 @@ export default function ChatPage() {
     }
   }, [kbIdNum]);
 
-  // 当流式响应完成时刷新 session 列表（消息此时已保存到 DB）
+  // Refresh sessions when streaming completes
   const isStreamingRef = useRef(isStreaming);
   useEffect(() => {
     if (isStreamingRef.current && !isStreaming) {
@@ -322,7 +316,6 @@ export default function ChatPage() {
         const results = await searchMessages(kbIdNum, q.trim());
         setSearchResults(results);
       } catch {
-        // Fallback: filter locally by first_question
         const local = sessions.filter((s) =>
           s.first_question?.toLowerCase().includes(q.trim().toLowerCase()),
         );
@@ -348,6 +341,16 @@ export default function ChatPage() {
     setActiveSessionId(null);
     clear();
   }, [messages.length, clear, resetLoadFlag]);
+
+  const handleSessionSelect = useCallback(
+    (sessionId: string) => {
+      resetLoadFlag();
+      setActiveSessionId(sessionId);
+      setSessionSearchQ("");
+      setSearchResults(null);
+    },
+    [resetLoadFlag],
+  );
 
   const handleDeleteSession = useCallback((s: Session) => {
     setConfirmDeleteSession(s);
@@ -438,7 +441,7 @@ export default function ChatPage() {
       const filename = file.name;
       const ext = `.${filename.split(".").pop()?.toLowerCase() ?? ""}`;
       const ALLOWED = [".txt", ".md", ".pdf", ".docx"];
-      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+      const MAX_FILE_SIZE = 50 * 1024 * 1024;
       if (file.size > MAX_FILE_SIZE) {
         setUploadQueue((prev) => [
           ...prev,
@@ -468,17 +471,16 @@ export default function ChatPage() {
           progress: 0,
         };
         setUploadQueue((prev) => [...prev, item]);
-        setShowUploadProgress(true); // 自动弹出进度面板
+        setShowUploadProgress(true);
 
         if (result.sync) {
           toast(`${filename} 上传完成`, "success");
-          refreshDocs(); // 同步上传也刷新文档列表
+          refreshDocs();
           return;
         }
 
-        // Poll until done (tracked for cleanup on unmount)
         const startTime = Date.now();
-        const MAX_POLL_MS = 1_920_000; // 32 分钟（worker job_timeout=1800s + 2min buffer）
+        const MAX_POLL_MS = 1_920_000;
         const poll = setInterval(async () => {
           try {
             const t = await pollTask(result.task_id);
@@ -512,7 +514,6 @@ export default function ChatPage() {
               clearInterval(poll);
               pollIntervalsRef.current.delete(result.task_id);
               toast(`${filename} 上传完成`, "success");
-              // 确保 DB 写入可见后再刷新，加二次刷新兜底
               setTimeout(() => refreshDocs(), 500);
               setTimeout(() => refreshDocs(), 2000);
             } else if (t.status === "failed" || elapsed > MAX_POLL_MS) {
@@ -539,13 +540,11 @@ export default function ChatPage() {
 
   /* ── Upload progress actions ── */
   const handleStopUpload = useCallback((taskId: string) => {
-    // Clear polling interval
     const interval = pollIntervalsRef.current.get(taskId);
     if (interval) {
       clearInterval(interval);
       pollIntervalsRef.current.delete(taskId);
     }
-    // Mark as error with "已终止" message
     setUploadQueue((prev) =>
       prev.map((q) =>
         q.taskId === taskId ? { ...q, status: "error", progress: 0, error: "已终止" } : q,
@@ -631,7 +630,6 @@ export default function ChatPage() {
   /* ── Edit message ── */
   const handleEditMessage = useCallback(
     (msgIndex: number, newContent: string) => {
-      // Remove the user message and everything after it, then resend
       flushSync(() => truncateAt(msgIndex));
       send(newContent);
       setTimeout(() => refreshSessions(), 500);
@@ -642,7 +640,6 @@ export default function ChatPage() {
   /* ── Regenerate ── */
   const handleRegenerate = useCallback(
     (msgIndex: number) => {
-      // Get the previous user message, remove this AI message, then resend
       const prevUserMsg = messages[msgIndex - 1];
       if (!prevUserMsg || prevUserMsg.role !== "user") return;
       const question = prevUserMsg.content;
@@ -654,111 +651,19 @@ export default function ChatPage() {
     [messages, resend, truncateAt, refreshSessions],
   );
 
+  const handleQuestionSelect = useCallback((q: string) => {
+    setInput(q);
+    const inp = document.querySelector<HTMLInputElement>('input[placeholder*="Enter"]');
+    inp?.focus();
+  }, []);
+
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
   const displayName = activeSessionId
     ? (sessions.find((s) => s.session_id === activeSessionId)?.first_question ?? "新的对话")
     : "新的对话";
-
-  /* ── Dashboard empty state ── */
-  const renderDashboard = () => (
-    <div className="text-center py-10 animate-fade-in-up">
-      <div
-        className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
-        style={{ backgroundColor: "var(--surface-bg)" }}
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          opacity="0.25"
-          role="img"
-          aria-label="对话"
-        >
-          <title>对话</title>
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      </div>
-      <p className="display-text text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
-        {kb?.name ?? "知识库"}
-      </p>
-
-      {/* Stats row */}
-      <div className="flex justify-center gap-4 mb-6">
-        {[
-          { value: kbStats.doc_count, label: "文档" },
-          { value: kbStats.chunk_count, label: "分块" },
-          { value: kbStats.session_count, label: "会话" },
-          { value: kbStats.message_count, label: "消息" },
-        ].map((s) => (
-          <div key={s.label} className="text-center">
-            <p
-              className="display-text text-lg font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {s.value}
-            </p>
-            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-              {s.label}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Suggested questions */}
-      {docs.length > 0 && (
-        <div className="max-w-md mx-auto">
-          <p
-            className="text-[10px] font-medium uppercase tracking-wider mb-2"
-            style={{ color: "var(--text-muted)" }}
-          >
-            建议问题
-          </p>
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {[
-              `请总结「${docs[0].filename}」的核心内容`,
-              docs.length > 1 ? `对比「${docs[0].filename}」和「${docs[1].filename}」` : null,
-              "文档中有哪些关键数据？请用表格列出",
-              "根据文档内容，有哪些需要注意的事项？",
-            ]
-              .filter(Boolean)
-              .map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  className="text-xs px-2.5 py-1.5 rounded-lg transition-all"
-                  style={{
-                    backgroundColor: "var(--surface-bg)",
-                    color: "var(--text-secondary)",
-                    border: "var(--border-light)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "var(--color-copper)";
-                    e.currentTarget.style.color = "var(--text-primary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border-color-light)";
-                    e.currentTarget.style.color = "var(--text-secondary)";
-                  }}
-                  onClick={() => {
-                    setInput(q as string);
-                    // Focus the input
-                    const inp = document.querySelector<HTMLInputElement>(
-                      'input[placeholder*="Enter"]',
-                    );
-                    inp?.focus();
-                  }}
-                >
-                  {q}
-                </button>
-              ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div
@@ -811,223 +716,41 @@ export default function ChatPage() {
           className="fixed inset-0 z-40 md:hidden"
           style={{ backgroundColor: "var(--overlay)", backdropFilter: "blur(2px)" }}
           onClick={() => setShowSidebar(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Left sidebar */}
-      <aside
-        className={
-          "w-56 shrink-0 card p-4 flex flex-col overflow-hidden z-50 " +
-          (showSidebar ? "fixed inset-y-0 left-0 " : "hidden ") +
-          "md:relative md:flex"
-        }
-      >
-        <h2
-          className="display-text text-sm font-semibold truncate mb-3"
-          style={{ color: "var(--text-primary)" }}
-        >
-          {kb?.name ?? "..."}
-        </h2>
+      <ChatSidebar
+        kb={kb}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        sessionSearchQ={sessionSearchQ}
+        searchResults={searchResults}
+        searching={searching}
+        uploadQueue={uploadQueue}
+        readyDocCount={readyDocs.length}
+        showSidebar={showSidebar}
+        onNewDoc={openNew}
+        onUploadClick={handleUploadClick}
+        onShowDocManage={() => setShowDocManage(true)}
+        onShowUploadProgress={() => setShowUploadProgress(true)}
+        onNewSession={handleNewSession}
+        onSessionSelect={handleSessionSelect}
+        onDeleteSession={handleDeleteSession}
+        onSessionSearch={handleSessionSearch}
+      />
 
-        {/* ── Action buttons ── */}
-        <div className="flex gap-1.5 mb-3">
-          <button
-            type="button"
-            className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
-            style={{ backgroundColor: "var(--color-ink)", color: "var(--color-cream)" }}
-            onClick={openNew}
-          >
-            + 新建
-          </button>
-          <button
-            type="button"
-            className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
-            style={{
-              backgroundColor: "var(--surface-bg)",
-              color: "var(--text-secondary)",
-              border: "var(--border-medium)",
-            }}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            上传
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".txt,.md,.pdf,.docx"
-            multiple
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-        </div>
-
-        {/* ── Upload progress — 常驻侧边栏 ── */}
-        <button
-          type="button"
-          className="w-full mb-3 px-3 py-2 rounded-md text-xs text-left transition-colors"
-          style={{
-            backgroundColor: "var(--surface-bg)",
-            color: uploadQueue.length > 0 ? "var(--text-secondary)" : "var(--text-muted)",
-          }}
-          onClick={() => setShowUploadProgress(true)}
-        >
-          <span className="font-medium">上传进度</span>
-          {uploadQueue.length > 0 ? (
-            <>
-              <span className="ml-1" style={{ color: "var(--text-muted)" }}>
-                ({uploadQueue.filter((q) => q.status === "done").length}/{uploadQueue.length})
-              </span>
-              {uploadQueue.some((q) => q.status === "uploading") && (
-                <span
-                  className="ml-2 inline-block w-2 h-2 rounded-full animate-pulse"
-                  style={{ backgroundColor: "var(--accent)" }}
-                />
-              )}
-            </>
-          ) : (
-            <span className="ml-1" style={{ color: "var(--text-muted)" }}>
-              (空)
-            </span>
-          )}
-        </button>
-
-        {/* ── Sessions section ── */}
-        <div
-          className="pb-2 mb-2 flex flex-col overflow-hidden"
-          style={{ borderBottom: "var(--border-light)", flex: "1 1 0%" }}
-        >
-          <div className="flex items-center justify-between mb-1 shrink-0">
-            <span
-              className="text-[10px] font-medium uppercase tracking-wider"
-              style={{ color: "var(--text-muted)" }}
-            >
-              会话
-            </span>
-            <button
-              type="button"
-              className="text-xs font-medium px-1.5 py-0.5 rounded transition-colors"
-              style={{ color: "var(--accent)" }}
-              onClick={handleNewSession}
-            >
-              + 新建
-            </button>
-          </div>
-
-          {/* Session search */}
-          <div className="mb-2 shrink-0">
-            <input
-              value={sessionSearchQ}
-              onChange={(e) => handleSessionSearch(e.target.value)}
-              placeholder="搜索对话…"
-              className="w-full px-2 py-1 rounded-md text-[11px] outline-none transition-colors"
-              style={{
-                backgroundColor: "var(--surface-bg)",
-                border: "var(--border-light)",
-                color: "var(--text-primary)",
-              }}
-            />
-          </div>
-
-          <div className="overflow-y-auto flex-1 -mx-4 px-4">
-            {searchResults ? (
-              searchResults.length === 0 ? (
-                <p className="text-[10px] py-1" style={{ color: "var(--text-muted)" }}>
-                  {searching ? "搜索中…" : "无匹配会话"}
-                </p>
-              ) : (
-                searchResults.map((r) => (
-                  <button
-                    key={r.session_id}
-                    type="button"
-                    className="w-full text-left py-1.5 text-xs rounded px-1 transition-colors mb-0.5"
-                    style={{ color: "var(--text-secondary)" }}
-                    onClick={() => {
-                      resetLoadFlag();
-                      setActiveSessionId(r.session_id);
-                      setSessionSearchQ("");
-                      setSearchResults(null);
-                    }}
-                  >
-                    <span className="block truncate text-[11px] font-medium">
-                      {r.first_question || "新的对话"}
-                    </span>
-                    {r.match_snippet && (
-                      <span
-                        className="block truncate text-[10px] mt-0.5"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        …{r.match_snippet}…
-                      </span>
-                    )}
-                  </button>
-                ))
-              )
-            ) : sessions.length === 0 ? (
-              <p className="text-[10px] py-1" style={{ color: "var(--text-muted)" }}>
-                暂无历史会话
-              </p>
-            ) : (
-              sessions.map((s) => {
-                const isActive = s.session_id === activeSessionId;
-                return (
-                  <div
-                    key={s.session_id}
-                    className="flex items-center justify-between py-1 text-xs group"
-                  >
-                    <button
-                      type="button"
-                      className={`text-left truncate flex-1 mr-1 py-0.5 rounded px-1 transition-colors ${isActive ? "font-medium" : ""}`}
-                      style={{
-                        color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                        backgroundColor: isActive ? "var(--surface-bg)" : "transparent",
-                      }}
-                      onClick={() => {
-                        resetLoadFlag();
-                        setActiveSessionId(s.session_id);
-                      }}
-                    >
-                      <span className="block truncate text-[11px]">
-                        {s.first_question || "新的对话"}
-                      </span>
-                      <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>
-                        {fmtDate(s.updated_at)} · {s.message_count} 条
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0 px-1 py-0.5 rounded text-[10px]"
-                      style={{ color: "var(--text-muted)" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteSession(s);
-                      }}
-                    >
-                      删除
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* ── Document management button ── */}
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-3 py-2 rounded-md text-xs transition-colors shrink-0"
-          style={{
-            backgroundColor: "var(--surface-bg)",
-            color: "var(--text-secondary)",
-          }}
-          onClick={() => setShowDocManage(true)}
-        >
-          <span className="flex items-center gap-1.5">
-            <span className="font-medium">文档管理</span>
-            <span style={{ color: "var(--text-muted)" }}>({readyDocs.length} 篇)</span>
-          </span>
-          <span style={{ color: "var(--text-muted)" }}>→</span>
-        </button>
-      </aside>
+      {/* Hidden file input (kept here so ref is accessible) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".txt,.md,.pdf,.docx"
+        multiple
+        className="hidden"
+        onChange={handleFileUpload}
+        aria-label="上传文件"
+      />
 
       {/* Chat area */}
       <div className="flex-1 flex flex-col card p-0 overflow-hidden">
@@ -1043,6 +766,7 @@ export default function ChatPage() {
               style={{ color: "var(--text-secondary)" }}
               onClick={() => setShowSidebar(!showSidebar)}
               aria-label={showSidebar ? "关闭侧栏" : "打开侧栏"}
+              aria-expanded={showSidebar}
             >
               <svg
                 width="18"
@@ -1109,7 +833,12 @@ export default function ChatPage() {
           {messagesLoading ? (
             <ChatSkeleton />
           ) : messages.length === 0 ? (
-            renderDashboard()
+            <DashboardView
+              kb={kb}
+              kbStats={kbStats}
+              docs={docs}
+              onQuestionSelect={handleQuestionSelect}
+            />
           ) : (
             messages.map((m, i) => {
               const prevMsg = i > 0 ? messages[i - 1] : null;
@@ -1136,7 +865,6 @@ export default function ChatPage() {
 
         {/* Input bar */}
         <div className="px-5 py-3 shrink-0" style={{ borderTop: "var(--border-light)" }}>
-          {/* Prompt templates */}
           <div className="mb-2">
             <PromptTemplates onSelect={(prompt) => setInput(prompt)} disabled={isStreaming} />
           </div>
@@ -1165,6 +893,7 @@ export default function ChatPage() {
                 e.target.style.borderColor = "var(--border-color-medium)";
               }}
               disabled={isStreaming}
+              aria-label="输入问题"
             />
             <button
               type="button"
@@ -1172,6 +901,7 @@ export default function ChatPage() {
               style={{ backgroundColor: "var(--color-ink)", color: "var(--color-cream)" }}
               disabled={isStreaming || !input.trim()}
               onClick={handleSend}
+              aria-label="发送消息"
             >
               {isStreaming ? (
                 <span className="text-xs">...</span>
@@ -1185,7 +915,7 @@ export default function ChatPage() {
           </div>
           {input.length > 3000 && (
             <div
-              className="flex justify-end mt-1 text-[10px]"
+              className="flex justify-end mt-1 text-[10px] tabular-nums"
               style={{ color: input.length >= 3900 ? "var(--danger)" : "var(--text-muted)" }}
             >
               {input.length}/4000
@@ -1237,8 +967,6 @@ export default function ChatPage() {
           onCancel={() => setConfirmClearChat(false)}
         />
       )}
-
-      {/* ── Document management modal ── */}
       {showDocManage && (
         <DocManageModal
           docs={docs}
@@ -1248,8 +976,6 @@ export default function ChatPage() {
           onSaved={refreshDocs}
         />
       )}
-
-      {/* ── Upload progress modal ── */}
       {showUploadProgress && (
         <UploadProgressModal
           items={uploadQueue}
