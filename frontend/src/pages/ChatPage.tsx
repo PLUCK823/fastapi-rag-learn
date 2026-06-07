@@ -180,30 +180,36 @@ export default function ChatPage() {
         try {
           const t = await pollTask(item.taskId);
           const elapsed = Date.now() - startTime;
-          setUploadQueue((prev) =>
-            prev.map((q) =>
+          const newStatus =
+            t.status === "failed"
+              ? "error"
+              : t.status === "done"
+                ? "done"
+                : elapsed > MAX_POLL_MS
+                  ? "error"
+                  : "uploading";
+          const newError =
+            t.status === "failed"
+              ? t.message
+              : elapsed > MAX_POLL_MS
+                ? "处理超时，请重试"
+                : undefined;
+
+          setUploadQueue((prev) => {
+            const existing = prev.find((q) => q.taskId === item.taskId);
+            if (
+              existing &&
+              existing.status === newStatus &&
+              existing.progress === t.progress
+            ) {
+              return prev;
+            }
+            return prev.map((q) =>
               q.taskId === item.taskId
-                ? {
-                    ...q,
-                    status:
-                      t.status === "failed"
-                        ? "error"
-                        : t.status === "done"
-                          ? "done"
-                          : elapsed > MAX_POLL_MS
-                            ? "error"
-                            : "uploading",
-                    progress: t.progress,
-                    error:
-                      t.status === "failed"
-                        ? t.message
-                        : elapsed > MAX_POLL_MS
-                          ? "处理超时，请重试"
-                          : undefined,
-                  }
+                ? { ...q, status: newStatus, progress: t.progress, error: newError }
                 : q,
-            ),
-          );
+            );
+          });
           if (t.status === "done") {
             clearInterval(poll);
             pollIntervalsRef.current.delete(item.taskId);
@@ -460,6 +466,27 @@ export default function ChatPage() {
         return;
       }
 
+      // 前端查重：按文件基础名（不含后缀）检查已有文档
+      const basename = filename.replace(/\.[^.]+$/, "");
+      const duplicate = docs.find((d) => {
+        const existingBasename = d.filename.replace(/\.[^.]+$/, "");
+        return existingBasename === basename && d.status !== "failed";
+      });
+      if (duplicate) {
+        setUploadQueue((prev) => [
+          ...prev,
+          {
+            filename,
+            taskId: "",
+            status: "error",
+            progress: 0,
+            error: `与已有文档「${duplicate.filename}」同名`,
+          },
+        ]);
+        toast(`${filename}: 知识库中已存在同名文档`, "error");
+        return;
+      }
+
       toast(`${filename} 上传中…`, "info");
 
       try {
@@ -486,30 +513,37 @@ export default function ChatPage() {
             const t = await pollTask(result.task_id);
             const elapsed = Date.now() - startTime;
 
-            setUploadQueue((prev) =>
-              prev.map((q) =>
+            const newStatus =
+              t.status === "failed"
+                ? "error"
+                : t.status === "done"
+                  ? "done"
+                  : elapsed > MAX_POLL_MS
+                    ? "error"
+                    : "uploading";
+            const newError =
+              t.status === "failed"
+                ? t.message
+                : elapsed > MAX_POLL_MS
+                  ? "处理超时，请重试"
+                  : undefined;
+
+            // Only update state if something changed (prevents flicker)
+            setUploadQueue((prev) => {
+              const existing = prev.find((q) => q.taskId === result.task_id);
+              if (
+                existing &&
+                existing.status === newStatus &&
+                existing.progress === t.progress
+              ) {
+                return prev;
+              }
+              return prev.map((q) =>
                 q.taskId === result.task_id
-                  ? {
-                      ...q,
-                      status:
-                        t.status === "failed"
-                          ? "error"
-                          : t.status === "done"
-                            ? "done"
-                            : elapsed > MAX_POLL_MS
-                              ? "error"
-                              : "uploading",
-                      progress: t.progress,
-                      error:
-                        t.status === "failed"
-                          ? t.message
-                          : elapsed > MAX_POLL_MS
-                            ? "处理超时，请重试"
-                            : undefined,
-                    }
+                  ? { ...q, status: newStatus, progress: t.progress, error: newError }
                   : q,
-              ),
-            );
+              );
+            });
             if (t.status === "done") {
               clearInterval(poll);
               pollIntervalsRef.current.delete(result.task_id);
@@ -535,7 +569,7 @@ export default function ChatPage() {
         toast(`${filename}: ${getErrorMessage(err)}`, "error");
       }
     },
-    [kbIdNum, refreshDocs],
+    [kbIdNum, refreshDocs, docs],
   );
 
   /* ── Upload progress actions ── */

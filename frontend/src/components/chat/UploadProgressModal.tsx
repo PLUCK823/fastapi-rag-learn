@@ -17,7 +17,9 @@ interface UploadProgressModalProps {
 
 type SortKey = "name-asc" | "name-desc" | "status" | "progress";
 
-export default function UploadProgressModal({
+import React from "react";
+
+export default React.memo(function UploadProgressModal({
   items,
   onClose,
   onRemove,
@@ -209,4 +211,4 @@ export default function UploadProgressModal({
       </div>
     </div>
   );
-}
+});
