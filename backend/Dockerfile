@@ -31,8 +31,7 @@ COPY app/ ./app/
 COPY alembic.ini ./
 COPY alembic/ ./alembic/
 
-# Docling / HuggingFace 模型下载使用国内镜像（加速 + 避免网络不可达）
-ENV HF_ENDPOINT=https://hf-mirror.com
+# Docling 模型从 HuggingFace Hub 下载（hf-mirror 镜像不包含 docling-models）
 
 # 预下载 Docling PDF 解析模型 ~200-300MB（避免首次上传 PDF 时等待）
 # 用最小 PDF 触发一次解析，缓存所有模型到 /root/.cache/huggingface

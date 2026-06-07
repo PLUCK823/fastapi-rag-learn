@@ -76,7 +76,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://raguser:devpassword@db:5432/raglearn
       - REDIS_URL=redis://redis:6379
       - QDRANT_URL=http://qdrant:6334
-      - HF_ENDPOINT=https://hf-mirror.com
+      - HF_XET_HIGH_PERFORMANCE=1
       - SECRET_KEY=dev-secret-key-not-for-production
     depends_on:
       db:
@@ -115,7 +115,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://raguser:devpassword@db:5432/raglearn
       - SECRET_KEY=dev-secret-key-not-for-production
       - QDRANT_URL=http://qdrant:6334
-      - HF_ENDPOINT=https://hf-mirror.com
+      - HF_XET_HIGH_PERFORMANCE=1
     depends_on:
       db:
         condition: service_healthy
